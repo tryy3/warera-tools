@@ -10,12 +10,14 @@ import { authPlaceholder } from "./middleware/auth-placeholder";
 import { countriesRoutes } from "./routes/countries";
 import { healthRoutes } from "./routes/health";
 import { jobsRoutes } from "./routes/jobs";
+import { scrapsRoutes } from "./routes/scraps";
 
 export type CreateAppDeps = {
   db: Db;
   logger: Logger;
   scheduler: SchedulerHandle;
   config: AppConfig;
+  warera: { request: <T>(path: string, init?: RequestInit) => Promise<T> };
 };
 
 export function createApp(deps: CreateAppDeps): Hono {
@@ -40,6 +42,7 @@ export function createApp(deps: CreateAppDeps): Hono {
   });
   app.route("/api/jobs", jobsRoutes(deps));
   app.route("/api/countries", countriesRoutes({ db: deps.db }));
+  app.route("/api/scraps", scrapsRoutes({ db: deps.db, warera: deps.warera }));
 
   // Production: serve built SPA from dist/web. Dev uses Vite on :5173.
   if (deps.config.nodeEnv === "production") {

@@ -24,8 +24,7 @@ async function main(): Promise<void> {
   await syncJobsToDb(db, listJobDefinitions());
   await reconcileInterruptedRuns(db, logger);
 
-  // Construct integrations at boot for readiness (wired into jobs/routes later).
-  createWareraClient({ config, logger });
+  const warera = createWareraClient({ config, logger });
   createDiscordNotifier({ webhookUrl: config.discordWebhookUrl, logger });
 
   const scheduler = await startScheduler({
@@ -33,7 +32,7 @@ async function main(): Promise<void> {
     logger,
     jobRunHistoryLimit: config.jobRunHistoryLimit,
   });
-  const app = createApp({ db, logger, scheduler, config });
+  const app = createApp({ db, logger, scheduler, config, warera });
 
   const server = serve({ fetch: app.fetch, hostname: config.host, port: config.port }, (info) => {
     logger.info({ host: info.address, port: info.port, env: config.nodeEnv }, "server listening");
