@@ -94,6 +94,17 @@ export function CalculatorPage() {
     void loadData();
   }, []);
 
+  // Keep local country in sync with URL on Back/Forward without writing defaults into the URL.
+  useEffect(() => {
+    if (search.country) {
+      setCountryIdState(search.country);
+      return;
+    }
+    if (countries.length > 0) {
+      setCountryIdState(pickDefaultCountryId(countries));
+    }
+  }, [search.country, countries]);
+
   const selectedCountry = countries.find((c) => c.id === countryId) ?? null;
   const taxRate = selectedCountry?.taxRate ?? 0;
   const scrapAmount = scrapAmountForTier(tier);
