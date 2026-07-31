@@ -1,3 +1,4 @@
+import { serveStatic } from "@hono/node-server/serve-static";
 import { Hono } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import type { AppConfig } from "../config/env";
@@ -37,6 +38,12 @@ export function createApp(deps: CreateAppDeps): Hono {
     return authPlaceholder(c, next);
   });
   app.route("/api/jobs", jobsRoutes(deps));
+
+  // Production: serve built SPA from dist/web. Dev uses Vite on :5173.
+  if (deps.config.nodeEnv === "production") {
+    app.use("/*", serveStatic({ root: "./dist/web" }));
+    app.get("/*", serveStatic({ root: "./dist/web", path: "index.html" }));
+  }
 
   return app;
 }

@@ -24,7 +24,5 @@ export async function pruneJobRuns(db: Db, jobId: string, keep: number): Promise
     return;
   }
 
-  await db
-    .delete(jobRuns)
-    .where(and(eq(jobRuns.jobId, jobId), notInArray(jobRuns.id, keepIds)));
+  await db.delete(jobRuns).where(and(eq(jobRuns.jobId, jobId), notInArray(jobRuns.id, keepIds)));
 }

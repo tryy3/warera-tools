@@ -14,7 +14,9 @@ export type AppConfig = {
   jobRunHistoryLimit: number;
 };
 
-export function parseConfig(env: NodeJS.ProcessEnv | Record<string, string | undefined>): AppConfig {
+export function parseConfig(
+  env: NodeJS.ProcessEnv | Record<string, string | undefined>,
+): AppConfig {
   const tursoDatabaseUrl = env.TURSO_DATABASE_URL;
   if (!tursoDatabaseUrl) {
     throw new Error("TURSO_DATABASE_URL is required");
