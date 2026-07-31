@@ -16,6 +16,7 @@ async function createMemoryDb(): Promise<Db> {
       id TEXT PRIMARY KEY NOT NULL,
       name TEXT NOT NULL UNIQUE,
       tax_rate REAL NOT NULL,
+      iso_code TEXT,
       created_at INTEGER NOT NULL,
       updated_at INTEGER NOT NULL
     )
@@ -35,13 +36,14 @@ function mountCountries(db: Db): Hono {
 
 async function seedCountry(
   db: Db,
-  row: { id: string; name: string; taxRate: number },
+  row: { id: string; name: string; taxRate: number; isoCode?: string | null },
 ): Promise<void> {
   const now = new Date();
   await db.insert(schema.countries).values({
     id: row.id,
     name: row.name,
     taxRate: row.taxRate,
+    isoCode: row.isoCode ?? null,
     createdAt: now,
     updatedAt: now,
   });
@@ -130,5 +132,48 @@ describe("countriesRoutes", () => {
     const body = (await res.json()) as { error: { code: string; message: string } };
     expect(body.error.code).toBe("not_found");
     expect(body.error.message).toContain("missing");
+  });
+
+  it("POST accepts isoCode and returns it uppercase", async () => {
+    const res = await app.request("/", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: "Norway", taxRate: 0.02, isoCode: "no" }),
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { country: { isoCode: string | null; name: string } };
+    expect(body.country.name).toBe("Norway");
+    expect(body.country.isoCode).toBe("NO");
+  });
+
+  it("POST rejects invalid isoCode", async () => {
+    const res = await app.request("/", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: "Norway", taxRate: 0.02, isoCode: "NOR" }),
+    });
+    expect(res.status).toBe(400);
+  });
+
+  it("PATCH can set and clear isoCode", async () => {
+    const setRes = await app.request("/sweden", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ isoCode: "se" }),
+    });
+    expect(setRes.status).toBe(200);
+    expect(((await setRes.json()) as { country: { isoCode: string | null } }).country.isoCode).toBe(
+      "SE",
+    );
+
+    const clearRes = await app.request("/sweden", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ isoCode: null }),
+    });
+    expect(clearRes.status).toBe(200);
+    expect(
+      ((await clearRes.json()) as { country: { isoCode: string | null } }).country.isoCode,
+    ).toBeNull();
   });
 });

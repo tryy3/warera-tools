@@ -3,6 +3,7 @@ import { Hono } from "hono";
 import type { Db } from "../../db/client";
 import { countries } from "../../db/schema";
 import { HttpError } from "../errors";
+import { parseIsoCode } from "../iso";
 import { parseTaxRate, slugifyCountryId } from "../slug";
 
 export type CountriesRouteDeps = {
@@ -86,6 +87,7 @@ export function countriesRoutes(deps: CountriesRouteDeps) {
     }
 
     const trimmedName = name.trim();
+    const isoCode = body.isoCode === undefined ? null : parseIsoCode(body.isoCode);
     await assertNoCountryConflict(db, { id, name: trimmedName });
 
     const now = new Date();
@@ -94,6 +96,7 @@ export function countriesRoutes(deps: CountriesRouteDeps) {
         id,
         name: trimmedName,
         taxRate,
+        isoCode,
         createdAt: now,
         updatedAt: now,
       });
@@ -123,7 +126,12 @@ export function countriesRoutes(deps: CountriesRouteDeps) {
     }
 
     const body = parseJsonBody(raw);
-    const patch: { name?: string; taxRate?: number; updatedAt: Date } = {
+    const patch: {
+      name?: string;
+      taxRate?: number;
+      isoCode?: string | null;
+      updatedAt: Date;
+    } = {
       updatedAt: new Date(),
     };
 
@@ -138,7 +146,11 @@ export function countriesRoutes(deps: CountriesRouteDeps) {
       patch.taxRate = parseTaxRate(body.taxRate);
     }
 
-    if (patch.name === undefined && patch.taxRate === undefined) {
+    if (body.isoCode !== undefined) {
+      patch.isoCode = parseIsoCode(body.isoCode);
+    }
+
+    if (patch.name === undefined && patch.taxRate === undefined && patch.isoCode === undefined) {
       return c.json({ country: existing[0] });
     }
 
