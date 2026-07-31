@@ -1,36 +1,34 @@
+import { Link } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 
-export type TabId = "dashboard" | "jobs" | "calculator" | "countries" | "economy";
-
 type ShellProps = {
-  activeTab: TabId;
-  onTabChange: (tab: TabId) => void;
   children: ReactNode;
 };
 
-const tabs: { id: TabId; label: string }[] = [
-  { id: "dashboard", label: "Dashboard" },
-  { id: "jobs", label: "Jobs" },
-  { id: "calculator", label: "Calculator" },
-  { id: "economy", label: "Economy" },
-  { id: "countries", label: "Countries" },
-];
+const tabs = [
+  { to: "/", label: "Dashboard" },
+  { to: "/jobs", label: "Jobs" },
+  { to: "/calculator", label: "Calculator" },
+  { to: "/economy", label: "Economy" },
+  { to: "/countries", label: "Countries" },
+] as const;
 
-export function Shell({ activeTab, onTabChange, children }: ShellProps) {
+export function Shell({ children }: ShellProps) {
   return (
     <div className="shell">
       <header className="shell-header">
         <div className="shell-brand">Warera</div>
         <nav className="shell-nav">
           {tabs.map((tab) => (
-            <button
-              key={tab.id}
-              type="button"
-              className={activeTab === tab.id ? "nav-link active" : "nav-link"}
-              onClick={() => onTabChange(tab.id)}
+            <Link
+              key={tab.to}
+              to={tab.to}
+              className="nav-link"
+              activeProps={{ className: "nav-link active" }}
+              activeOptions={tab.to === "/" ? { exact: true } : undefined}
             >
               {tab.label}
-            </button>
+            </Link>
           ))}
         </nav>
       </header>
