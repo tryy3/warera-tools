@@ -1,4 +1,4 @@
-export type JobStatus = "success" | "error" | "running" | string | null;
+export type JobStatus = "success" | "error" | "running" | null;
 
 export type Job = {
   id: string;
