@@ -4,6 +4,7 @@ dist/
 .env
 .env.local
 *.log
+*.db
 .direnv/
 .devenv/
 .vite/
