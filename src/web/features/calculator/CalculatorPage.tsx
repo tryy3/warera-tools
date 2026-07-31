@@ -96,13 +96,13 @@ export function CalculatorPage() {
 
   // Keep local country in sync with URL on Back/Forward without writing defaults into the URL.
   useEffect(() => {
-    if (search.country) {
+    if (countries.length === 0) return;
+
+    if (search.country && countries.some((c) => c.id === search.country)) {
       setCountryIdState(search.country);
       return;
     }
-    if (countries.length > 0) {
-      setCountryIdState(pickDefaultCountryId(countries));
-    }
+    setCountryIdState(pickDefaultCountryId(countries));
   }, [search.country, countries]);
 
   const selectedCountry = countries.find((c) => c.id === countryId) ?? null;
