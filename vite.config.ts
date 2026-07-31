@@ -1,8 +1,8 @@
 import path from "node:path";
 import { defineConfig, lazyPlugins } from "vite-plus";
 import react from "@vitejs/plugin-react";
+import { tanstackRouter } from "@tanstack/router-plugin/vite";
 
-// https://vite.dev/config/
 export default defineConfig({
   fmt: {
     ignorePatterns: ["docs/**", ".superpowers/**", "*.md", "flake.nix", "flake.lock"],
@@ -34,7 +34,16 @@ export default defineConfig({
   test: {
     passWithNoTests: true,
   },
-  plugins: lazyPlugins(() => [react()]),
+  appType: "spa",
+  plugins: lazyPlugins(() => [
+    tanstackRouter({
+      target: "react",
+      autoCodeSplitting: true,
+      routesDirectory: "./src/web/routes",
+      generatedRouteTree: "./src/web/routeTree.gen.ts",
+    }),
+    react(),
+  ]),
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "src"),
