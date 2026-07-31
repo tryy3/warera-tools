@@ -218,6 +218,72 @@ button:disabled {
   background: #fff;
 }
 
+.calc-controls .calc-control-tier {
+  flex: 1 1 100%;
+}
+
+.tier-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.tier-tile {
+  width: 4.75rem;
+  height: 6.5rem;
+  padding: 0.4rem 0.35rem 0.35rem;
+  border: 2px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.25rem;
+  cursor: pointer;
+  color: #e5e7eb;
+}
+
+.tier-tile.is-selected {
+  border-color: #38bdf8;
+  box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.35);
+}
+
+.tier-tile-icon {
+  width: 78%;
+  height: auto;
+  object-fit: contain;
+  filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.45));
+}
+
+.tier-tile-footer {
+  width: 100%;
+  text-align: center;
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+  padding: 0.15rem 0;
+  border-radius: 5px;
+  background: rgba(0, 0, 0, 0.38);
+}
+
+.tier-tile--gray {
+  background: linear-gradient(160deg, #6b7280 0%, #374151 55%, #1f2937 100%);
+}
+.tier-tile--green {
+  background: linear-gradient(160deg, #34d399 0%, #166534 50%, #052e16 100%);
+}
+.tier-tile--blue {
+  background: linear-gradient(160deg, #60a5fa 0%, #1d4ed8 50%, #172554 100%);
+}
+.tier-tile--purple {
+  background: linear-gradient(160deg, #c084fc 0%, #7e22ce 50%, #3b0764 100%);
+}
+.tier-tile--yellow {
+  background: linear-gradient(160deg, #fbbf24 0%, #b45309 50%, #451a03 100%);
+}
+.tier-tile--red {
+  background: linear-gradient(160deg, #f87171 0%, #b91c1c 50%, #450a0a 100%);
+}
+
 .calc-breakdown {
   display: grid;
   gap: 0.35rem;
