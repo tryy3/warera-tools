@@ -250,3 +250,40 @@ button:disabled {
   cursor: pointer;
   color: var(--muted);
 }
+
+.country-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+}
+
+.country-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.9em;
+  color: var(--muted);
+}
+
+.country-form input,
+.jobs-table input {
+  font: inherit;
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 0.3rem 0.5rem;
+  background: #fff;
+}
+
+.country-form button {
+  border: 1px solid var(--border);
+  background: #fff;
+  border-radius: 4px;
+  padding: 0.3rem 0.7rem;
+}
+
+.country-form button:hover:not(:disabled) {
+  border-color: #9ca3af;
+}
