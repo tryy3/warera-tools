@@ -190,4 +190,66 @@ describe("createWareraClient", () => {
       expect.any(String),
     );
   });
+
+  it("falls back to api2 when gateway returns unknown method", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response("unknown method: company.getProductionBonus\n", { status: 400 }),
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ result: { data: { total: 50.5 } } }), { status: 200 }),
+      );
+
+    const client = createWareraClient({
+      config: baseConfig,
+      logger: testLogger(),
+      fetchImpl: fetchMock,
+      sleep: async () => {},
+    });
+
+    const result = await client.request<{ result: { data: { total: number } } }>(
+      "company.getProductionBonus?input=%7B%7D",
+    );
+    expect(result.result.data.total).toBe(50.5);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(String(fetchMock.mock.calls[1]![0])).toContain("api2.warera.io");
+  });
+
+  it("POSTs JSON with X-API-Key when authStyle is api-key", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(
+        new Response(JSON.stringify({ result: { data: ["region-1"] } }), { status: 200 }),
+      );
+
+    const client = createWareraClient({
+      config: {
+        ...baseConfig,
+        wareraApiBaseUrl: "https://gateway.warerastats.io/trpc",
+      },
+      logger: testLogger(),
+      fetchImpl: fetchMock,
+      sleep: async () => {},
+    });
+
+    await client.request("company.getRecommendedRegionIdsByItemCode", {
+      method: "POST",
+      json: { itemCode: "lead", count: 1 },
+      authStyle: "api-key",
+      baseUrl: "https://api2.warera.io/trpc",
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0]!;
+    expect(String(url)).toBe(
+      "https://api2.warera.io/trpc/company.getRecommendedRegionIdsByItemCode",
+    );
+    expect(init.method).toBe("POST");
+    expect(init.body).toBe(JSON.stringify({ itemCode: "lead", count: 1 }));
+    const headers = new Headers(init.headers);
+    expect(headers.get("X-API-Key")).toBe("test-key");
+    expect(headers.get("Authorization")).toBeNull();
+    expect(headers.get("content-type")).toBe("application/json");
+  });
 });

@@ -22,6 +22,13 @@
       "when": 1785519707511,
       "tag": "0002_rich_menace",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1785528000000,
+      "tag": "0003_price_history",
+      "breakpoints": true
     }
   ]
 }

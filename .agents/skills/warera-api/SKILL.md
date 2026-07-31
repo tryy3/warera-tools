@@ -5,6 +5,8 @@ description: Use WarEra's allowed public tRPC API (api2 / gateway), endpoint all
 
 # WarEra API
 
+Game economy formulas (PP, companies, scrap tiers, tax) → [warera-game-mechanics](../warera-game-mechanics/SKILL.md).
+
 ## Allowed surface (hard rule)
 
 The API we are **allowed** to use publicly is what is listed on the official docs:
@@ -34,12 +36,20 @@ Default `WARERA_API_BASE_URL` is `https://gateway.warerastats.io/trpc`. Do not u
 
 ## How to call
 
-Official note: procedures are invoked with **GET** (OpenAPI may show POST; prefer GET).
+Most public procedures work with **GET** + optional `input` query JSON (OpenAPI may show POST; GET is preferred when it works):
 
 ```
 GET {base}/{namespace}.{method}
 GET {base}/{namespace}.{method}?input=<url-encoded JSON>
 ```
+
+**Exception:** some auth-required procedures on api2 (notably `company.getRecommendedRegionIdsByItemCode`) require:
+
+- **POST** to `https://api2.warera.io/trpc/{procedure}`
+- Header **`X-API-Key`** (Bearer does **not** work for these)
+- JSON body, e.g. `{ "itemCode": "lead", "count": 1 }`
+
+Gateway does not currently expose that procedure — call api2 directly.
 
 Examples:
 
@@ -47,13 +57,19 @@ Examples:
 # Official API (often public, no key)
 curl -G 'https://api2.warera.io/trpc/country.getAllCountries'
 
-# With input
+# With input (GET)
 curl -G 'https://api2.warera.io/trpc/user.getUserLite' \
   --data-urlencode 'input={"userId":"<id>"}'
 
 # Gateway (requires gateway API key)
 curl -G 'https://gateway.warerastats.io/trpc/country.getAllCountries' \
   -H 'X-API-Key: <gateway-key>'
+
+# Recommended regions (api2 POST + X-API-Key)
+curl -sS -X POST 'https://api2.warera.io/trpc/company.getRecommendedRegionIdsByItemCode' \
+  -H 'X-API-Key: <api-key>' \
+  -H 'Content-Type: application/json' \
+  -d '{"itemCode":"lead","count":3}'
 ```
 
 Response shape is typically tRPC: `{ "result": { "data": ... } }` (or `{ "error": ... }`).
@@ -62,12 +78,12 @@ Response shape is typically tRPC: `{ "result": { "data": ... } }` (or `{ "error"
 
 | Target | Header |
 | --- | --- |
-| `api2.warera.io` | `Authorization: Bearer <session-token>` when the procedure needs auth |
+| `api2.warera.io` | Often `Authorization: Bearer <token>`; **some procedures require `X-API-Key` instead** (e.g. `company.getRecommendedRegionIdsByItemCode`) |
 | `gateway.warerastats.io` | `X-API-Key: <gateway-key>` (required; missing → 401) |
 
 Use env vars (`WARERA_API_KEY`). Never hardcode secrets.
 
-`src/warera/client.ts` picks the header from the base URL host: `X-API-Key` for gateway, Bearer otherwise.
+`src/warera/client.ts` defaults: `X-API-Key` for gateway, Bearer for api2. Per-request `authStyle: "api-key"` forces `X-API-Key` (needed for the recommended-regions POST). Gateway misses (`unknown method`) fall back to api2 preserving method/body/authStyle.
 
 ## Rate limits & caching
 
@@ -91,6 +107,8 @@ Preferences:
 
 Refresh from https://api2.warera.io/openapi.json when in doubt. Gateway may support a subset — if a procedure 404s on gateway, retry on api2.
 
+Official OpenAPI is **incomplete** relative to live api2. Community explorers such as https://warera.realmarijn.nl/api-explorer document additional read procedures that work with an API key. This project may call those when explicitly needed (document the override in code/design). Prefer official OpenAPI first.
+
 | Namespace | Procedures |
 | --- | --- |
 | article | `getArticleById`, `getArticleLiteById`, `getArticlesPaginated` |
@@ -98,7 +116,7 @@ Refresh from https://api2.warera.io/openapi.json when in doubt. Gateway may supp
 | battleLootSummary | `getByBattleAndUser` |
 | battleOrder | `getByBattle` |
 | battleRanking | `getRanking` |
-| company | `getById`, `getCompanies` |
+| company | `getById`, `getCompanies`, `getProductionBonus`†, `getRecommendedRegionIdsByItemCode`† |
 | country | `getAllCountries`, `getCountryById` |
 | event | `getEventsPaginated` |
 | gameConfig | `getDates`, `getGameConfig` |
@@ -118,6 +136,8 @@ Refresh from https://api2.warera.io/openapi.json when in doubt. Gateway may supp
 | user | `getUserById`, `getUserLite`, `getUsersByCountry` |
 | workOffer | `getById`, `getWorkOfferByCompanyId`, `getWorkOffersPaginated` |
 | worker | `getTotalWorkersCount`, `getWorkers` |
+
+† Auth-required; present on live api2 / explorers but not always on official OpenAPI. Used for Economy advisor (recommended regions / production bonus).
 
 For parameters and schemas: official OpenAPI. For observed response shapes: community `spec.md` / `spec.json` under majimawrks/warera-api-docs.
 

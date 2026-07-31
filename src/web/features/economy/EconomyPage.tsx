@@ -1,0 +1,302 @@
+import { useEffect, useState } from "react";
+import { api } from "../../api";
+import type { AdvisorResponse, CompanyAdvisorRow, SearchUsersResponse } from "./types";
+
+function formatNum(value: number | null | undefined, digits = 3): string {
+  if (value == null || !Number.isFinite(value)) return "—";
+  return value.toLocaleString(undefined, {
+    maximumFractionDigits: digits,
+    minimumFractionDigits: 0,
+  });
+}
+
+function formatItem(code: string): string {
+  return code.replace(/([A-Z])/g, " $1").replace(/^./, (c) => c.toUpperCase());
+}
+
+function FormulaBox({ label, children }: { label: string; children: string }) {
+  return (
+    <div className="formula-box">
+      <div className="formula-label">{label}</div>
+      <code className="formula-text">{children}</code>
+    </div>
+  );
+}
+
+function CompanyCard({ row }: { row: CompanyAdvisorRow }) {
+  const bonusPct = row.company.productionBonus != null ? row.company.productionBonus * 100 : null;
+
+  return (
+    <article className="economy-card">
+      <header>
+        <h3>{row.company.name}</h3>
+        <span className="pill positive-pill">
+          {row.currentDailyValue != null ? `+${formatNum(row.currentDailyValue, 3)} G/day` : "—"}
+        </span>
+      </header>
+
+      <dl className="economy-stats">
+        <div>
+          <dt>Material</dt>
+          <dd>{row.company.itemCode ? formatItem(row.company.itemCode) : "—"}</dd>
+        </div>
+        <div>
+          <dt>Region</dt>
+          <dd>{row.company.regionName ?? row.company.regionId ?? "—"}</dd>
+        </div>
+        <div>
+          <dt>AE level</dt>
+          <dd>{row.company.aeLevel}</dd>
+        </div>
+        <div>
+          <dt>Bonus</dt>
+          <dd>{bonusPct != null ? `${formatNum(bonusPct, 1)}%` : "—"}</dd>
+        </div>
+        <div>
+          <dt>Profit/PP</dt>
+          <dd>{formatNum(row.currentProfitPerPp, 4)} G</dd>
+        </div>
+        <div>
+          <dt>Daily PP</dt>
+          <dd>{row.aeBreakdown ? formatNum(row.aeBreakdown.dailyPp, 1) : "—"}</dd>
+        </div>
+      </dl>
+
+      {row.bonusDetails ? (
+        <FormulaBox label="Production bonus">{row.bonusDetails.formula}</FormulaBox>
+      ) : null}
+
+      {row.profitBreakdown ? (
+        <FormulaBox label="Profit / PP">{row.profitBreakdown.formula}</FormulaBox>
+      ) : null}
+
+      {row.aeBreakdown ? (
+        <FormulaBox label="AE / day">{`${row.aeBreakdown.formula} = ${formatNum(row.aeBreakdown.dailyValue, 4)} G`}</FormulaBox>
+      ) : null}
+
+      {row.bestSwitch ? (
+        <div className="economy-switch">
+          <div className="economy-switch-title">Best switch (raw)</div>
+          <p>
+            → <strong>{formatItem(row.bestSwitch.itemCode)}</strong>
+            {row.bestSwitch.bestRegionName || row.bestSwitch.bestRegionId
+              ? ` @ ${row.bestSwitch.bestRegionName ?? row.bestSwitch.bestRegionId}`
+              : " (same region)"}{" "}
+            (+{formatNum(row.bestSwitch.bestBonus * 100, 1)}% bonus)
+          </p>
+          <dl className="economy-stats compact">
+            <div>
+              <dt>Δ / day</dt>
+              <dd className="positive">+{formatNum(row.bestSwitch.dailyDelta, 2)} G</dd>
+            </div>
+            <div>
+              <dt>Transfer</dt>
+              <dd>
+                {row.bestSwitch.transferConcrete} Concrete (~
+                {formatNum(row.bestSwitch.transferGold, 1)} G)
+              </dd>
+            </div>
+            <div>
+              <dt>Payback</dt>
+              <dd>
+                {row.bestSwitch.paybackDays != null
+                  ? `${formatNum(row.bestSwitch.paybackDays, 1)}d`
+                  : "—"}
+              </dd>
+            </div>
+          </dl>
+          <FormulaBox label="Alt Profit / PP">{row.bestSwitch.profitFormula}</FormulaBox>
+          <FormulaBox label="Alt AE / day">{row.bestSwitch.aeFormula}</FormulaBox>
+          <FormulaBox label="Transfer cost">{row.bestSwitch.transferFormula}</FormulaBox>
+          {row.bestSwitch.paybackFormula ? (
+            <FormulaBox label="Payback">{row.bestSwitch.paybackFormula}</FormulaBox>
+          ) : null}
+        </div>
+      ) : (
+        <p className="muted small">No profitable switch found with current prices.</p>
+      )}
+    </article>
+  );
+}
+
+export function EconomyPage() {
+  const [query, setQuery] = useState("");
+  const [users, setUsers] = useState<SearchUsersResponse["users"]>([]);
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
+  const [selectedUsername, setSelectedUsername] = useState<string | null>(null);
+  const [advisor, setAdvisor] = useState<AdvisorResponse | null>(null);
+  const [searching, setSearching] = useState(false);
+  const [loadingAdvisor, setLoadingAdvisor] = useState(false);
+  const [polling, setPolling] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const q = query.trim();
+    if (q.length < 2) {
+      setUsers([]);
+      return;
+    }
+    const handle = window.setTimeout(() => {
+      void (async () => {
+        setSearching(true);
+        setError(null);
+        try {
+          const data = await api<SearchUsersResponse>(
+            `/api/economy/search?q=${encodeURIComponent(q)}`,
+          );
+          setUsers(data.users);
+        } catch (err) {
+          setError(err instanceof Error ? err.message : String(err));
+        } finally {
+          setSearching(false);
+        }
+      })();
+    }, 300);
+    return () => window.clearTimeout(handle);
+  }, [query]);
+
+  async function loadAdvisor(userId: string, username: string) {
+    setSelectedUserId(userId);
+    setSelectedUsername(username);
+    setLoadingAdvisor(true);
+    setError(null);
+    try {
+      const data = await api<AdvisorResponse>(
+        `/api/economy/advisor?userId=${encodeURIComponent(userId)}`,
+      );
+      setAdvisor(data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+      setAdvisor(null);
+    } finally {
+      setLoadingAdvisor(false);
+    }
+  }
+
+  async function refreshPrices() {
+    setPolling(true);
+    setError(null);
+    try {
+      await api("/api/prices/poll", { method: "POST" });
+      if (selectedUserId && selectedUsername) {
+        await loadAdvisor(selectedUserId, selectedUsername);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setPolling(false);
+    }
+  }
+
+  return (
+    <div className="page economy-page">
+      <div className="page-header">
+        <div>
+          <h1>Economy</h1>
+          <p className="muted">
+            AE daily value = AE level × (1 + production bonus) × 24h × Profit/PP. Formulas shown per
+            company.
+          </p>
+        </div>
+        <button
+          type="button"
+          className="btn"
+          disabled={polling}
+          onClick={() => void refreshPrices()}
+        >
+          {polling ? "Refreshing…" : "Refresh prices"}
+        </button>
+      </div>
+
+      {error ? <p className="error-text">{error}</p> : null}
+
+      <section className="economy-search">
+        <label htmlFor="user-search">Find player</label>
+        <input
+          id="user-search"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Search by username…"
+          autoComplete="off"
+        />
+        {searching ? <p className="muted">Searching…</p> : null}
+        {users.length > 0 ? (
+          <ul className="economy-user-list">
+            {users.map((u) => (
+              <li key={u.userId}>
+                <button
+                  type="button"
+                  className={selectedUserId === u.userId ? "economy-user active" : "economy-user"}
+                  onClick={() => void loadAdvisor(u.userId, u.username)}
+                >
+                  <span>{u.username}</span>
+                  <span className="muted mono">{u.userId.slice(-6)}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        ) : null}
+      </section>
+
+      {selectedUsername ? (
+        <p className="muted">
+          Showing companies for <strong>{selectedUsername}</strong>
+          {advisor?.recordedAt
+            ? ` · prices as of ${new Date(advisor.recordedAt).toLocaleString()}`
+            : null}
+        </p>
+      ) : null}
+
+      {loadingAdvisor ? <p className="muted">Loading advisor…</p> : null}
+
+      <div className="economy-grid">
+        <section className="economy-col">
+          <h2>Companies</h2>
+          {!advisor && !loadingAdvisor ? (
+            <p className="muted">Search for a player to load companies.</p>
+          ) : null}
+          {advisor?.companies.length === 0 ? (
+            <p className="muted">No companies found for this user.</p>
+          ) : null}
+          <div className="economy-company-list">
+            {advisor?.companies.map((row) => (
+              <CompanyCard key={row.company.id} row={row} />
+            ))}
+          </div>
+        </section>
+
+        <section className="economy-col">
+          <h2>Market opportunities</h2>
+          <p className="muted small">
+            Ranked by Profit/PP = (market price − input cost) / consumed PP.
+          </p>
+          <table className="economy-table">
+            <thead>
+              <tr>
+                <th>Item</th>
+                <th>G/PP</th>
+                <th>Formula</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(advisor?.opportunities ?? []).map((o) => (
+                <tr key={o.itemCode}>
+                  <td>{formatItem(o.itemCode)}</td>
+                  <td className="mono">{formatNum(o.profitPerPp, 4)}</td>
+                  <td className="mono small muted">{o.formula}</td>
+                </tr>
+              ))}
+              {!advisor?.opportunities?.length ? (
+                <tr>
+                  <td colSpan={3} className="muted">
+                    No price data yet — refresh prices.
+                  </td>
+                </tr>
+              ) : null}
+            </tbody>
+          </table>
+        </section>
+      </div>
+    </div>
+  );
+}

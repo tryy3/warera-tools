@@ -1,15 +1,45 @@
+import type { WareraRequestInit } from "./client";
+import { unwrapTrpcData, wareraProcedurePath } from "./trpc";
+
+export type ItemPriceMap = Record<string, number>;
+
+export function parseItemPrices(trpcJson: unknown): ItemPriceMap {
+  const data = unwrapTrpcData<Record<string, unknown>>(trpcJson);
+  const out: ItemPriceMap = {};
+  for (const [key, value] of Object.entries(data)) {
+    if (typeof value === "number" && Number.isFinite(value) && value >= 0) {
+      out[key] = value;
+    }
+  }
+  if (Object.keys(out).length === 0) {
+    throw new Error("WarEra itemTrading.getPrices returned no valid item prices");
+  }
+  return out;
+}
+
 export function parseScrapsPrice(trpcJson: unknown): number {
-  const data = (trpcJson as { result?: { data?: { scraps?: unknown } } })?.result?.data;
-  const price = data?.scraps;
+  const prices = parseItemPrices(trpcJson);
+  const price = prices.scraps;
   if (typeof price !== "number" || !Number.isFinite(price) || price < 0) {
     throw new Error("WarEra itemTrading.getPrices did not return a valid scraps price");
   }
   return price;
 }
 
-export async function fetchScrapsPrice(warera: {
-  request: <T>(path: string, init?: RequestInit) => Promise<T>;
-}): Promise<number> {
-  const json = await warera.request<unknown>("itemTrading.getPrices");
-  return parseScrapsPrice(json);
+export type WareraRequester = {
+  request: <T>(path: string, init?: WareraRequestInit) => Promise<T>;
+};
+
+export async function fetchItemPrices(warera: WareraRequester): Promise<ItemPriceMap> {
+  const json = await warera.request<unknown>(wareraProcedurePath("itemTrading.getPrices"));
+  return parseItemPrices(json);
+}
+
+export async function fetchScrapsPrice(warera: WareraRequester): Promise<number> {
+  const prices = await fetchItemPrices(warera);
+  const price = prices.scraps;
+  if (typeof price !== "number" || !Number.isFinite(price) || price < 0) {
+    throw new Error("WarEra itemTrading.getPrices did not return a valid scraps price");
+  }
+  return price;
 }

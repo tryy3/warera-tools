@@ -147,16 +147,18 @@ export function JobsPage() {
                   <td>{job.lastStatus ?? "—"}</td>
                   <td>{formatTs(job.lastStartedAt)}</td>
                   <td>{formatTs(job.lastFinishedAt)}</td>
-                  <td className="actions">
-                    <button type="button" disabled={busy} onClick={() => void toggleEnabled(job)}>
-                      {job.enabled ? "Disable" : "Enable"}
-                    </button>
-                    <button type="button" disabled={busy} onClick={() => void runNow(job)}>
-                      Run now
-                    </button>
-                    <button type="button" onClick={() => selectJob(job.id)}>
-                      {selected ? "Hide runs" : "Runs"}
-                    </button>
+                  <td>
+                    <div className="actions">
+                      <button type="button" disabled={busy} onClick={() => void toggleEnabled(job)}>
+                        {job.enabled ? "Disable" : "Enable"}
+                      </button>
+                      <button type="button" disabled={busy} onClick={() => void runNow(job)}>
+                        Run now
+                      </button>
+                      <button type="button" onClick={() => selectJob(job.id)}>
+                        {selected ? "Hide runs" : "Runs"}
+                      </button>
+                    </div>
                   </td>
                 </tr>
               );

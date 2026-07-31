@@ -1,44 +1,96 @@
 import { createClient } from "@libsql/client";
 import { drizzle } from "drizzle-orm/libsql";
 import { beforeEach, describe, expect, it } from "vite-plus/test";
-import { setCached } from "../../db/cache";
+import { insertPricePoll, insertPriceSnapshots } from "../../db/prices";
 import type { Db } from "../../db/client";
 import * as schema from "../../db/schema";
+import type { Logger } from "../../logging/logger";
 import { HttpError } from "../errors";
-import {
-  SCRAPS_CACHE_KEY,
-  SCRAPS_CACHE_TTL_SECONDS,
-  type ScrapPricePayload,
-  resolveScrapPrice,
-} from "./scraps";
+import { resolveScrapPrice } from "./scraps";
+
+const silentLogger = {
+  info: () => {},
+  warn: () => {},
+  error: () => {},
+  debug: () => {},
+  child: () => silentLogger,
+} as unknown as Logger;
 
 async function createMemoryDb(): Promise<Db> {
   const client = createClient({ url: ":memory:" });
   await client.execute(`
-    CREATE TABLE cache (
-      key TEXT PRIMARY KEY NOT NULL,
-      payload TEXT NOT NULL,
-      fetched_at INTEGER NOT NULL,
-      ttl_seconds INTEGER NOT NULL,
-      tags TEXT
+    CREATE TABLE price_polls (
+      id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+      recorded_at INTEGER NOT NULL,
+      status TEXT NOT NULL,
+      error TEXT,
+      item_count INTEGER DEFAULT 0 NOT NULL
+    )
+  `);
+  await client.execute(`
+    CREATE TABLE price_snapshots (
+      id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+      poll_id INTEGER NOT NULL,
+      item_code TEXT NOT NULL,
+      market_price REAL,
+      buy_min REAL,
+      buy_max REAL,
+      buy_avg REAL,
+      sell_min REAL,
+      sell_max REAL,
+      sell_avg REAL,
+      FOREIGN KEY (poll_id) REFERENCES price_polls(id)
     )
   `);
   return drizzle(client, { schema });
 }
 
-describe("resolveScrapPrice", () => {
+function mockWarera(scraps: number) {
+  return {
+    request: async <T>(path: string): Promise<T> => {
+      if (path.startsWith("itemTrading.getPrices")) {
+        return { result: { data: { scraps, steel: 1.5, concrete: 1.6, lead: 0.08 } } } as T;
+      }
+      if (path.startsWith("tradingOrder.getTopOrders")) {
+        return {
+          result: {
+            data: {
+              buyOrders: [{ price: 0.08 }],
+              sellOrders: [{ price: 0.09 }],
+            },
+          },
+        } as T;
+      }
+      throw new Error(`unexpected path ${path}`);
+    },
+  };
+}
+
+describe("resolveScrapPrice (history)", () => {
   let db: Db;
 
   beforeEach(async () => {
     db = await createMemoryDb();
   });
 
-  it("returns fresh cache without calling WarEra", async () => {
-    const payload: ScrapPricePayload = {
-      price: 0.215,
-      fetchedAt: "2026-07-31T12:00:00.000Z",
-    };
-    await setCached(db, SCRAPS_CACHE_KEY, payload, SCRAPS_CACHE_TTL_SECONDS, "scraps");
+  it("returns latest history without calling WarEra", async () => {
+    const pollId = await insertPricePoll(db, {
+      recordedAt: new Date("2026-07-31T12:00:00.000Z"),
+      status: "success",
+      itemCount: 1,
+    });
+    await insertPriceSnapshots(db, pollId, [
+      {
+        itemCode: "scraps",
+        marketPrice: 0.215,
+        buyMin: null,
+        buyMax: null,
+        buyAvg: null,
+        sellMin: null,
+        sellMax: null,
+        sellAvg: null,
+      },
+    ]);
 
     let calls = 0;
     const warera = {
@@ -48,89 +100,76 @@ describe("resolveScrapPrice", () => {
       },
     };
 
-    const result = await resolveScrapPrice(db, warera, { force: false });
-    expect(result).toEqual(payload);
+    const result = await resolveScrapPrice(db, warera, silentLogger, { force: false });
+    expect(result.price).toBe(0.215);
+    expect(result.fetchedAt).toBe("2026-07-31T12:00:00.000Z");
     expect(calls).toBe(0);
   });
 
-  it("fetches and caches on miss", async () => {
-    const warera = {
-      request: async <T>(_path: string): Promise<T> =>
-        ({ result: { data: { scraps: 0.42 } } }) as T,
-    };
-
-    const result = await resolveScrapPrice(db, warera, { force: false });
+  it("polls on miss", async () => {
+    const result = await resolveScrapPrice(db, mockWarera(0.42), silentLogger, {
+      force: false,
+    });
     expect(result.price).toBe(0.42);
-    expect(typeof result.fetchedAt).toBe("string");
     expect(result.stale).toBeUndefined();
 
-    const cached = await resolveScrapPrice(db, warera, { force: false });
+    const cached = await resolveScrapPrice(db, mockWarera(0.99), silentLogger, {
+      force: false,
+    });
     expect(cached.price).toBe(0.42);
   });
 
-  it("force bypasses fresh cache and refetches", async () => {
-    await setCached(
-      db,
-      SCRAPS_CACHE_KEY,
-      { price: 0.1, fetchedAt: "2026-07-31T10:00:00.000Z" },
-      SCRAPS_CACHE_TTL_SECONDS,
-      "scraps",
-    );
-
-    const warera = {
-      request: async <T>(_path: string): Promise<T> =>
-        ({ result: { data: { scraps: 0.99 } } }) as T,
-    };
-
-    const result = await resolveScrapPrice(db, warera, { force: true });
+  it("force runs a new poll", async () => {
+    await resolveScrapPrice(db, mockWarera(0.1), silentLogger, { force: false });
+    const result = await resolveScrapPrice(db, mockWarera(0.99), silentLogger, {
+      force: true,
+    });
     expect(result.price).toBe(0.99);
   });
 
-  it("returns stale payload when fetch fails but row exists", async () => {
-    const payload: ScrapPricePayload = {
+  it("returns stale when poll fails but history exists", async () => {
+    const pollId = await insertPricePoll(db, {
+      recordedAt: new Date("2026-07-30T12:00:00.000Z"),
+      status: "success",
+      itemCount: 1,
+    });
+    await insertPriceSnapshots(db, pollId, [
+      {
+        itemCode: "scraps",
+        marketPrice: 0.33,
+        buyMin: null,
+        buyMax: null,
+        buyAvg: null,
+        sellMin: null,
+        sellMax: null,
+        sellAvg: null,
+      },
+    ]);
+
+    const warera = {
+      request: async <T>(_path: string): Promise<T> => {
+        throw new Error("upstream down");
+      },
+    };
+
+    const result = await resolveScrapPrice(db, warera, silentLogger, { force: true });
+    expect(result).toEqual({
       price: 0.33,
       fetchedAt: "2026-07-30T12:00:00.000Z",
-    };
-    // TTL 0 → immediately stale for getCached, still present for getCachedRow
-    await setCached(db, SCRAPS_CACHE_KEY, payload, 0, "scraps");
-
-    const warera = {
-      request: async <T>(_path: string): Promise<T> => {
-        throw new Error("upstream down");
-      },
-    };
-
-    const result = await resolveScrapPrice(db, warera, { force: false });
-    expect(result).toEqual({ ...payload, stale: true });
+      stale: true,
+    });
   });
 
-  it("throws HttpError 502 when fetch fails with empty cache", async () => {
+  it("throws HttpError 502 when poll fails with empty history", async () => {
     const warera = {
       request: async <T>(_path: string): Promise<T> => {
         throw new Error("upstream down");
       },
     };
 
-    await expect(resolveScrapPrice(db, warera, { force: false })).rejects.toSatisfy(
+    await expect(resolveScrapPrice(db, warera, silentLogger, { force: false })).rejects.toSatisfy(
       (err: unknown) =>
         err instanceof HttpError && err.status === 502 && err.code === "upstream_error",
     );
-  });
-
-  it("force:true returns stale when fetch fails but row exists", async () => {
-    const payload: ScrapPricePayload = {
-      price: 0.55,
-      fetchedAt: "2026-07-31T11:00:00.000Z",
-    };
-    await setCached(db, SCRAPS_CACHE_KEY, payload, SCRAPS_CACHE_TTL_SECONDS, "scraps");
-
-    const warera = {
-      request: async <T>(_path: string): Promise<T> => {
-        throw new Error("upstream down");
-      },
-    };
-
-    const result = await resolveScrapPrice(db, warera, { force: true });
-    expect(result).toEqual({ ...payload, stale: true });
   });
 });

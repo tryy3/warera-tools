@@ -2,6 +2,7 @@ import { and, eq } from "drizzle-orm";
 import type { Db } from "../db/client";
 import { jobRuns, jobs } from "../db/schema";
 import type { Logger } from "../logging/logger";
+import type { WareraRequester } from "../warera/prices";
 import { pruneJobRuns } from "./prune";
 import type { JobDefinition } from "./types";
 
@@ -18,6 +19,7 @@ export type RunJobResult = {
 export type RunJobOptions = {
   force?: boolean;
   keep?: number;
+  warera: WareraRequester;
 };
 
 /** In-process guard so cron + POST /run cannot double-start the same job. */
@@ -80,7 +82,7 @@ export async function runJob(
   db: Db,
   logger: Logger,
   def: JobDefinition,
-  opts?: RunJobOptions,
+  opts: RunJobOptions,
 ): Promise<RunJobResult> {
   if (inflightJobs.has(def.id)) {
     logger.info({ jobId: def.id }, "job already running in-process; skip");
@@ -99,9 +101,9 @@ async function runJobLocked(
   db: Db,
   logger: Logger,
   def: JobDefinition,
-  opts?: RunJobOptions,
+  opts: RunJobOptions,
 ): Promise<RunJobResult> {
-  const keep = opts?.keep ?? DEFAULT_JOB_RUN_HISTORY_LIMIT;
+  const keep = opts.keep ?? DEFAULT_JOB_RUN_HISTORY_LIMIT;
   const now = new Date();
   const rows = await db.select().from(jobs).where(eq(jobs.id, def.id)).limit(1);
   const job = rows[0];
@@ -149,6 +151,7 @@ async function runJobLocked(
     const message = await def.run({
       db,
       logger,
+      warera: opts.warera,
       state: (job?.state as Record<string, unknown> | null) ?? null,
       setState,
     });

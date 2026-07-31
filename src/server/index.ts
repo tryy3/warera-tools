@@ -30,6 +30,7 @@ async function main(): Promise<void> {
   const scheduler = await startScheduler({
     db,
     logger,
+    warera,
     jobRunHistoryLimit: config.jobRunHistoryLimit,
   });
   const app = createApp({ db, logger, scheduler, config, warera });

@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 
-export type TabId = "dashboard" | "jobs" | "calculator" | "countries";
+export type TabId = "dashboard" | "jobs" | "calculator" | "countries" | "economy";
 
 type ShellProps = {
   activeTab: TabId;
@@ -12,6 +12,7 @@ const tabs: { id: TabId; label: string }[] = [
   { id: "dashboard", label: "Dashboard" },
   { id: "jobs", label: "Jobs" },
   { id: "calculator", label: "Calculator" },
+  { id: "economy", label: "Economy" },
   { id: "countries", label: "Countries" },
 ];
 

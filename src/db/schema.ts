@@ -48,3 +48,29 @@ export const countries = sqliteTable("countries", {
     .notNull()
     .$defaultFn(() => new Date()),
 });
+
+export const pricePollStatuses = ["success", "partial", "error"] as const;
+export type PricePollStatus = (typeof pricePollStatuses)[number];
+
+export const pricePolls = sqliteTable("price_polls", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  recordedAt: integer("recorded_at", { mode: "timestamp_ms" }).notNull(),
+  status: text("status").notNull(),
+  error: text("error"),
+  itemCount: integer("item_count").notNull().default(0),
+});
+
+export const priceSnapshots = sqliteTable("price_snapshots", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  pollId: integer("poll_id")
+    .notNull()
+    .references(() => pricePolls.id),
+  itemCode: text("item_code").notNull(),
+  marketPrice: real("market_price"),
+  buyMin: real("buy_min"),
+  buyMax: real("buy_max"),
+  buyAvg: real("buy_avg"),
+  sellMin: real("sell_min"),
+  sellMax: real("sell_max"),
+  sellAvg: real("sell_avg"),
+});

@@ -45,7 +45,7 @@ vp run dev             # preferred: API :8787 + Vite WebUI :5173
 - API listens on `http://127.0.0.1:8787`
 - WebUI at `http://127.0.0.1:5173` (Vite proxies `/api` → `:8787`)
 
-WebUI tabs: **Calculator** compares gear listing profit vs scrap value (with tax), and **Countries** manages per-country tax rates. Scrap price is cached 24h from WarEra `itemTrading.getPrices`. Calculator scrap price needs `WARERA_API_KEY` when using the gateway (default `WARERA_API_BASE_URL`).
+WebUI tabs: **Calculator** (gear vs scrap), **Economy** (company Profit/PP + switch payback), and **Countries** (market tax rates). Market prices are polled hourly into a local history table (`price-poll` job) from `itemTrading.getPrices` + top orders; Calculator scraps and Economy both read that history. Gateway usage needs `WARERA_API_KEY`.
 
 API-only: `pnpm dev:server`. WebUI-only: `pnpm dev:web`.
 
@@ -72,5 +72,6 @@ Allowed public surface is the official tRPC API (not undocumented in-game hosts)
 - Prefer gateway (caching / rate limits): `https://gateway.warerastats.io/trpc`
 - Fallback: `https://api2.warera.io/trpc`
 - Community response docs: https://majimawrks.github.io/warera-api-docs/#/
+- Broader live explorer (some auth-required procedures missing from official OpenAPI): https://warera.realmarijn.nl/api-explorer
 
-Default `WARERA_API_BASE_URL` is the gateway. Auth: `X-API-Key` on the gateway; `Authorization: Bearer` on api2 (`WARERA_API_KEY`). Only call procedures listed in the official docs. Agent notes: [`.agents/skills/warera-api/SKILL.md`](.agents/skills/warera-api/SKILL.md).
+Default `WARERA_API_BASE_URL` is the gateway. Auth: `X-API-Key` on the gateway; `Authorization: Bearer` on api2 (`WARERA_API_KEY`). Prefer procedures listed in the official docs; explorer-only reads (e.g. `company.getRecommendedRegionIdsByItemCode`) are used only where designed. Agent notes: [`.agents/skills/warera-api/SKILL.md`](.agents/skills/warera-api/SKILL.md).

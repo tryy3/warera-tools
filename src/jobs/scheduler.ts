@@ -3,6 +3,7 @@ import { eq } from "drizzle-orm";
 import type { Db } from "../db/client";
 import { jobs } from "../db/schema";
 import type { Logger } from "../logging/logger";
+import type { WareraRequester } from "../warera/prices";
 import { listJobDefinitions } from "./registry";
 import { resolveCron } from "./resolve-cron";
 import { runJob } from "./runner";
@@ -22,9 +23,10 @@ export type SchedulerHandle = {
 export async function startScheduler(deps: {
   db: Db;
   logger: Logger;
+  warera: WareraRequester;
   jobRunHistoryLimit?: number;
 }): Promise<SchedulerHandle> {
-  const { db, logger, jobRunHistoryLimit } = deps;
+  const { db, logger, warera, jobRunHistoryLimit } = deps;
   const defs = new Map(listJobDefinitions().map((d) => [d.id, d]));
   const crons = new Map<string, Cron>();
 
@@ -44,7 +46,7 @@ export async function startScheduler(deps: {
 
     const cronExpr = resolveCron(row.cron, def.defaultCron, logger);
     const jobCron = new Cron(cronExpr, { protect: true, name: def.id }, () => {
-      void runJob(db, logger, def, { keep: jobRunHistoryLimit }).catch((err) => {
+      void runJob(db, logger, def, { keep: jobRunHistoryLimit, warera }).catch((err) => {
         logger.error({ err, jobId: def.id }, "unhandled job error");
       });
     });
@@ -57,7 +59,6 @@ export async function startScheduler(deps: {
   return {
     stop() {
       for (const c of crons.values()) c.stop();
-      crons.clear();
     },
     async reloadJob(jobId: string) {
       const def = defs.get(jobId);

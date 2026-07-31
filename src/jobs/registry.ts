@@ -1,10 +1,11 @@
 import type { Db } from "../db/client";
 import { jobs } from "../db/schema";
 import { exampleHeartbeatJob } from "./example-heartbeat";
+import { pricePollJob } from "./price-poll";
 import type { JobDefinition } from "./types";
 
 export function listJobDefinitions(): JobDefinition[] {
-  return [exampleHeartbeatJob];
+  return [exampleHeartbeatJob, pricePollJob];
 }
 
 export async function syncJobsToDb(db: Db, defs: JobDefinition[]): Promise<void> {

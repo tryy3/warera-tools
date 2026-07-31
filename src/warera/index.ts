@@ -1,3 +1,17 @@
-export { createWareraClient } from "./client";
+export {
+  createWareraClient,
+  API2_TRPC_BASE,
+  type WareraAuthStyle,
+  type WareraRequestInit,
+} from "./client";
 export { createRateLimiter } from "./rate-limit";
-export { fetchScrapsPrice, parseScrapsPrice } from "./prices";
+export {
+  fetchItemPrices,
+  fetchScrapsPrice,
+  parseItemPrices,
+  parseScrapsPrice,
+  type ItemPriceMap,
+  type WareraRequester,
+} from "./prices";
+export { fetchTopOrderAggregates, parseTopOrderAggregates } from "./top-orders";
+export { wareraProcedurePath, unwrapTrpcData } from "./trpc";

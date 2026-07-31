@@ -217,25 +217,27 @@ export function CountriesPage() {
                       })
                     )}
                   </td>
-                  <td className="actions">
-                    {editing ? (
-                      <>
-                        <button type="button" disabled={busy} onClick={() => void saveEdit()}>
-                          Save
+                  <td>
+                    <div className="actions">
+                      {editing ? (
+                        <>
+                          <button type="button" disabled={busy} onClick={() => void saveEdit()}>
+                            Save
+                          </button>
+                          <button type="button" disabled={busy} onClick={cancelEdit}>
+                            Cancel
+                          </button>
+                        </>
+                      ) : (
+                        <button
+                          type="button"
+                          disabled={busy || editingId != null}
+                          onClick={() => startEdit(country)}
+                        >
+                          Edit
                         </button>
-                        <button type="button" disabled={busy} onClick={cancelEdit}>
-                          Cancel
-                        </button>
-                      </>
-                    ) : (
-                      <button
-                        type="button"
-                        disabled={busy || editingId != null}
-                        onClick={() => startEdit(country)}
-                      >
-                        Edit
-                      </button>
-                    )}
+                      )}
+                    </div>
                   </td>
                 </tr>
               );

@@ -1,39 +1,48 @@
 import { Hono } from "hono";
-import { getCached, getCachedRow, setCached } from "../../db/cache";
+import { getLatestItemMarketPrice } from "../../db/prices";
 import type { Db } from "../../db/client";
-import { fetchScrapsPrice } from "../../warera/prices";
+import { runPricePoll } from "../../jobs/price-poll/run";
+import type { Logger } from "../../logging/logger";
+import type { WareraRequester } from "../../warera/prices";
 import { HttpError } from "../errors";
-
-export const SCRAPS_CACHE_KEY = "warera:scraps:price";
-export const SCRAPS_CACHE_TTL_SECONDS = 86400;
 
 export type ScrapPricePayload = { price: number; fetchedAt: string };
 export type ScrapPriceResponse = ScrapPricePayload & { stale?: boolean };
 
 export type ScrapsRouteDeps = {
   db: Db;
-  warera: { request: <T>(path: string, init?: RequestInit) => Promise<T> };
+  warera: WareraRequester;
+  logger: Logger;
 };
 
 export async function resolveScrapPrice(
   db: Db,
-  warera: { request: <T>(path: string, init?: RequestInit) => Promise<T> },
+  warera: WareraRequester,
+  logger: Logger,
   options: { force: boolean },
 ): Promise<ScrapPriceResponse> {
   if (!options.force) {
-    const fresh = await getCached<ScrapPricePayload>(db, SCRAPS_CACHE_KEY);
-    if (fresh) return fresh;
+    const hit = await getLatestItemMarketPrice(db, "scraps");
+    if (hit) {
+      return { price: hit.price, fetchedAt: hit.fetchedAt.toISOString() };
+    }
   }
 
   try {
-    const price = await fetchScrapsPrice(warera);
-    const payload: ScrapPricePayload = { price, fetchedAt: new Date().toISOString() };
-    await setCached(db, SCRAPS_CACHE_KEY, payload, SCRAPS_CACHE_TTL_SECONDS, "scraps");
-    return payload;
+    await runPricePoll({ db, warera, logger });
+    const hit = await getLatestItemMarketPrice(db, "scraps");
+    if (!hit) {
+      throw new Error("Price poll completed but scraps price is missing");
+    }
+    return { price: hit.price, fetchedAt: hit.fetchedAt.toISOString() };
   } catch (err) {
-    const row = await getCachedRow<ScrapPricePayload>(db, SCRAPS_CACHE_KEY);
-    if (row) {
-      return { ...row.payload, stale: true };
+    const fallback = await getLatestItemMarketPrice(db, "scraps");
+    if (fallback) {
+      return {
+        price: fallback.price,
+        fetchedAt: fallback.fetchedAt.toISOString(),
+        stale: true,
+      };
     }
     throw new HttpError(
       502,
@@ -43,25 +52,17 @@ export async function resolveScrapPrice(
   }
 }
 
-export async function getScrapPrice(
-  db: Db,
-  warera: { request: <T>(path: string, init?: RequestInit) => Promise<T> },
-  opts?: { force?: boolean },
-): Promise<ScrapPriceResponse> {
-  return resolveScrapPrice(db, warera, { force: opts?.force ?? false });
-}
-
 export function scrapsRoutes(deps: ScrapsRouteDeps) {
-  const { db, warera } = deps;
+  const { db, warera, logger } = deps;
   const app = new Hono();
 
   app.get("/", async (c) => {
-    const result = await resolveScrapPrice(db, warera, { force: false });
+    const result = await resolveScrapPrice(db, warera, logger, { force: false });
     return c.json(result);
   });
 
   app.post("/refresh", async (c) => {
-    const result = await resolveScrapPrice(db, warera, { force: true });
+    const result = await resolveScrapPrice(db, warera, logger, { force: true });
     return c.json(result);
   });
 

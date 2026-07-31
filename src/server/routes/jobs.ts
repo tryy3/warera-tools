@@ -12,10 +12,11 @@ export type JobsRouteDeps = {
   logger: Logger;
   scheduler: SchedulerHandle;
   config: AppConfig;
+  warera: { request: <T>(path: string, init?: RequestInit) => Promise<T> };
 };
 
 export function jobsRoutes(deps: JobsRouteDeps) {
-  const { db, logger, scheduler, config } = deps;
+  const { db, logger, scheduler, config, warera } = deps;
   const app = new Hono();
   const defs = new Map(listJobDefinitions().map((d) => [d.id, d]));
 
@@ -103,6 +104,7 @@ export function jobsRoutes(deps: JobsRouteDeps) {
     const result = await runJob(db, logger, def, {
       force: true,
       keep: config.jobRunHistoryLimit,
+      warera,
     });
 
     if (!result.started) {

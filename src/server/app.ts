@@ -8,8 +8,10 @@ import type { Logger } from "../logging/logger";
 import { errorPayload, HttpError } from "./errors";
 import { authPlaceholder } from "./middleware/auth-placeholder";
 import { countriesRoutes } from "./routes/countries";
+import { economyRoutes } from "./routes/economy";
 import { healthRoutes } from "./routes/health";
 import { jobsRoutes } from "./routes/jobs";
+import { pricesRoutes } from "./routes/prices";
 import { scrapsRoutes } from "./routes/scraps";
 
 export type CreateAppDeps = {
@@ -42,7 +44,12 @@ export function createApp(deps: CreateAppDeps): Hono {
   });
   app.route("/api/jobs", jobsRoutes(deps));
   app.route("/api/countries", countriesRoutes({ db: deps.db }));
-  app.route("/api/scraps", scrapsRoutes({ db: deps.db, warera: deps.warera }));
+  app.route("/api/scraps", scrapsRoutes({ db: deps.db, warera: deps.warera, logger: deps.logger }));
+  app.route("/api/prices", pricesRoutes({ db: deps.db, warera: deps.warera, logger: deps.logger }));
+  app.route(
+    "/api/economy",
+    economyRoutes({ db: deps.db, warera: deps.warera, logger: deps.logger }),
+  );
 
   // Production: serve built SPA from dist/web. Dev uses Vite on :5173.
   if (deps.config.nodeEnv === "production") {
