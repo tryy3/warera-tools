@@ -7,6 +7,7 @@ import type { SchedulerHandle } from "../jobs";
 import type { Logger } from "../logging/logger";
 import { errorPayload, HttpError } from "./errors";
 import { authPlaceholder } from "./middleware/auth-placeholder";
+import { countriesRoutes } from "./routes/countries";
 import { healthRoutes } from "./routes/health";
 import { jobsRoutes } from "./routes/jobs";
 
@@ -38,6 +39,7 @@ export function createApp(deps: CreateAppDeps): Hono {
     return authPlaceholder(c, next);
   });
   app.route("/api/jobs", jobsRoutes(deps));
+  app.route("/api/countries", countriesRoutes({ db: deps.db }));
 
   // Production: serve built SPA from dist/web. Dev uses Vite on :5173.
   if (deps.config.nodeEnv === "production") {
