@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
-import { calculateProfit, GEAR_TIERS, scrapAmountForTier, type GearTierId } from "@/calculator";
+import { calculateProfit, scrapAmountForTier, type GearTierId } from "@/calculator";
 import { api } from "../../api";
+import { CountrySelect } from "./CountrySelect";
+import { TierPicker } from "./TierPicker";
 import type { CountriesResponse, Country, ScrapsResponse } from "./types";
 
 function formatTs(value: string | null | undefined): string {
@@ -107,34 +109,19 @@ export function CalculatorPage() {
       {!loading ? (
         <>
           <div className="calc-controls">
-            <label>
+            <label className="calc-control-tier">
               Tier
-              <select value={tier} onChange={(e) => setTier(e.target.value as GearTierId)}>
-                {GEAR_TIERS.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.label}
-                  </option>
-                ))}
-              </select>
+              <TierPicker value={tier} onChange={setTier} />
             </label>
 
             <label>
               Country
-              <select
+              <CountrySelect
+                countries={countries}
                 value={countryId}
-                onChange={(e) => setCountryId(e.target.value)}
+                onChange={setCountryId}
                 disabled={countries.length === 0}
-              >
-                {countries.length === 0 ? (
-                  <option value="">No countries</option>
-                ) : (
-                  countries.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name}
-                    </option>
-                  ))
-                )}
-              </select>
+              />
             </label>
 
             <label>
