@@ -1,6 +1,10 @@
+import { getRouteApi } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { api } from "../../api";
+import { buildEconomySearch } from "../../lib/economySearch";
 import type { AdvisorResponse, CompanyAdvisorRow, SearchUsersResponse } from "./types";
+
+const economyRoute = getRouteApi("/economy");
 
 function formatNum(value: number | null | undefined, digits = 3): string {
   if (value == null || !Number.isFinite(value)) return "—";
@@ -120,15 +124,20 @@ function CompanyCard({ row }: { row: CompanyAdvisorRow }) {
 }
 
 export function EconomyPage() {
+  const search = economyRoute.useSearch();
+  const navigate = economyRoute.useNavigate();
+  const selectedUserId = search.userId ?? null;
+  const selectedUsername = search.username ?? null;
+
   const [query, setQuery] = useState("");
   const [users, setUsers] = useState<SearchUsersResponse["users"]>([]);
-  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
-  const [selectedUsername, setSelectedUsername] = useState<string | null>(null);
   const [advisor, setAdvisor] = useState<AdvisorResponse | null>(null);
   const [searching, setSearching] = useState(false);
   const [loadingAdvisor, setLoadingAdvisor] = useState(false);
   const [polling, setPolling] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const displayName = selectedUsername ?? selectedUserId;
 
   useEffect(() => {
     const q = query.trim();
@@ -155,9 +164,7 @@ export function EconomyPage() {
     return () => window.clearTimeout(handle);
   }, [query]);
 
-  async function loadAdvisor(userId: string, username: string) {
-    setSelectedUserId(userId);
-    setSelectedUsername(username);
+  async function loadAdvisor(userId: string) {
     setLoadingAdvisor(true);
     setError(null);
     try {
@@ -173,13 +180,21 @@ export function EconomyPage() {
     }
   }
 
+  useEffect(() => {
+    if (!selectedUserId) {
+      setAdvisor(null);
+      return;
+    }
+    void loadAdvisor(selectedUserId);
+  }, [selectedUserId]);
+
   async function refreshPrices() {
     setPolling(true);
     setError(null);
     try {
       await api("/api/prices/poll", { method: "POST" });
-      if (selectedUserId && selectedUsername) {
-        await loadAdvisor(selectedUserId, selectedUsername);
+      if (selectedUserId) {
+        await loadAdvisor(selectedUserId);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -227,7 +242,12 @@ export function EconomyPage() {
                 <button
                   type="button"
                   className={selectedUserId === u.userId ? "economy-user active" : "economy-user"}
-                  onClick={() => void loadAdvisor(u.userId, u.username)}
+                  onClick={() => {
+                    void navigate({
+                      search: buildEconomySearch({ userId: u.userId, username: u.username }),
+                      replace: true,
+                    });
+                  }}
                 >
                   <span>{u.username}</span>
                   <span className="muted mono">{u.userId.slice(-6)}</span>
@@ -238,9 +258,9 @@ export function EconomyPage() {
         ) : null}
       </section>
 
-      {selectedUsername ? (
+      {displayName ? (
         <p className="muted">
-          Showing companies for <strong>{selectedUsername}</strong>
+          Showing companies for <strong>{displayName}</strong>
           {advisor?.recordedAt
             ? ` · prices as of ${new Date(advisor.recordedAt).toLocaleString()}`
             : null}
