@@ -1,4 +1,4 @@
-import { integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import { integer, real, sqliteTable, text } from "drizzle-orm/sqlite-core";
 
 export const jobStatuses = ["success", "error", "running"] as const;
 export type JobStatus = (typeof jobStatuses)[number];
@@ -34,4 +34,16 @@ export const cache = sqliteTable("cache", {
   fetchedAt: integer("fetched_at", { mode: "timestamp_ms" }).notNull(),
   ttlSeconds: integer("ttl_seconds").notNull(),
   tags: text("tags"),
+});
+
+export const countries = sqliteTable("countries", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull().unique(),
+  taxRate: real("tax_rate").notNull(),
+  createdAt: integer("created_at", { mode: "timestamp_ms" })
+    .notNull()
+    .$defaultFn(() => new Date()),
+  updatedAt: integer("updated_at", { mode: "timestamp_ms" })
+    .notNull()
+    .$defaultFn(() => new Date()),
 });

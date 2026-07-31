@@ -2,6 +2,7 @@ import { serve } from "@hono/node-server";
 import { loadConfig } from "../config/env";
 import { createDb } from "../db/client";
 import { migrateDb } from "../db/migrate";
+import { seedDefaultCountries } from "../db/seed-countries";
 import { createDiscordNotifier } from "../discord";
 import {
   listJobDefinitions,
@@ -19,6 +20,7 @@ async function main(): Promise<void> {
   const { db, client } = createDb(config);
 
   await migrateDb(db);
+  await seedDefaultCountries(db);
   await syncJobsToDb(db, listJobDefinitions());
   await reconcileInterruptedRuns(db, logger);
 
