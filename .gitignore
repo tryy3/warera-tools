@@ -10,7 +10,6 @@ dist/
 .vite/
 coverage/
 .DS_Store
-drizzle/meta/*_snapshot.json
 dist-ssr/
 logs/
 .vscode/*
