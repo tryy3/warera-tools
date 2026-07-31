@@ -154,12 +154,12 @@ button:disabled {
 }
 
 .jobs-table th {
-  background: #f3f4f6;
+  background: var(--raised);
   font-weight: 600;
 }
 
 .jobs-table tr.selected {
-  background: #f8fafc;
+  background: var(--accent-soft);
 }
 
 .actions {
@@ -171,14 +171,15 @@ button:disabled {
 .actions button,
 .page-header button {
   border: 1px solid var(--border);
-  background: #fff;
+  background: var(--raised);
   border-radius: 4px;
   padding: 0.25rem 0.55rem;
+  color: var(--text);
 }
 
 .actions button:hover:not(:disabled),
 .page-header button:hover:not(:disabled) {
-  border-color: #9ca3af;
+  border-color: rgba(232, 165, 75, 0.55);
 }
 
 .linkish {
@@ -219,7 +220,7 @@ button:disabled {
   border-radius: 4px;
   padding: 0.3rem 0.5rem;
   min-width: 10rem;
-  background: #fff;
+  background: var(--raised);
 }
 
 .calc-controls .calc-control-tier {
@@ -302,7 +303,7 @@ button:disabled {
 }
 
 .profit-positive {
-  color: #15803d;
+  color: var(--success);
   font-weight: 600;
 }
 
@@ -344,18 +345,19 @@ button:disabled {
   border: 1px solid var(--border);
   border-radius: 4px;
   padding: 0.3rem 0.5rem;
-  background: #fff;
+  background: var(--raised);
 }
 
 .country-form button {
   border: 1px solid var(--border);
-  background: #fff;
+  background: var(--raised);
   border-radius: 4px;
   padding: 0.3rem 0.7rem;
+  color: var(--text);
 }
 
 .country-form button:hover:not(:disabled) {
-  border-color: #9ca3af;
+  border-color: rgba(232, 165, 75, 0.55);
 }
 
 .country-select {
@@ -371,7 +373,7 @@ button:disabled {
   border: 1px solid var(--border);
   border-radius: 4px;
   padding: 0.3rem 0.5rem;
-  background: #fff;
+  background: var(--raised);
 }
 
 .country-select-list {
@@ -383,10 +385,10 @@ button:disabled {
   margin: 0;
   padding: 0.25rem;
   list-style: none;
-  background: #fff;
+  background: var(--panel);
   border: 1px solid var(--border);
   border-radius: 6px;
-  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.12);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.45);
   max-height: 16rem;
   overflow: auto;
 }
