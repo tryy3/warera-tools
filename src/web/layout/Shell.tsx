@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 
-export type TabId = "dashboard" | "jobs";
+export type TabId = "dashboard" | "jobs" | "calculator";
 
 type ShellProps = {
   activeTab: TabId;
@@ -11,6 +11,7 @@ type ShellProps = {
 const tabs: { id: TabId; label: string }[] = [
   { id: "dashboard", label: "Dashboard" },
   { id: "jobs", label: "Jobs" },
+  { id: "calculator", label: "Calculator" },
 ];
 
 export function Shell({ activeTab, onTabChange, children }: ShellProps) {

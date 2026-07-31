@@ -191,3 +191,62 @@ button:disabled {
 .runs-panel {
   margin-top: 0.5rem;
 }
+
+.calc-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin: 0.75rem 0;
+}
+
+.calc-controls label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.9em;
+  color: var(--muted);
+}
+
+.calc-controls select,
+.calc-controls input {
+  font: inherit;
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 0.3rem 0.5rem;
+  min-width: 10rem;
+  background: #fff;
+}
+
+.calc-breakdown {
+  display: grid;
+  gap: 0.35rem;
+  margin: 1rem 0;
+  max-width: 28rem;
+}
+
+.calc-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.profit-positive {
+  color: #15803d;
+  font-weight: 600;
+}
+
+.profit-negative {
+  color: var(--error);
+  font-weight: 600;
+}
+
+.calc-details {
+  margin-top: 0.5rem;
+  max-width: 36rem;
+}
+
+.calc-details summary {
+  cursor: pointer;
+  color: var(--muted);
+}
