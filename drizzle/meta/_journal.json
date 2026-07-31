@@ -15,6 +15,13 @@
       "when": 1785515901211,
       "tag": "0001_late_dreadnoughts",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1785519707511,
+      "tag": "0002_rich_menace",
+      "breakpoints": true
     }
   ]
 }

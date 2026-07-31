@@ -40,6 +40,7 @@ export const countries = sqliteTable("countries", {
   id: text("id").primaryKey(),
   name: text("name").notNull().unique(),
   taxRate: real("tax_rate").notNull(),
+  isoCode: text("iso_code"),
   createdAt: integer("created_at", { mode: "timestamp_ms" })
     .notNull()
     .$defaultFn(() => new Date()),

@@ -1,0 +1,1 @@
+ALTER TABLE `countries` ADD `iso_code` text;
