@@ -25,7 +25,7 @@ Primary audience for now: single user on a local NixOS machine. Later possible: 
 | Logging | pino structured logs to console; file transport later |
 | Notifications | Discord webhooks only (bot later if needed) |
 | Auth | None for now; localhost default; structure for BetterAuth later |
-| Game API | `https://api5.warera.io` — explore as needed; older docs at `https://api2.warera.io/docs/` are hints only |
+| Game API | Allowed public tRPC only (official https://api2.warera.io/docs/); prefer `https://gateway.warerastats.io/trpc`, fallback `https://api2.warera.io/trpc` |
 | Nix | `flake.nix` + devenv; system packages via flake when not npm deps |
 
 ## Architecture
@@ -141,17 +141,23 @@ Generic key/value cache for WarEra (and other) data.
 
 Location: `src/warera/`
 
-- Base URL default: `https://api5.warera.io` (overridable)
-- API key from env
-- Soft global rate limit well under observed 200 req/min (configurable, default e.g. 120/min)
+- Base URL default: `https://gateway.warerastats.io/trpc` (overridable; fallback `https://api2.warera.io/trpc`)
+- Only procedures listed in official docs/OpenAPI are allowed (in-game/private hosts are out of bounds)
+- Auth from `WARERA_API_KEY`: `X-API-Key` for gateway; `Authorization: Bearer` for api2
+- Soft global rate limit under gateway/upstream caps (configurable, default 120/min; gateway advertises ~200/min)
 - Structured pino context on requests (`path`, status, latency)
 - Cache helpers: `getCached` / `setCached` / `getOrFetch`
 - Caching convention for later features:
-  - Live data (trades/offers): no cache or very short TTL
-  - Stable data (items, equipment stats): longer TTL + explicit refresh
+  - Live data (trades/offers): no cache or very short TTL; prefer api2 when gateway staleness matters
+  - Stable data (items, equipment stats): longer TTL + explicit refresh; gateway is a good default
 - Foundation does not implement real trade/calculator endpoints — only client infrastructure
 
-Official docs for api5 are incomplete; treat `https://api2.warera.io/docs/` as a starting hint only and discover live usage as features are built.
+Sources of truth:
+
+- Allowlist / inputs: https://api2.warera.io/docs/ and https://api2.warera.io/openapi.json
+- Gateway behavior: https://gateway.warerastats.io/
+- Observed response shapes (community): https://majimawrks.github.io/warera-api-docs/#/
+- Agent skill: `.agents/skills/warera-api/SKILL.md`
 
 ## Discord
 
@@ -183,10 +189,11 @@ Location: `src/discord/`
 
 - `TURSO_DATABASE_URL`
 - `TURSO_AUTH_TOKEN`
-- `WARERA_API_KEY`
+- `WARERA_API_BASE_URL` (default gateway `/trpc`)
+- `WARERA_API_KEY` (gateway API key or api2 Bearer token, depending on base URL)
+- `WARERA_MAX_REQUESTS_PER_MINUTE`
 - `DISCORD_WEBHOOK_URL`
 - `PORT` (and related)
-- Rate-limit soft cap if exposed
 
 Bind HTTP to localhost by default.
 
@@ -217,7 +224,7 @@ Bind HTTP to localhost by default.
 - BetterAuth / multi-user accounts
 - Docker
 - File log transport
-- Relying on outdated api2 docs as source of truth
+- Calling undocumented or in-game-only endpoints outside the official api2 allowlist
 
 ## Success criteria
 

@@ -49,9 +49,14 @@ export function createWareraClient(options: CreateWareraClientOptions) {
     const url = joinUrl(options.config.wareraApiBaseUrl, path);
 
     const headers = new Headers(fetchInit.headers);
-    // Auth assumption: Bearer token. Live API probing may adjust header name/scheme later.
     if (options.config.wareraApiKey) {
-      headers.set("Authorization", `Bearer ${options.config.wareraApiKey}`);
+      // Gateway requires X-API-Key; official api2 uses Bearer session tokens.
+      const isGateway = options.config.wareraApiBaseUrl.includes("gateway.warerastats.io");
+      if (isGateway) {
+        headers.set("X-API-Key", options.config.wareraApiKey);
+      } else {
+        headers.set("Authorization", `Bearer ${options.config.wareraApiKey}`);
+      }
     }
 
     let lastError: unknown;

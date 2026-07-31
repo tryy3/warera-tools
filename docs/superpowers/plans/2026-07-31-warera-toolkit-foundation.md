@@ -18,7 +18,7 @@
 - pino structured logging to console; centralize logger construction for future file transport
 - Discord webhooks only (no bot)
 - No auth UI; localhost bind; leave BetterAuth middleware hook
-- WarEra base URL default `https://api5.warera.io`; soft rate limit default 120/min
+- WarEra base URL default `https://gateway.warerastats.io/trpc` (fallback `https://api2.warera.io/trpc`); soft rate limit default 120/min; only official api2 allowlisted procedures
 - System packages via flake/devenv; npm/pnpm only for JS deps
 - No Docker, no real trade/calculator features, no live WarEra integration tests in this plan
 - Follow design spec: `docs/superpowers/specs/2026-07-31-warera-toolkit-foundation-design.md`
@@ -343,7 +343,7 @@ export type AppConfig = {
   port: number; // default 8787
   tursoDatabaseUrl: string;
   tursoAuthToken: string | undefined;
-  wareraApiBaseUrl: string; // default "https://api5.warera.io"
+  wareraApiBaseUrl: string; // default "https://gateway.warerastats.io/trpc"
   wareraApiKey: string | undefined;
   wareraMaxRequestsPerMinute: number; // default 120
   discordWebhookUrl: string | undefined;
@@ -367,7 +367,7 @@ describe("parseConfig", () => {
     expect(cfg.host).toBe("127.0.0.1");
     expect(cfg.port).toBe(8787);
     expect(cfg.wareraMaxRequestsPerMinute).toBe(120);
-    expect(cfg.wareraApiBaseUrl).toBe("https://api5.warera.io");
+    expect(cfg.wareraApiBaseUrl).toBe("https://gateway.warerastats.io/trpc");
   });
 
   it("parses PORT override", () => {
@@ -417,7 +417,7 @@ export function parseConfig(env: NodeJS.ProcessEnv | Record<string, string | und
     port: Number(env.PORT ?? 8787),
     tursoDatabaseUrl,
     tursoAuthToken: env.TURSO_AUTH_TOKEN,
-    wareraApiBaseUrl: env.WARERA_API_BASE_URL ?? "https://api5.warera.io",
+    wareraApiBaseUrl: env.WARERA_API_BASE_URL ?? "https://gateway.warerastats.io/trpc",
     wareraApiKey: env.WARERA_API_KEY,
     wareraMaxRequestsPerMinute: Number(env.WARERA_MAX_REQUESTS_PER_MINUTE ?? 120),
     discordWebhookUrl: env.DISCORD_WEBHOOK_URL,
@@ -460,7 +460,9 @@ LOG_LEVEL=info
 TURSO_DATABASE_URL=libsql://YOUR_DB.turso.io
 TURSO_AUTH_TOKEN=
 
-WARERA_API_BASE_URL=https://api5.warera.io
+# Prefer gateway; fallback https://api2.warera.io/trpc
+WARERA_API_BASE_URL=https://gateway.warerastats.io/trpc
+# Gateway: X-API-Key. Official api2: Authorization Bearer session token.
 WARERA_API_KEY=
 WARERA_MAX_REQUESTS_PER_MINUTE=120
 
@@ -866,7 +868,7 @@ import { createWareraClient } from "./client";
 import type { AppConfig } from "../config/env";
 
 const baseConfig = {
-  wareraApiBaseUrl: "https://api5.warera.io",
+  wareraApiBaseUrl: "https://gateway.warerastats.io/trpc",
   wareraApiKey: "test-key",
   wareraMaxRequestsPerMinute: 1000,
 } as AppConfig;
@@ -900,8 +902,8 @@ Run: `vp test src/warera/client.test.ts`
 - [ ] **Step 3: Implement client**
 
 Implement `createWareraClient` that:
-- Joins `wareraApiBaseUrl` + path
-- Sets `Authorization` / API key header as `Bearer ${wareraApiKey}` when key present (adjust header name later when live API probing shows the real scheme — document as assumption in a code comment)
+- Joins `wareraApiBaseUrl` + path (base should include `/trpc`)
+- When key present: `X-API-Key` if base host is `gateway.warerastats.io`, else `Authorization: Bearer`
 - Calls `rateLimiter.acquire()` unless `skipRateLimit`
 - Logs `{ path, status, durationMs }` via pino
 - Throws on final non-OK response with status + body snippet
@@ -1416,8 +1418,8 @@ git commit -m "feat: wire server entry, static UI, and graceful shutdown"
   - Env vars (point at `.env.example`)
   - `pnpm dev` / `vp run dev` workflow
   - `vp check` / `vp test`
-  - Note that api5 is undocumented; client header may need adjustment when probing live API
-  - Link to design spec
+  - WarEra API: prefer gateway `/trpc`, fallback api2 `/trpc`; official allowlist + auth notes
+  - Link to design spec and `.agents/skills/warera-api/SKILL.md`
 
 - [ ] **Step 2: Final verification checklist**
 

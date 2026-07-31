@@ -3,7 +3,7 @@ import { createWareraClient } from "./client";
 import type { AppConfig } from "../config/env";
 
 const baseConfig = {
-  wareraApiBaseUrl: "https://api5.warera.io",
+  wareraApiBaseUrl: "https://gateway.warerastats.io/trpc",
   wareraApiKey: "test-key",
   wareraMaxRequestsPerMinute: 1000,
 } as AppConfig;
@@ -86,7 +86,7 @@ describe("createWareraClient", () => {
     expect(fetchMock).toHaveBeenCalledTimes(3);
   });
 
-  it("sends Bearer Authorization when API key is present", async () => {
+  it("sends X-API-Key when using the gateway base URL", async () => {
     const fetchMock = vi
       .fn()
       .mockResolvedValue(new Response(JSON.stringify({ ok: true }), { status: 200 }));
@@ -98,10 +98,33 @@ describe("createWareraClient", () => {
       sleep: async () => {},
     });
 
-    await client.request("/v1/ping");
+    await client.request("/country.getAllCountries");
+    const init = fetchMock.mock.calls[0]![1] as RequestInit;
+    const headers = new Headers(init.headers);
+    expect(headers.get("X-API-Key")).toBe("test-key");
+    expect(headers.get("Authorization")).toBeNull();
+  });
+
+  it("sends Bearer Authorization when using the official api2 base URL", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(new Response(JSON.stringify({ ok: true }), { status: 200 }));
+
+    const client = createWareraClient({
+      config: {
+        ...baseConfig,
+        wareraApiBaseUrl: "https://api2.warera.io/trpc",
+      },
+      logger: testLogger(),
+      fetchImpl: fetchMock,
+      sleep: async () => {},
+    });
+
+    await client.request("/country.getAllCountries");
     const init = fetchMock.mock.calls[0]![1] as RequestInit;
     const headers = new Headers(init.headers);
     expect(headers.get("Authorization")).toBe("Bearer test-key");
+    expect(headers.get("X-API-Key")).toBeNull();
   });
 
   it("serializes rate-limit acquire across concurrent requests", async () => {

@@ -62,6 +62,13 @@ vp run build           # dist/web + dist/server
 NODE_ENV=production pnpm start   # API + static UI from dist/web
 ```
 
-## WarEra API note
+## WarEra API
 
-The live client targets `api5.warera.io` (see `WARERA_API_BASE_URL`). That API is **undocumented**; the client currently sends `Authorization: Bearer <WARERA_API_KEY>`. Header name/scheme may need adjustment when probing the live API.
+Allowed public surface is the official tRPC API (not undocumented in-game hosts):
+
+- Docs: https://api2.warera.io/docs/ · OpenAPI: https://api2.warera.io/openapi.json
+- Prefer gateway (caching / rate limits): `https://gateway.warerastats.io/trpc`
+- Fallback: `https://api2.warera.io/trpc`
+- Community response docs: https://majimawrks.github.io/warera-api-docs/#/
+
+Default `WARERA_API_BASE_URL` is the gateway. Auth: `X-API-Key` on the gateway; `Authorization: Bearer` on api2 (`WARERA_API_KEY`). Only call procedures listed in the official docs. Agent notes: [`.agents/skills/warera-api/SKILL.md`](.agents/skills/warera-api/SKILL.md).
