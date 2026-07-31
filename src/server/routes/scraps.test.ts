@@ -116,4 +116,21 @@ describe("resolveScrapPrice", () => {
         err instanceof HttpError && err.status === 502 && err.code === "upstream_error",
     );
   });
+
+  it("force:true returns stale when fetch fails but row exists", async () => {
+    const payload: ScrapPricePayload = {
+      price: 0.55,
+      fetchedAt: "2026-07-31T11:00:00.000Z",
+    };
+    await setCached(db, SCRAPS_CACHE_KEY, payload, SCRAPS_CACHE_TTL_SECONDS, "scraps");
+
+    const warera = {
+      request: async <T>(_path: string): Promise<T> => {
+        throw new Error("upstream down");
+      },
+    };
+
+    const result = await resolveScrapPrice(db, warera, { force: true });
+    expect(result).toEqual({ ...payload, stale: true });
+  });
 });

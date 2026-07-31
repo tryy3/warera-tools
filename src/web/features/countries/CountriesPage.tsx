@@ -175,7 +175,9 @@ export function CountriesPage() {
                         aria-label="Tax percent"
                       />
                     ) : (
-                      percentFromRate(country.taxRate)
+                      percentFromRate(country.taxRate).toLocaleString(undefined, {
+                        maximumFractionDigits: 4,
+                      })
                     )}
                   </td>
                   <td className="actions">

@@ -15,7 +15,7 @@ function isUniqueConstraintError(err: unknown): boolean {
   return message.includes("unique constraint") || message.includes("unique constraint failed");
 }
 
-async function assertNoCountryConflict(
+export async function assertNoCountryConflict(
   db: Db,
   fields: { id?: string; name?: string; excludeId?: string },
 ): Promise<void> {
