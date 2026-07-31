@@ -8,7 +8,7 @@
     "dev:web": "vp dev",
     "dev:server": "tsx watch src/server/index.ts",
     "dev:all": "concurrently -k \"pnpm dev:server\" \"pnpm dev:web\"",
-    "build": "vp build && tsc -p tsconfig.server.json",
+    "build": "vp build && vp pack",
     "start": "node dist/server/index.js",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx src/db/migrate-cli.ts",

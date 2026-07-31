@@ -53,4 +53,17 @@ export default defineConfig({
     outDir: "dist/web",
     emptyOutDir: true,
   },
+  pack: {
+    entry: "src/server/index.ts",
+    outDir: "dist/server",
+    format: "esm",
+    platform: "node",
+    target: "node22",
+    tsconfig: "tsconfig.server.json",
+    dts: false,
+    fixedExtension: false,
+    deps: {
+      neverBundle: true,
+    },
+  },
 });

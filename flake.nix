@@ -16,6 +16,7 @@
             turso-cli
             nodejs_26
             pnpm
+            vp
           ];
 
           shellHook = ''
@@ -23,6 +24,15 @@
             if ! command -v vp >/dev/null 2>&1; then
               echo "Note: install Vite+ CLI with: curl -fsSL https://vite.plus | bash"
             fi
+
+            # Vite+ (`vp`) ships as a local npm devDependency; use Nix's Node.js.
+            if [ ! -x node_modules/.bin/vp ]; then
+              echo "Installing npm dependencies (vite-plus / vp)..."
+              npm install --no-fund --no-audit
+            fi
+            export PATH="$PWD/node_modules/.bin:$PATH"
+
+
           '';
         };
       }
