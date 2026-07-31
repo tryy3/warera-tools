@@ -109,20 +109,20 @@ export function CalculatorPage() {
       {!loading ? (
         <>
           <div className="calc-controls">
-            <label className="calc-control-tier">
-              Tier
+            <div className="calc-control-tier">
+              <span>Tier</span>
               <TierPicker value={tier} onChange={setTier} />
-            </label>
+            </div>
 
-            <label>
-              Country
+            <div className="calc-control">
+              <span>Country</span>
               <CountrySelect
                 countries={countries}
                 value={countryId}
                 onChange={setCountryId}
                 disabled={countries.length === 0}
               />
-            </label>
+            </div>
 
             <label>
               Incl. price

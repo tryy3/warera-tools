@@ -199,7 +199,9 @@ button:disabled {
   margin: 0.75rem 0;
 }
 
-.calc-controls label {
+.calc-controls label,
+.calc-controls .calc-control,
+.calc-controls .calc-control-tier {
   display: flex;
   flex-direction: column;
   gap: 0.25rem;

@@ -179,15 +179,18 @@ export function CountriesPage() {
                   </td>
                   <td>
                     {editing ? (
-                      <input
-                        type="text"
-                        value={editIsoCode}
-                        onChange={(e) => setEditIsoCode(e.target.value)}
-                        disabled={busy}
-                        maxLength={2}
-                        placeholder="SE"
-                        aria-label="ISO country code"
-                      />
+                      <>
+                        <input
+                          type="text"
+                          value={editIsoCode}
+                          onChange={(e) => setEditIsoCode(e.target.value)}
+                          disabled={busy}
+                          maxLength={2}
+                          placeholder="SE"
+                          aria-label="ISO country code"
+                        />
+                        <div className="muted small">Optional ISO 3166-1 alpha-2 (e.g. SE)</div>
+                      </>
                     ) : country.isoCode ? (
                       <>
                         {flagEmojiFromIso(country.isoCode)} {country.isoCode}
@@ -277,6 +280,7 @@ export function CountriesPage() {
             placeholder="SE"
             aria-label="ISO country code"
           />
+          <span className="muted small">Optional ISO 3166-1 alpha-2 (e.g. SE)</span>
         </label>
         <button type="submit" disabled={busy}>
           Add
