@@ -45,6 +45,8 @@ vp run dev             # preferred: API :8787 + Vite WebUI :5173
 - API listens on `http://127.0.0.1:8787`
 - WebUI at `http://127.0.0.1:5173` (Vite proxies `/api` → `:8787`)
 
+WebUI tabs: **Calculator** compares gear listing profit vs scrap value (with tax), and **Countries** manages per-country tax rates. Scrap price is cached 24h from WarEra `itemTrading.getPrices`.
+
 API-only: `pnpm dev:server`. WebUI-only: `pnpm dev:web`.
 
 ## Check / test
