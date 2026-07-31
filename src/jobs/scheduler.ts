@@ -19,8 +19,12 @@ export type SchedulerHandle = {
  * (callers such as the server entry can rely on schedules being live before
  * accepting traffic).
  */
-export async function startScheduler(deps: { db: Db; logger: Logger }): Promise<SchedulerHandle> {
-  const { db, logger } = deps;
+export async function startScheduler(deps: {
+  db: Db;
+  logger: Logger;
+  jobRunHistoryLimit?: number;
+}): Promise<SchedulerHandle> {
+  const { db, logger, jobRunHistoryLimit } = deps;
   const defs = new Map(listJobDefinitions().map((d) => [d.id, d]));
   const crons = new Map<string, Cron>();
 
@@ -40,7 +44,7 @@ export async function startScheduler(deps: { db: Db; logger: Logger }): Promise<
 
     const cronExpr = resolveCron(row.cron, def.defaultCron, logger);
     const jobCron = new Cron(cronExpr, { protect: true, name: def.id }, () => {
-      void runJob(db, logger, def).catch((err) => {
+      void runJob(db, logger, def, { keep: jobRunHistoryLimit }).catch((err) => {
         logger.error({ err, jobId: def.id }, "unhandled job error");
       });
     });

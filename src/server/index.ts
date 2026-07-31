@@ -3,7 +3,12 @@ import { loadConfig } from "../config/env";
 import { createDb } from "../db/client";
 import { migrateDb } from "../db/migrate";
 import { createDiscordNotifier } from "../discord";
-import { listJobDefinitions, startScheduler, syncJobsToDb } from "../jobs";
+import {
+  listJobDefinitions,
+  reconcileInterruptedRuns,
+  startScheduler,
+  syncJobsToDb,
+} from "../jobs";
 import { createLogger } from "../logging/logger";
 import { createWareraClient } from "../warera";
 import { createApp } from "./app";
@@ -15,12 +20,17 @@ async function main(): Promise<void> {
 
   await migrateDb(db);
   await syncJobsToDb(db, listJobDefinitions());
+  await reconcileInterruptedRuns(db, logger);
 
   // Construct integrations at boot for readiness (wired into jobs/routes later).
   createWareraClient({ config, logger });
   createDiscordNotifier({ webhookUrl: config.discordWebhookUrl, logger });
 
-  const scheduler = await startScheduler({ db, logger });
+  const scheduler = await startScheduler({
+    db,
+    logger,
+    jobRunHistoryLimit: config.jobRunHistoryLimit,
+  });
   const app = createApp({ db, logger, scheduler, config });
 
   const server = serve({ fetch: app.fetch, hostname: config.host, port: config.port }, (info) => {

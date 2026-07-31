@@ -15,7 +15,7 @@ export type JobsRouteDeps = {
 };
 
 export function jobsRoutes(deps: JobsRouteDeps) {
-  const { db, logger, scheduler } = deps;
+  const { db, logger, scheduler, config } = deps;
   const app = new Hono();
   const defs = new Map(listJobDefinitions().map((d) => [d.id, d]));
 
@@ -100,7 +100,14 @@ export function jobsRoutes(deps: JobsRouteDeps) {
       throw new HttpError(404, "not_found", `Job ${id} not found`);
     }
 
-    await runJob(db, logger, def, { force: true });
+    const result = await runJob(db, logger, def, {
+      force: true,
+      keep: config.jobRunHistoryLimit,
+    });
+
+    if (!result.started) {
+      throw new HttpError(409, "job_busy", result.skippedReason ?? "job already running");
+    }
 
     const rows = await db.select().from(jobs).where(eq(jobs.id, id)).limit(1);
     return c.json({ ok: true, job: rows[0] });
