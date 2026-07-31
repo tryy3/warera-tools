@@ -1,1 +1,12 @@
 .worktrees/
+node_modules/
+dist/
+.env
+.env.local
+*.log
+.direnv/
+.devenv/
+.vite/
+coverage/
+.DS_Store
+drizzle/meta/*_snapshot.json
