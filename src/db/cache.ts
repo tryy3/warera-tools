@@ -6,12 +6,25 @@ export function isCacheFresh(fetchedAt: Date, ttlSeconds: number, now = new Date
   return now.getTime() < fetchedAt.getTime() + ttlSeconds * 1000;
 }
 
-export async function getCached<T>(db: Db, key: string): Promise<T | null> {
+export async function getCachedRow<T>(
+  db: Db,
+  key: string,
+): Promise<{ payload: T; fetchedAt: Date; ttlSeconds: number } | null> {
   const rows = await db.select().from(cache).where(eq(cache.key, key)).limit(1);
   const row = rows[0];
   if (!row) return null;
-  if (!isCacheFresh(row.fetchedAt as Date, row.ttlSeconds)) return null;
-  return row.payload as T;
+  return {
+    payload: row.payload as T,
+    fetchedAt: row.fetchedAt as Date,
+    ttlSeconds: row.ttlSeconds,
+  };
+}
+
+export async function getCached<T>(db: Db, key: string): Promise<T | null> {
+  const row = await getCachedRow<T>(db, key);
+  if (!row) return null;
+  if (!isCacheFresh(row.fetchedAt, row.ttlSeconds)) return null;
+  return row.payload;
 }
 
 export async function setCached(
