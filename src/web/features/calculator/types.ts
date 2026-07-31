@@ -2,6 +2,7 @@ export type Country = {
   id: string;
   name: string;
   taxRate: number;
+  isoCode: string | null;
 };
 
 export type CountriesResponse = { countries: Country[] };

@@ -1,5 +1,6 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { api } from "../../api";
+import { flagEmojiFromIso } from "../../lib/flagEmoji";
 import type { CountriesResponse, Country } from "./types";
 
 function percentFromRate(taxRate: number): number {
@@ -18,10 +19,12 @@ export function CountriesPage() {
 
   const [addName, setAddName] = useState("");
   const [addTaxPercent, setAddTaxPercent] = useState("1");
+  const [addIsoCode, setAddIsoCode] = useState("");
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
   const [editTaxPercent, setEditTaxPercent] = useState("");
+  const [editIsoCode, setEditIsoCode] = useState("");
 
   async function loadCountries() {
     setLoading(true);
@@ -44,6 +47,7 @@ export function CountriesPage() {
     setEditingId(country.id);
     setEditName(country.name);
     setEditTaxPercent(String(percentFromRate(country.taxRate)));
+    setEditIsoCode(country.isoCode ?? "");
     setError(null);
   }
 
@@ -51,6 +55,7 @@ export function CountriesPage() {
     setEditingId(null);
     setEditName("");
     setEditTaxPercent("");
+    setEditIsoCode("");
   }
 
   async function handleAdd(e: FormEvent) {
@@ -71,11 +76,16 @@ export function CountriesPage() {
     try {
       const data = await api<{ country: Country }>("/api/countries", {
         method: "POST",
-        body: JSON.stringify({ name, taxRate: rateFromPercent(percent) }),
+        body: JSON.stringify({
+          name,
+          taxRate: rateFromPercent(percent),
+          isoCode: addIsoCode.trim() === "" ? null : addIsoCode.trim(),
+        }),
       });
       setCountries((prev) => [...prev, data.country]);
       setAddName("");
       setAddTaxPercent("1");
+      setAddIsoCode("");
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -104,7 +114,11 @@ export function CountriesPage() {
         `/api/countries/${encodeURIComponent(editingId)}`,
         {
           method: "PATCH",
-          body: JSON.stringify({ name, taxRate: rateFromPercent(percent) }),
+          body: JSON.stringify({
+            name,
+            taxRate: rateFromPercent(percent),
+            isoCode: editIsoCode.trim() === "" ? null : editIsoCode.trim(),
+          }),
         },
       );
       setCountries((prev) => prev.map((c) => (c.id === data.country.id ? data.country : c)));
@@ -137,6 +151,7 @@ export function CountriesPage() {
           <thead>
             <tr>
               <th>Name</th>
+              <th>ISO</th>
               <th>Tax %</th>
               <th>Edit</th>
             </tr>
@@ -160,6 +175,25 @@ export function CountriesPage() {
                         {country.name}
                         <div className="muted small mono">{country.id}</div>
                       </>
+                    )}
+                  </td>
+                  <td>
+                    {editing ? (
+                      <input
+                        type="text"
+                        value={editIsoCode}
+                        onChange={(e) => setEditIsoCode(e.target.value)}
+                        disabled={busy}
+                        maxLength={2}
+                        placeholder="SE"
+                        aria-label="ISO country code"
+                      />
+                    ) : country.isoCode ? (
+                      <>
+                        {flagEmojiFromIso(country.isoCode)} {country.isoCode}
+                      </>
+                    ) : (
+                      "—"
                     )}
                   </td>
                   <td>
@@ -230,6 +264,18 @@ export function CountriesPage() {
             onChange={(e) => setAddTaxPercent(e.target.value)}
             disabled={busy}
             required
+          />
+        </label>
+        <label>
+          ISO
+          <input
+            type="text"
+            value={addIsoCode}
+            onChange={(e) => setAddIsoCode(e.target.value)}
+            disabled={busy}
+            maxLength={2}
+            placeholder="SE"
+            aria-label="ISO country code"
           />
         </label>
         <button type="submit" disabled={busy}>
