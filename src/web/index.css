@@ -1,19 +1,21 @@
 :root {
-  --text: #1f2937;
-  --muted: #6b7280;
-  --bg: #f8fafc;
-  --panel: #ffffff;
-  --border: #d1d5db;
-  --error: #b91c1c;
-  --accent: #1d4ed8;
-  --accent-soft: #dbeafe;
+  --text: #f0ebe6;
+  --muted: #9a9086;
+  --bg: #12100e;
+  --panel: #1a1714;
+  --raised: #24201c;
+  --border: #3a342e;
+  --error: #f07178;
+  --success: #6bbf8a;
+  --accent: #e8a54b;
+  --accent-soft: rgba(232, 165, 75, 0.16);
   --sans: system-ui, "Segoe UI", Roboto, sans-serif;
   --mono: ui-monospace, Consolas, monospace;
 
   font: 14px/1.45 var(--sans);
   color: var(--text);
   background: var(--bg);
-  color-scheme: light;
+  color-scheme: dark;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
@@ -77,13 +79,13 @@ button:disabled {
 
 .nav-link:hover {
   color: var(--text);
-  background: #f3f4f6;
+  background: var(--raised);
 }
 
 .nav-link.active {
   color: var(--accent);
   background: var(--accent-soft);
-  border-color: #bfdbfe;
+  border-color: rgba(232, 165, 75, 0.45);
 }
 
 .shell-main {
