@@ -38,7 +38,14 @@ function mountCountries(db: Db): Hono {
 
 async function seedCountry(
   db: Db,
-  row: { id: string; name: string; taxRate: number; isoCode?: string | null },
+  row: {
+    id: string;
+    name: string;
+    taxRate: number;
+    isoCode?: string | null;
+    source?: "warera" | "manual";
+    syncedAt?: Date | null;
+  },
 ): Promise<void> {
   const now = new Date();
   await db.insert(schema.countries).values({
@@ -46,6 +53,8 @@ async function seedCountry(
     name: row.name,
     taxRate: row.taxRate,
     isoCode: row.isoCode ?? null,
+    source: row.source ?? "manual",
+    syncedAt: row.syncedAt ?? null,
     createdAt: now,
     updatedAt: now,
   });
@@ -177,5 +186,54 @@ describe("countriesRoutes", () => {
     expect(
       ((await clearRes.json()) as { country: { isoCode: string | null } }).country.isoCode,
     ).toBeNull();
+  });
+
+  it("POST sets source=manual and syncedAt=null", async () => {
+    const res = await app.request("/", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: "Norway", taxRate: 0.02 }),
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      country: { source: string; syncedAt: string | null };
+    };
+    expect(body.country.source).toBe("manual");
+    expect(body.country.syncedAt).toBeNull();
+  });
+
+  it("PATCH rejects WarEra-synced name/taxRate/isoCode with api_owned_field", async () => {
+    await seedCountry(db, {
+      id: "finland",
+      name: "Finland",
+      taxRate: 0.03,
+      isoCode: "FI",
+      source: "warera",
+      syncedAt: new Date("2026-01-01T00:00:00.000Z"),
+    });
+
+    for (const patchBody of [{ taxRate: 0.05 }, { name: "Suomi" }, { isoCode: "SF" }]) {
+      const res = await app.request("/finland", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(patchBody),
+      });
+      expect(res.status).toBe(400);
+      const body = (await res.json()) as { error: { code: string; message: string } };
+      expect(body.error.code).toBe("api_owned_field");
+      expect(body.error.message).toBe("Cannot overwrite WarEra-synced country fields");
+    }
+  });
+
+  it("PATCH allows taxRate on manual countries", async () => {
+    const res = await app.request("/sweden", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ taxRate: 0.05 }),
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { country: { taxRate: number; source: string } };
+    expect(body.country.taxRate).toBe(0.05);
+    expect(body.country.source).toBe("manual");
   });
 });

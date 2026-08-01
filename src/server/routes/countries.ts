@@ -97,6 +97,8 @@ export function countriesRoutes(deps: CountriesRouteDeps) {
         name: trimmedName,
         taxRate,
         isoCode,
+        source: "manual",
+        syncedAt: null,
         createdAt: now,
         updatedAt: now,
       });
@@ -126,6 +128,18 @@ export function countriesRoutes(deps: CountriesRouteDeps) {
     }
 
     const body = parseJsonBody(raw);
+
+    if (
+      existing[0].source === "warera" &&
+      (body.name !== undefined || body.taxRate !== undefined || body.isoCode !== undefined)
+    ) {
+      throw new HttpError(
+        400,
+        "api_owned_field",
+        "Cannot overwrite WarEra-synced country fields",
+      );
+    }
+
     const patch: {
       name?: string;
       taxRate?: number;

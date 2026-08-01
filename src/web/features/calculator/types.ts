@@ -3,6 +3,8 @@ export type Country = {
   name: string;
   taxRate: number;
   isoCode: string | null;
+  source: "warera" | "manual";
+  syncedAt: string | null;
 };
 
 export type CountriesResponse = { countries: Country[] };
