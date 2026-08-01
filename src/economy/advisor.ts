@@ -15,8 +15,11 @@ import {
   type CompanyPackEntry,
 } from "../db/company-packs";
 import { getLatestPrices, marketPriceMap } from "../db/prices";
-import { getRecommendedRegion, upsertRecommendedRegion } from "../db/recommended-regions";
-import { enqueueRegion, getRegion, upsertRegionFetched } from "../db/regions";
+import {
+  getRecommendedRegionsByItemCodes,
+  upsertRecommendedRegion,
+} from "../db/recommended-regions";
+import { enqueueRegions, getRegionsByIds, upsertRegionFetched } from "../db/regions";
 import type { Db } from "../db/client";
 import { runPricePoll } from "../jobs/price-poll/run";
 import type { Logger } from "../logging/logger";
@@ -163,9 +166,11 @@ export async function buildAdvisor(options: {
     );
     const fetchedAt = new Date();
     await upsertCompanyPack(db, { userId, companies: enrichedLive, fetchedAt });
-    for (const entry of enrichedLive) {
-      if (entry.regionId) await enqueueRegion(db, entry.regionId, fetchedAt);
-    }
+    await enqueueRegions(
+      db,
+      enrichedLive.flatMap((e) => (e.regionId ? [e.regionId] : [])),
+      fetchedAt,
+    );
     packEntries = enrichedLive;
     companiesFetchedAt = fetchedAt.getTime();
     companiesRefreshed = true;
@@ -180,24 +185,60 @@ export async function buildAdvisor(options: {
     "advisor",
   );
 
+  phaseStarted = performance.now();
+  const recipeCodes = listProducibleRecipes().map((r) => r.itemCode);
+  const recommendedByItem = await getRecommendedRegionsByItemCodes(db, recipeCodes);
+  cacheStats.recommendedHit = recommendedByItem.size;
+  cacheStats.recommendedMiss = Math.max(0, recipeCodes.length - recommendedByItem.size);
+
+  const regionIdsNeeded = new Set<string>();
+  for (const entry of packEntries) {
+    if (entry.regionId) regionIdsNeeded.add(entry.regionId);
+  }
+  for (const row of recommendedByItem.values()) {
+    regionIdsNeeded.add(row.regionId);
+  }
+
+  const regionsById = await getRegionsByIds(db, [...regionIdsNeeded]);
+  await enqueueRegions(db, [...regionIdsNeeded]);
+
   const regionInfoCache = new Map<string, RegionInfo>();
+  for (const [id, row] of regionsById) {
+    if (row.fetchedAt != null) {
+      cacheStats.regionHit += 1;
+      regionInfoCache.set(id, { name: row.name, countryCode: row.countryCode });
+    }
+  }
+
+  const bestRegionCache = new Map<string, RecommendedRegion | null>();
+  for (const [itemCode, row] of recommendedByItem) {
+    bestRegionCache.set(itemCode, {
+      regionId: row.regionId,
+      regionName: row.regionName,
+      bonus: row.bonus ?? 0,
+    });
+  }
+
+  logger.info(
+    {
+      phase: "prefetchCaches",
+      durationMs: Math.round(performance.now() - phaseStarted),
+      recommendedCached: recommendedByItem.size,
+      regionsCached: regionInfoCache.size,
+      regionIds: regionIdsNeeded.size,
+    },
+    "advisor",
+  );
+
   async function regionInfo(regionId: string | null): Promise<RegionInfo> {
     if (!regionId) return { name: null, countryCode: null };
     if (regionInfoCache.has(regionId)) return regionInfoCache.get(regionId)!;
-
-    const cached = await getRegion(db, regionId);
-    if (cached?.fetchedAt != null) {
-      cacheStats.regionHit += 1;
-      const info = { name: cached.name, countryCode: cached.countryCode };
-      regionInfoCache.set(regionId, info);
-      return info;
-    }
 
     cacheStats.regionMiss += 1;
     cacheStats.regionLiveFetch += 1;
     const info = await fetchRegionInfo(warera, regionId);
     const now = new Date();
-    await enqueueRegion(db, regionId, now);
+    await enqueueRegions(db, [regionId], now);
     await upsertRegionFetched(db, {
       id: regionId,
       name: info.name,
@@ -208,25 +249,9 @@ export async function buildAdvisor(options: {
     return info;
   }
 
-  const bestRegionCache = new Map<string, RecommendedRegion | null>();
-
   async function bestRegion(itemCode: string): Promise<RecommendedRegion | null> {
     if (bestRegionCache.has(itemCode)) return bestRegionCache.get(itemCode)!;
 
-    const cached = await getRecommendedRegion(db, itemCode);
-    if (cached) {
-      cacheStats.recommendedHit += 1;
-      const region: RecommendedRegion = {
-        regionId: cached.regionId,
-        regionName: cached.regionName,
-        bonus: cached.bonus ?? 0,
-      };
-      bestRegionCache.set(itemCode, region);
-      await enqueueRegion(db, region.regionId);
-      return region;
-    }
-
-    cacheStats.recommendedMiss += 1;
     try {
       const region = await fetchBestRecommendedRegion(warera, itemCode);
       if (region) {
@@ -243,7 +268,7 @@ export async function buildAdvisor(options: {
           },
           fetchedAt: now,
         });
-        await enqueueRegion(db, region.regionId, now);
+        await enqueueRegions(db, [region.regionId], now);
       }
       bestRegionCache.set(itemCode, region);
       return region;

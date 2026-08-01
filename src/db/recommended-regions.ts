@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import type { Db } from "./client";
 import { recommendedRegions } from "./schema";
 
@@ -11,6 +11,17 @@ export type RecommendedRegionRow = {
   fetchedAt: Date;
 };
 
+function mapRow(row: typeof recommendedRegions.$inferSelect): RecommendedRegionRow {
+  return {
+    itemCode: row.itemCode,
+    regionId: row.regionId,
+    regionName: row.regionName ?? null,
+    bonus: row.bonus ?? null,
+    payload: (row.payload as Record<string, unknown> | null) ?? null,
+    fetchedAt: row.fetchedAt,
+  };
+}
+
 export async function getRecommendedRegion(
   db: Db,
   itemCode: string,
@@ -20,16 +31,23 @@ export async function getRecommendedRegion(
     .from(recommendedRegions)
     .where(eq(recommendedRegions.itemCode, itemCode))
     .limit(1);
-  const row = rows[0];
-  if (!row) return null;
-  return {
-    itemCode: row.itemCode,
-    regionId: row.regionId,
-    regionName: row.regionName ?? null,
-    bonus: row.bonus ?? null,
-    payload: (row.payload as Record<string, unknown> | null) ?? null,
-    fetchedAt: row.fetchedAt,
-  };
+  return rows[0] ? mapRow(rows[0]) : null;
+}
+
+/** Load many recommended regions in one query. Empty input → no query. */
+export async function getRecommendedRegionsByItemCodes(
+  db: Db,
+  itemCodes: string[],
+): Promise<Map<string, RecommendedRegionRow>> {
+  const unique = [...new Set(itemCodes.filter((c) => c.length > 0))];
+  const out = new Map<string, RecommendedRegionRow>();
+  if (unique.length === 0) return out;
+  const rows = await db
+    .select()
+    .from(recommendedRegions)
+    .where(inArray(recommendedRegions.itemCode, unique));
+  for (const row of rows) out.set(row.itemCode, mapRow(row));
+  return out;
 }
 
 export async function upsertRecommendedRegion(

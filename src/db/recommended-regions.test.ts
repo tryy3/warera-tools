@@ -6,7 +6,11 @@ import { join } from "node:path";
 import { beforeEach, describe, expect, it } from "vite-plus/test";
 import type { Db } from "./client";
 import * as schema from "./schema";
-import { getRecommendedRegion, upsertRecommendedRegion } from "./recommended-regions";
+import {
+  getRecommendedRegion,
+  getRecommendedRegionsByItemCodes,
+  upsertRecommendedRegion,
+} from "./recommended-regions";
 
 async function createDb(): Promise<Db> {
   const dir = mkdtempSync(join(tmpdir(), "rec-regions-"));
@@ -51,5 +55,28 @@ describe("recommended_regions db", () => {
       fetchedAt: new Date("2026-08-01T13:00:00.000Z"),
     });
     expect((await getRecommendedRegion(db, "steel"))?.regionId).toBe("r2");
+  });
+
+  it("batch loads by item codes", async () => {
+    await upsertRecommendedRegion(db, {
+      itemCode: "steel",
+      regionId: "r1",
+      regionName: null,
+      bonus: 0.1,
+      payload: null,
+      fetchedAt: new Date("2026-08-01T12:00:00.000Z"),
+    });
+    await upsertRecommendedRegion(db, {
+      itemCode: "iron",
+      regionId: "r2",
+      regionName: null,
+      bonus: 0.2,
+      payload: null,
+      fetchedAt: new Date("2026-08-01T12:00:00.000Z"),
+    });
+    const map = await getRecommendedRegionsByItemCodes(db, ["steel", "iron", "wood"]);
+    expect(map.size).toBe(2);
+    expect(map.get("steel")?.regionId).toBe("r1");
+    expect(map.has("wood")).toBe(false);
   });
 });
