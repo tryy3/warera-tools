@@ -135,7 +135,7 @@ Paths stay under `src/components/ui/` per `components.json`. Prefer `size="sm"` 
 
 ## Work order
 
-1. **Tokens** — Reorder `src/web/index.css`: shadcn vars hold hex; legacy aliases; fix accent vs primary; add `--success` to `@theme`; Geist + dark-only.
+1. **Tokens** — Reorder `src/web/index.css`: shadcn vars hold hex; legacy aliases (no `--accent` alias); set shadcn `--accent` to soft surface; rewrite legacy `var(--accent)` brand uses → `var(--primary)`; set `--radius: 0.375rem`; add `--success` to `@theme`; Geist + dark-only.
 2. **Primitives** — `shadcn add` Card, Table, Badge, Separator (+ optional Alert / Collapsible if used).
 3. **Economy restyle** — Migrate `EconomyPage` (and small locals) to primitives + Tailwind; leave `EconomyPlayerSearch` behavior intact.
 4. **CSS cleanup** — Remove unused Economy-only rules (`.economy-*`, formula classes if inlined, `.btn` if unused elsewhere). Leave other page/shell rules on aliases.
