@@ -1,6 +1,8 @@
 import { getRouteApi } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { calculateProfit, scrapAmountForTier } from "@/calculator";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { api } from "../../api";
 import { DEFAULT_CALC_TIER, buildCalculatorSearch } from "../../lib/calculatorSearch";
 import { CountrySelect } from "./CountrySelect";
@@ -126,25 +128,27 @@ export function CalculatorPage() {
   const defaultCountryId = pickDefaultCountryId(countries);
 
   return (
-    <section className="page">
-      <div className="page-header">
-        <h1>Calculator</h1>
-        <button
+    <section className="mx-auto max-w-[1100px] rounded-md border border-border bg-card p-4 pb-6">
+      <div className="mb-3 flex items-center justify-between gap-4">
+        <h1 className="m-0 text-[1.35rem] font-semibold tracking-tight">Calculator</h1>
+        <Button
           type="button"
+          variant="outline"
+          size="sm"
           onClick={() => void refreshScrapPrice()}
           disabled={refreshing || loading}
         >
           Refresh scrap price
-        </button>
+        </Button>
       </div>
 
-      {error ? <p className="error">{error}</p> : null}
-      {loading ? <p className="muted">Loading calculator data…</p> : null}
+      {error ? <p className="my-2 text-destructive">{error}</p> : null}
+      {loading ? <p className="text-muted-foreground">Loading calculator data…</p> : null}
 
       {!loading ? (
         <>
-          <div className="calc-controls">
-            <div className="calc-control-tier">
+          <div className="my-3 flex flex-wrap gap-4">
+            <div className="flex w-full flex-col gap-1 text-sm text-muted-foreground">
               <span>Tier</span>
               <TierPicker
                 value={tier}
@@ -159,7 +163,7 @@ export function CalculatorPage() {
               />
             </div>
 
-            <div className="calc-control">
+            <div className="flex min-w-40 flex-col gap-1 text-sm text-muted-foreground">
               <span>Country</span>
               <CountrySelect
                 countries={countries}
@@ -177,9 +181,9 @@ export function CalculatorPage() {
               />
             </div>
 
-            <label>
+            <label className="flex flex-col gap-1 text-sm text-muted-foreground">
               Incl. price
-              <input
+              <Input
                 type="number"
                 inputMode="decimal"
                 min="0"
@@ -194,34 +198,37 @@ export function CalculatorPage() {
                   })
                 }
                 placeholder="e.g. 3.9"
+                className="min-w-40"
               />
             </label>
           </div>
 
           {scraps ? (
             <>
-              <div className="calc-breakdown">
-                <div className="calc-row">
+              <div className="my-4 grid max-w-md gap-1.5">
+                <div className="flex justify-between gap-4">
                   <span>Dismantle value</span>
-                  <span className="mono">
+                  <span className="font-mono">
                     {dismantleValue != null ? formatNum(dismantleValue) : "—"}
                   </span>
                 </div>
                 {breakdown ? (
                   <>
-                    <div className="calc-row">
+                    <div className="flex justify-between gap-4">
                       <span>Incl. price</span>
-                      <span className="mono">{formatNum(breakdown.inclPrice)}</span>
+                      <span className="font-mono">{formatNum(breakdown.inclPrice)}</span>
                     </div>
-                    <div className="calc-row">
+                    <div className="flex justify-between gap-4">
                       <span>Excl. price</span>
-                      <span className="mono">{formatNum(breakdown.exclPrice)}</span>
+                      <span className="font-mono">{formatNum(breakdown.exclPrice)}</span>
                     </div>
-                    <div className="calc-row">
+                    <div className="flex justify-between gap-4">
                       <span>Profit</span>
                       <span
                         className={
-                          breakdown.profit >= 0 ? "mono profit-positive" : "mono profit-negative"
+                          breakdown.profit >= 0
+                            ? "font-mono font-semibold text-success"
+                            : "font-mono font-semibold text-destructive"
                         }
                       >
                         {formatNum(breakdown.profit)}
@@ -231,9 +238,11 @@ export function CalculatorPage() {
                 ) : null}
               </div>
 
-              <details className="calc-details">
-                <summary>Scrap &amp; tax details</summary>
-                <p className="muted small">
+              <details className="mt-2 max-w-xl">
+                <summary className="cursor-pointer text-muted-foreground">
+                  Scrap &amp; tax details
+                </summary>
+                <p className="text-sm text-muted-foreground">
                   Scrap amount: {scrapAmount} · Scrap price: {formatNum(scraps.price)} · Tax:{" "}
                   {(taxRate * 100).toLocaleString(undefined, { maximumFractionDigits: 4 })}% ·
                   Fetched: {formatTs(scraps.fetchedAt)}
@@ -242,7 +251,7 @@ export function CalculatorPage() {
               </details>
             </>
           ) : !error ? (
-            <p className="muted">No scrap price loaded.</p>
+            <p className="text-muted-foreground">No scrap price loaded.</p>
           ) : null}
         </>
       ) : null}

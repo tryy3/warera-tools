@@ -1,4 +1,11 @@
-import { useEffect, useId, useRef, useState } from "react";
+import {
+  Combobox,
+  ComboboxContent,
+  ComboboxEmpty,
+  ComboboxInput,
+  ComboboxItem,
+  ComboboxList,
+} from "@/components/ui/combobox";
 import { flagEmojiFromIso } from "../../lib/flagEmoji";
 import type { Country } from "./types";
 
@@ -15,61 +22,38 @@ function labelFor(country: Country): string {
 }
 
 export function CountrySelect({ countries, value, onChange, disabled }: Props) {
-  const [open, setOpen] = useState(false);
-  const rootRef = useRef<HTMLDivElement>(null);
-  const listId = useId();
   const selected = countries.find((c) => c.id === value) ?? null;
-
-  useEffect(() => {
-    if (!open) return;
-    function onDocMouseDown(e: MouseEvent) {
-      if (!rootRef.current?.contains(e.target as Node)) setOpen(false);
-    }
-    function onKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape") setOpen(false);
-    }
-    document.addEventListener("mousedown", onDocMouseDown);
-    document.addEventListener("keydown", onKeyDown);
-    return () => {
-      document.removeEventListener("mousedown", onDocMouseDown);
-      document.removeEventListener("keydown", onKeyDown);
-    };
-  }, [open]);
+  const empty = countries.length === 0;
 
   return (
-    <div className="country-select" ref={rootRef}>
-      <button
-        type="button"
-        className="country-select-trigger"
-        aria-haspopup="listbox"
-        aria-expanded={open}
-        aria-controls={listId}
-        disabled={disabled || countries.length === 0}
-        onClick={() => setOpen((v) => !v)}
-      >
-        {selected ? labelFor(selected) : countries.length === 0 ? "No countries" : "Select country"}
-      </button>
-      {open ? (
-        <ul id={listId} className="country-select-list" role="listbox">
-          {countries.map((country) => {
-            const isSelected = country.id === value;
-            return (
-              <li key={country.id} role="option" aria-selected={isSelected}>
-                <button
-                  type="button"
-                  className={isSelected ? "is-selected" : undefined}
-                  onClick={() => {
-                    onChange(country.id);
-                    setOpen(false);
-                  }}
-                >
-                  {labelFor(country)}
-                </button>
-              </li>
-            );
-          })}
-        </ul>
-      ) : null}
-    </div>
+    <Combobox
+      items={countries}
+      value={selected}
+      onValueChange={(next) => {
+        const country = next as Country | null;
+        if (country) onChange(country.id);
+      }}
+      itemToStringLabel={(item: Country) => labelFor(item)}
+      itemToStringValue={(item: Country) => item.id}
+      isItemEqualToValue={(a: Country, b: Country) => a.id === b.id}
+      disabled={disabled || empty}
+    >
+      <ComboboxInput
+        placeholder={empty ? "No countries" : "Select country"}
+        disabled={disabled || empty}
+        className="w-full min-w-40"
+        showClear={false}
+      />
+      <ComboboxContent>
+        <ComboboxEmpty>No countries</ComboboxEmpty>
+        <ComboboxList>
+          {(country: Country) => (
+            <ComboboxItem key={country.id} value={country}>
+              {labelFor(country)}
+            </ComboboxItem>
+          )}
+        </ComboboxList>
+      </ComboboxContent>
+    </Combobox>
   );
 }
