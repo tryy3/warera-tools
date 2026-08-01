@@ -5,10 +5,17 @@ import { tanstackRouter } from "@tanstack/router-plugin/vite";
 
 export default defineConfig({
   fmt: {
-    ignorePatterns: ["docs/**", ".superpowers/**", "*.md", "flake.nix", "flake.lock"],
+    ignorePatterns: [
+      "docs/**",
+      ".superpowers/**",
+      "*.md",
+      "flake.nix",
+      "flake.lock",
+      "src/web/routeTree.gen.ts",
+    ],
   },
   lint: {
-    ignorePatterns: ["docs/**", ".superpowers/**"],
+    ignorePatterns: ["docs/**", ".superpowers/**", "src/web/routeTree.gen.ts"],
     plugins: ["react", "typescript", "oxc"],
     rules: {
       "react/rules-of-hooks": "error",
