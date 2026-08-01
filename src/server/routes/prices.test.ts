@@ -53,7 +53,18 @@ function appFor(db: Db) {
     const { status, body } = errorPayload(err);
     return c.json(body, status as ContentfulStatusCode);
   });
-  app.route("/", pricesRoutes({ db, warera: { request: async () => { throw new Error("unused"); } }, logger: silentLogger }));
+  app.route(
+    "/",
+    pricesRoutes({
+      db,
+      warera: {
+        request: async () => {
+          throw new Error("unused");
+        },
+      },
+      logger: silentLogger,
+    }),
+  );
   return app;
 }
 
@@ -84,9 +95,7 @@ describe("GET /history", () => {
       },
     ]);
 
-    const res = await appFor(db).request(
-      "http://localhost/history?itemCode=steel&range=7d",
-    );
+    const res = await appFor(db).request("http://localhost/history?itemCode=steel&range=7d");
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.itemCode).toBe("steel");
@@ -115,17 +124,13 @@ describe("GET /history", () => {
         sellAvg: null,
       },
     ]);
-    const res = await appFor(db).request(
-      "http://localhost/history?itemCode=steel&range=nope",
-    );
+    const res = await appFor(db).request("http://localhost/history?itemCode=steel&range=nope");
     expect(res.status).toBe(200);
     expect((await res.json()).range).toBe("7d");
   });
 
   it("404s for unknown item", async () => {
-    const res = await appFor(db).request(
-      "http://localhost/history?itemCode=missing&range=7d",
-    );
+    const res = await appFor(db).request("http://localhost/history?itemCode=missing&range=7d");
     expect(res.status).toBe(404);
   });
 

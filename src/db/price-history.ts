@@ -73,12 +73,7 @@ export async function getItemPriceHistory(
     })
     .from(priceSnapshots)
     .innerJoin(pricePolls, eq(priceSnapshots.pollId, pricePolls.id))
-    .where(
-      and(
-        eq(priceSnapshots.itemCode, itemCode),
-        inArray(pricePolls.status, [...OK_STATUSES]),
-      ),
-    )
+    .where(and(eq(priceSnapshots.itemCode, itemCode), inArray(pricePolls.status, [...OK_STATUSES])))
     .orderBy(desc(pricePolls.recordedAt), desc(pricePolls.id))
     .limit(1);
 

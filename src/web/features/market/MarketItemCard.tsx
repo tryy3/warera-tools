@@ -3,11 +3,8 @@ import { Badge } from "@/components/ui/badge";
 import { formatDisplayNumber } from "@/lib/formatDisplayNumber";
 import { GoldIcon } from "../../components/GoldIcon";
 import { ItemIcon } from "../../components/ItemIcon";
+import { formatItem } from "./formatItem";
 import type { LatestPriceItem } from "./types";
-
-function formatItem(code: string): string {
-  return code.replace(/([A-Z])/g, " $1").replace(/^./, (c) => c.toUpperCase());
-}
 
 function formatNum(value: number | null | undefined, digits = 4): string {
   if (value == null || !Number.isFinite(value)) return "—";
@@ -33,6 +30,7 @@ export function MarketItemCard({ item }: Props) {
     <Link
       to="/market/$itemCode"
       params={{ itemCode: item.itemCode }}
+      search={{ range: "7d" }}
       className="block rounded-md border border-border bg-secondary px-3.5 py-3 text-inherit no-underline shadow-none transition-colors hover:border-primary/45 hover:bg-secondary/80"
     >
       <div className="flex items-start justify-between gap-2">
