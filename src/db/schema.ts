@@ -36,11 +36,16 @@ export const cache = sqliteTable("cache", {
   tags: text("tags"),
 });
 
+export const countrySources = ["warera", "manual"] as const;
+export type CountrySource = (typeof countrySources)[number];
+
 export const countries = sqliteTable("countries", {
   id: text("id").primaryKey(),
   name: text("name").notNull().unique(),
   taxRate: real("tax_rate").notNull(),
   isoCode: text("iso_code"),
+  source: text("source").notNull().default("manual"),
+  syncedAt: integer("synced_at", { mode: "timestamp_ms" }),
   createdAt: integer("created_at", { mode: "timestamp_ms" })
     .notNull()
     .$defaultFn(() => new Date()),
