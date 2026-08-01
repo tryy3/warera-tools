@@ -23,8 +23,7 @@ function formatNum(value: number, digits = 4): string {
 }
 
 function pickDefaultCountryId(countries: Country[]): string {
-  if (countries.some((c) => c.id === "sweden")) return "sweden";
-  return countries[0]?.id ?? "";
+  return countries.find((c) => c.isoCode === "SE")?.id ?? countries[0]?.id ?? "";
 }
 
 export function CalculatorPage() {

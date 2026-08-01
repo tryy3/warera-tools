@@ -1,6 +1,6 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { api } from "../../api";
-import { flagEmojiFromIso } from "../../lib/flagEmoji";
+import { FlagIcon } from "../../components/FlagIcon";
 import type { CountriesResponse, Country } from "./types";
 
 function percentFromRate(taxRate: number): number {
@@ -44,6 +44,7 @@ export function CountriesPage() {
   }, []);
 
   function startEdit(country: Country) {
+    if (country.source === "warera") return;
     setEditingId(country.id);
     setEditName(country.name);
     setEditTaxPercent(String(percentFromRate(country.taxRate)));
@@ -158,7 +159,8 @@ export function CountriesPage() {
           </thead>
           <tbody>
             {countries.map((country) => {
-              const editing = editingId === country.id;
+              const isWarera = country.source === "warera";
+              const editing = !isWarera && editingId === country.id;
               return (
                 <tr key={country.id} className={editing ? "selected" : undefined}>
                   <td>
@@ -192,9 +194,10 @@ export function CountriesPage() {
                         <div className="muted small">Optional ISO 3166-1 alpha-2 (e.g. SE)</div>
                       </>
                     ) : country.isoCode ? (
-                      <>
-                        {flagEmojiFromIso(country.isoCode)} {country.isoCode}
-                      </>
+                      <span className="icon-label">
+                        <FlagIcon code={country.isoCode} />
+                        {country.isoCode}
+                      </span>
                     ) : (
                       "—"
                     )}
@@ -218,26 +221,30 @@ export function CountriesPage() {
                     )}
                   </td>
                   <td>
-                    <div className="actions">
-                      {editing ? (
-                        <>
-                          <button type="button" disabled={busy} onClick={() => void saveEdit()}>
-                            Save
+                    {isWarera ? (
+                      <span className="muted small">Synced</span>
+                    ) : (
+                      <div className="actions">
+                        {editing ? (
+                          <>
+                            <button type="button" disabled={busy} onClick={() => void saveEdit()}>
+                              Save
+                            </button>
+                            <button type="button" disabled={busy} onClick={cancelEdit}>
+                              Cancel
+                            </button>
+                          </>
+                        ) : (
+                          <button
+                            type="button"
+                            disabled={busy || editingId != null}
+                            onClick={() => startEdit(country)}
+                          >
+                            Edit
                           </button>
-                          <button type="button" disabled={busy} onClick={cancelEdit}>
-                            Cancel
-                          </button>
-                        </>
-                      ) : (
-                        <button
-                          type="button"
-                          disabled={busy || editingId != null}
-                          onClick={() => startEdit(country)}
-                        >
-                          Edit
-                        </button>
-                      )}
-                    </div>
+                        )}
+                      </div>
+                    )}
                   </td>
                 </tr>
               );
