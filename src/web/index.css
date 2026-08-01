@@ -42,16 +42,8 @@
 
   /* app-only extensions */
   --success: #6bbf8a;
-  --accent-soft: rgba(232, 165, 75, 0.16);
   --sans: system-ui, "Segoe UI", Roboto, sans-serif;
   --mono: ui-monospace, Consolas, monospace;
-
-  /* legacy aliases (temporary — do not alias --accent or --muted) */
-  --bg: var(--background);
-  --panel: var(--card);
-  --raised: var(--secondary);
-  --text: var(--foreground);
-  --error: var(--destructive);
 
   font: 14px/1.45 var(--sans);
   color: var(--foreground);
