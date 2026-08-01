@@ -1,4 +1,12 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+@import "@fontsource-variable/geist";
+
+@custom-variant dark (&:is(.dark *));
+
 :root {
+  /* App / legacy tokens */
   --text: #f0ebe6;
   --muted: #9a9086;
   --bg: #12100e;
@@ -20,6 +28,37 @@
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+
+  /* shadcn semantic tokens → existing palette (always dark) */
+  --background: #12100e;
+  --foreground: #f0ebe6;
+  --card: #1a1714;
+  --card-foreground: #f0ebe6;
+  --popover: #1a1714;
+  --popover-foreground: #f0ebe6;
+  --primary: #e8a54b;
+  --primary-foreground: #12100e;
+  --secondary: #24201c;
+  --secondary-foreground: #f0ebe6;
+  --muted-foreground: #9a9086;
+  --accent-foreground: #12100e;
+  --destructive: #f07178;
+  --input: #3a342e;
+  --ring: #e8a54b;
+  --chart-1: #e8a54b;
+  --chart-2: #9a9086;
+  --chart-3: #6bbf8a;
+  --chart-4: #3a342e;
+  --chart-5: #24201c;
+  --radius: 0.625rem;
+  --sidebar: #1a1714;
+  --sidebar-foreground: #f0ebe6;
+  --sidebar-primary: #e8a54b;
+  --sidebar-primary-foreground: #12100e;
+  --sidebar-accent: #24201c;
+  --sidebar-accent-foreground: #f0ebe6;
+  --sidebar-border: #3a342e;
+  --sidebar-ring: #e8a54b;
 }
 
 * {
@@ -760,4 +799,87 @@ button:disabled {
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
+}
+
+@theme inline {
+  --font-heading: var(--font-sans);
+  --font-sans: "Geist Variable", var(--sans);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  /* Use raised surface for Tailwind muted bg; keep --muted as app muted text */
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--raised);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --color-foreground: var(--foreground);
+  --color-background: var(--background);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+.dark {
+  /* App is always dark; keep .dark in sync if class is ever applied */
+  --background: #12100e;
+  --foreground: #f0ebe6;
+  --card: #1a1714;
+  --card-foreground: #f0ebe6;
+  --popover: #1a1714;
+  --popover-foreground: #f0ebe6;
+  --primary: #e8a54b;
+  --primary-foreground: #12100e;
+  --secondary: #24201c;
+  --secondary-foreground: #f0ebe6;
+  --muted-foreground: #9a9086;
+  --accent-foreground: #12100e;
+  --destructive: #f07178;
+  --input: #3a342e;
+  --ring: #e8a54b;
+  --sidebar: #1a1714;
+  --sidebar-foreground: #f0ebe6;
+  --sidebar-primary: #e8a54b;
+  --sidebar-primary-foreground: #12100e;
+  --sidebar-accent: #24201c;
+  --sidebar-accent-foreground: #f0ebe6;
+  --sidebar-border: #3a342e;
+  --sidebar-ring: #e8a54b;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+  html {
+    @apply font-sans;
+  }
 }
