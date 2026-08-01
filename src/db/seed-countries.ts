@@ -1,27 +1,20 @@
-import { eq } from "drizzle-orm";
 import type { Db } from "./client";
 import { countries } from "./schema";
 
+/** Bootstrap Sweden when empty so the calculator works before the first country-sync. Sync migrates this row by ISO. */
 export async function seedDefaultCountries(db: Db): Promise<void> {
-  const existing = await db.select().from(countries).where(eq(countries.id, "sweden")).limit(1);
+  const any = await db.select({ id: countries.id }).from(countries).limit(1);
+  if (any[0]) return;
+
   const now = new Date();
-
-  if (!existing[0]) {
-    await db.insert(countries).values({
-      id: "sweden",
-      name: "Sweden",
-      taxRate: 0.01,
-      isoCode: "SE",
-      createdAt: now,
-      updatedAt: now,
-    });
-    return;
-  }
-
-  if (existing[0].isoCode == null) {
-    await db
-      .update(countries)
-      .set({ isoCode: "SE", updatedAt: now })
-      .where(eq(countries.id, "sweden"));
-  }
+  await db.insert(countries).values({
+    id: "sweden",
+    name: "Sweden",
+    taxRate: 0.01,
+    isoCode: "SE",
+    source: "manual",
+    syncedAt: null,
+    createdAt: now,
+    updatedAt: now,
+  });
 }
