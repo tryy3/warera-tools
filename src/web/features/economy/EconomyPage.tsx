@@ -165,9 +165,7 @@ function CompanyCard({ row }: { row: CompanyAdvisorRow }) {
             <div>
               <dt>Transfer</dt>
               <dd className="economy-transfer">
-                <span>
-                  {row.bestSwitch.transferConcrete} Concrete
-                </span>
+                <span>{row.bestSwitch.transferConcrete} Concrete</span>
                 <span className="economy-transfer-gold">
                   ~ <GoldAmount value={row.bestSwitch.transferGold} digits={1} />
                 </span>
