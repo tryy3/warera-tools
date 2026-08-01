@@ -1,5 +1,6 @@
 import { getRouteApi } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
+import type { ReactNode } from "react";
 import { formatDisplayNumber } from "@/lib/formatDisplayNumber";
 import { api } from "../../api";
 import { FlagIcon } from "../../components/FlagIcon";
@@ -25,6 +26,15 @@ function FormulaBox({ label, children }: { label: string; children: string }) {
       <div className="formula-label">{label}</div>
       <code className="formula-text">{children}</code>
     </div>
+  );
+}
+
+function FormulaDetails({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <details className="formula-details">
+      <summary className="formula-details-summary">{label}</summary>
+      <div className="formula-details-body">{children}</div>
+    </details>
   );
 }
 
@@ -109,16 +119,18 @@ function CompanyCard({ row }: { row: CompanyAdvisorRow }) {
         </div>
       </dl>
 
-      {row.bonusDetails ? (
-        <FormulaBox label="Production bonus">{row.bonusDetails.formula}</FormulaBox>
-      ) : null}
-
-      {row.profitBreakdown ? (
-        <FormulaBox label="Profit / PP">{row.profitBreakdown.formula}</FormulaBox>
-      ) : null}
-
-      {row.aeBreakdown ? (
-        <FormulaBox label="AE / day">{`${row.aeBreakdown.formula} = ${formatNum(row.aeBreakdown.dailyValue, 4)} G`}</FormulaBox>
+      {row.bonusDetails || row.profitBreakdown || row.aeBreakdown ? (
+        <FormulaDetails label="How calculated">
+          {row.bonusDetails ? (
+            <FormulaBox label="Production bonus">{row.bonusDetails.formula}</FormulaBox>
+          ) : null}
+          {row.profitBreakdown ? (
+            <FormulaBox label="Profit / PP">{row.profitBreakdown.formula}</FormulaBox>
+          ) : null}
+          {row.aeBreakdown ? (
+            <FormulaBox label="AE / day">{`${row.aeBreakdown.formula} = ${formatNum(row.aeBreakdown.dailyValue, 4)} G`}</FormulaBox>
+          ) : null}
+        </FormulaDetails>
       ) : null}
 
       {row.bestSwitch ? (
@@ -165,12 +177,14 @@ function CompanyCard({ row }: { row: CompanyAdvisorRow }) {
               </dd>
             </div>
           </dl>
-          <FormulaBox label="Alt Profit / PP">{row.bestSwitch.profitFormula}</FormulaBox>
-          <FormulaBox label="Alt AE / day">{row.bestSwitch.aeFormula}</FormulaBox>
-          <FormulaBox label="Transfer cost">{row.bestSwitch.transferFormula}</FormulaBox>
-          {row.bestSwitch.paybackFormula ? (
-            <FormulaBox label="Payback">{row.bestSwitch.paybackFormula}</FormulaBox>
-          ) : null}
+          <FormulaDetails label="Switch math">
+            <FormulaBox label="Alt Profit / PP">{row.bestSwitch.profitFormula}</FormulaBox>
+            <FormulaBox label="Alt AE / day">{row.bestSwitch.aeFormula}</FormulaBox>
+            <FormulaBox label="Transfer cost">{row.bestSwitch.transferFormula}</FormulaBox>
+            {row.bestSwitch.paybackFormula ? (
+              <FormulaBox label="Payback">{row.bestSwitch.paybackFormula}</FormulaBox>
+            ) : null}
+          </FormulaDetails>
         </div>
       ) : (
         <p className="muted small">No profitable switch found with current prices.</p>

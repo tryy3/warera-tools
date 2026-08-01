@@ -605,6 +605,45 @@ button:disabled {
   background: rgba(0, 0, 0, 0.2);
 }
 
+.formula-details {
+  margin-top: 0.55rem;
+  padding: 0.35rem 0.55rem 0.45rem;
+  border: 1px dashed rgba(232, 165, 75, 0.35);
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.formula-details-summary {
+  cursor: pointer;
+  font-size: 0.75em;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--accent);
+  list-style: none;
+}
+
+.formula-details-summary::-webkit-details-marker {
+  display: none;
+}
+
+.formula-details-summary::before {
+  content: "▸ ";
+  display: inline-block;
+  transition: transform 0.12s ease;
+}
+
+.formula-details[open] > .formula-details-summary::before {
+  transform: rotate(90deg);
+}
+
+.formula-details-body .formula-box {
+  margin-top: 0.45rem;
+}
+
+.formula-details-body .formula-box:first-child {
+  margin-top: 0.35rem;
+}
+
 .formula-label {
   font-size: 0.7em;
   letter-spacing: 0.05em;
