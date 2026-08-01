@@ -136,26 +136,27 @@ function CompanyCard({ row }: { row: CompanyAdvisorRow }) {
       {row.bestSwitch ? (
         <div className="economy-switch">
           <div className="economy-switch-title">Best switch (raw)</div>
-          <p>
-            →{" "}
+          <div className="economy-switch-summary">
+            <span className="economy-switch-arrow">→</span>
             <span className="icon-label">
               <ItemIcon itemCode={row.bestSwitch.itemCode} />
               <strong>{formatItem(row.bestSwitch.itemCode)}</strong>
             </span>
             {row.bestSwitch.bestRegionName || row.bestSwitch.bestRegionId ? (
               <>
-                {" "}
-                @{" "}
+                <span className="economy-switch-at">@</span>
                 <span className="icon-label">
                   <FlagIcon code={row.bestSwitch.bestRegionCountryCode} />
                   {row.bestSwitch.bestRegionName ?? row.bestSwitch.bestRegionId}
                 </span>
               </>
             ) : (
-              " (same region)"
-            )}{" "}
-            (+{formatNum(row.bestSwitch.bestBonus * 100, 1)}% bonus)
-          </p>
+              <span>(same region)</span>
+            )}
+            <span className="economy-switch-bonus">
+              (+{formatNum(row.bestSwitch.bestBonus * 100, 1)}% bonus)
+            </span>
+          </div>
           <dl className="economy-stats compact">
             <div>
               <dt>Δ / day</dt>
@@ -163,9 +164,13 @@ function CompanyCard({ row }: { row: CompanyAdvisorRow }) {
             </div>
             <div>
               <dt>Transfer</dt>
-              <dd>
-                {row.bestSwitch.transferConcrete} Concrete (~
-                <GoldAmount value={row.bestSwitch.transferGold} digits={1} />)
+              <dd className="economy-transfer">
+                <span>
+                  {row.bestSwitch.transferConcrete} Concrete
+                </span>
+                <span className="economy-transfer-gold">
+                  ~ <GoldAmount value={row.bestSwitch.transferGold} digits={1} />
+                </span>
               </dd>
             </div>
             <div>
