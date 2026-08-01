@@ -15,6 +15,8 @@ import { Route as CalculatorRouteImport } from './routes/calculator'
 import { Route as CompaniesRouteImport } from './routes/companies'
 import { Route as CountriesRouteImport } from './routes/countries'
 import { Route as JobsRouteImport } from './routes/jobs'
+import { Route as MarketRouteImport } from './routes/market'
+import { Route as MarketItemCodeRouteImport } from './routes/market_.$itemCode'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -46,6 +48,16 @@ const JobsRoute = JobsRouteImport.update({
   path: '/jobs',
   getParentRoute: () => rootRouteImport,
 } as any)
+const MarketRoute = MarketRouteImport.update({
+  id: '/market',
+  path: '/market',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MarketItemCodeRoute = MarketItemCodeRouteImport.update({
+  id: '/market_/$itemCode',
+  path: '/market/$itemCode',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -54,6 +66,8 @@ export interface FileRoutesByFullPath {
   '/companies': typeof CompaniesRoute
   '/countries': typeof CountriesRoute
   '/jobs': typeof JobsRoute
+  '/market': typeof MarketRoute
+  '/market/$itemCode': typeof MarketItemCodeRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -62,6 +76,8 @@ export interface FileRoutesByTo {
   '/companies': typeof CompaniesRoute
   '/countries': typeof CountriesRoute
   '/jobs': typeof JobsRoute
+  '/market': typeof MarketRoute
+  '/market/$itemCode': typeof MarketItemCodeRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -71,12 +87,30 @@ export interface FileRoutesById {
   '/companies': typeof CompaniesRoute
   '/countries': typeof CountriesRoute
   '/jobs': typeof JobsRoute
+  '/market': typeof MarketRoute
+  '/market_/$itemCode': typeof MarketItemCodeRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/$' | '/calculator' | '/companies' | '/countries' | '/jobs'
+  fullPaths:
+    | '/'
+    | '/$'
+    | '/calculator'
+    | '/companies'
+    | '/countries'
+    | '/jobs'
+    | '/market'
+    | '/market/$itemCode'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/$' | '/calculator' | '/companies' | '/countries' | '/jobs'
+  to:
+    | '/'
+    | '/$'
+    | '/calculator'
+    | '/companies'
+    | '/countries'
+    | '/jobs'
+    | '/market'
+    | '/market/$itemCode'
   id:
     | '__root__'
     | '/'
@@ -85,6 +119,8 @@ export interface FileRouteTypes {
     | '/companies'
     | '/countries'
     | '/jobs'
+    | '/market'
+    | '/market_/$itemCode'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -94,6 +130,8 @@ export interface RootRouteChildren {
   CompaniesRoute: typeof CompaniesRoute
   CountriesRoute: typeof CountriesRoute
   JobsRoute: typeof JobsRoute
+  MarketRoute: typeof MarketRoute
+  MarketItemCodeRoute: typeof MarketItemCodeRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -140,6 +178,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof JobsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/market': {
+      id: '/market'
+      path: '/market'
+      fullPath: '/market'
+      preLoaderRoute: typeof MarketRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/market_/$itemCode': {
+      id: '/market_/$itemCode'
+      path: '/market/$itemCode'
+      fullPath: '/market/$itemCode'
+      preLoaderRoute: typeof MarketItemCodeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -150,6 +202,8 @@ const rootRouteChildren: RootRouteChildren = {
   CompaniesRoute: CompaniesRoute,
   CountriesRoute: CountriesRoute,
   JobsRoute: JobsRoute,
+  MarketRoute: MarketRoute,
+  MarketItemCodeRoute: MarketItemCodeRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
