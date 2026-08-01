@@ -131,9 +131,7 @@ function CompanyCard({ row }: { row: CompanyAdvisorRow }) {
             <dt className="m-0 text-[0.75em] tracking-wide text-muted-foreground uppercase">
               Bonus
             </dt>
-            <dd className="mt-0.5 mb-0">
-              {bonusPct != null ? `${formatNum(bonusPct, 1)}%` : "—"}
-            </dd>
+            <dd className="mt-0.5 mb-0">{bonusPct != null ? `${formatNum(bonusPct, 1)}%` : "—"}</dd>
           </div>
           <div>
             <dt className="m-0 text-[0.75em] tracking-wide text-muted-foreground uppercase">
