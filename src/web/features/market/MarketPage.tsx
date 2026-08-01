@@ -60,7 +60,7 @@ export function MarketPage() {
         <div>
           <h1 className="mb-0.5 text-[1.35rem] font-semibold tracking-tight">Market</h1>
           <p className="m-0 text-muted-foreground">
-            Current market prices by item. Top buy is highest bid; top sell is lowest ask.
+            Current market prices by item. Buy is highest bid; Sell is lowest ask.
             {recordedAt ? ` · as of ${new Date(recordedAt).toLocaleString()}` : null}
           </p>
         </div>
@@ -89,7 +89,7 @@ export function MarketPage() {
             return (
               <section key={key} className="mt-5">
                 <h2 className="mt-0 mb-2 text-[1.05rem] font-semibold">{title}</h2>
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
                   {sectionItems.map((item) => (
                     <MarketItemCard key={item.itemCode} item={item} />
                   ))}
