@@ -113,9 +113,7 @@
       "indexes": {
         "countries_name_unique": {
           "name": "countries_name_unique",
-          "columns": [
-            "name"
-          ],
+          "columns": ["name"],
           "isUnique": true
         }
       },
@@ -183,12 +181,8 @@
           "name": "job_runs_job_id_jobs_id_fk",
           "tableFrom": "job_runs",
           "tableTo": "jobs",
-          "columnsFrom": [
-            "job_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["job_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -405,12 +399,8 @@
           "name": "price_snapshots_poll_id_price_polls_id_fk",
           "tableFrom": "price_snapshots",
           "tableTo": "price_polls",
-          "columnsFrom": [
-            "poll_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["poll_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }

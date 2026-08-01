@@ -133,11 +133,7 @@ export function countriesRoutes(deps: CountriesRouteDeps) {
       existing[0].source === "warera" &&
       (body.name !== undefined || body.taxRate !== undefined || body.isoCode !== undefined)
     ) {
-      throw new HttpError(
-        400,
-        "api_owned_field",
-        "Cannot overwrite WarEra-synced country fields",
-      );
+      throw new HttpError(400, "api_owned_field", "Cannot overwrite WarEra-synced country fields");
     }
 
     const patch: {

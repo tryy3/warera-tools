@@ -27,8 +27,7 @@ function formatInputs(recipe: Recipe, prices: Record<string, number>): string {
   return recipe.inputs
     .map((input) => {
       const p = prices[input.itemCode];
-      const priceLabel =
-        p != null && Number.isFinite(p) ? `${formatDisplayNumber(p)} G` : "? G";
+      const priceLabel = p != null && Number.isFinite(p) ? `${formatDisplayNumber(p)} G` : "? G";
       return `${input.quantity} ${input.itemCode} × ${priceLabel}`;
     })
     .join(" + ");

@@ -8,11 +8,6 @@ type Props = {
 export function FlagIcon({ code, className }: Props) {
   if (!code) return null;
   return (
-    <img
-      className={className ?? "flag-icon"}
-      src={wareraFlagUrl(code)}
-      alt=""
-      draggable={false}
-    />
+    <img className={className ?? "flag-icon"} src={wareraFlagUrl(code)} alt="" draggable={false} />
   );
 }

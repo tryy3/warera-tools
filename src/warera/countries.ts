@@ -25,8 +25,7 @@ function parseCountryRow(raw: unknown): WareraCountryRow | null {
 
   const taxes = asRecord(obj.taxes);
   const marketTax = taxes?.market;
-  const taxRate =
-    typeof marketTax === "number" && Number.isFinite(marketTax) ? marketTax / 100 : 0;
+  const taxRate = typeof marketTax === "number" && Number.isFinite(marketTax) ? marketTax / 100 : 0;
 
   return {
     id,
