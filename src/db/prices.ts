@@ -64,22 +64,60 @@ export async function insertPriceSnapshots(
   );
 }
 
+/**
+ * Latest successful/partial poll + its snapshots in **one** round-trip
+ * (subquery for poll id, then join snapshots).
+ */
 export async function getLatestPrices(db: Db): Promise<LatestPrices | null> {
-  const polls = await db
-    .select()
-    .from(pricePolls)
-    .where(sql`${pricePolls.status} IN ('success', 'partial')`)
-    .orderBy(desc(pricePolls.recordedAt), desc(pricePolls.id))
-    .limit(1);
-  const poll = polls[0];
-  if (!poll) return null;
+  const latestPollId = sql`(
+    select ${pricePolls.id}
+    from ${pricePolls}
+    where ${pricePolls.status} in ('success', 'partial')
+    order by ${pricePolls.recordedAt} desc, ${pricePolls.id} desc
+    limit 1
+  )`;
 
-  const rows = await db.select().from(priceSnapshots).where(eq(priceSnapshots.pollId, poll.id));
+  const rows = await db
+    .select({
+      pollId: pricePolls.id,
+      recordedAt: pricePolls.recordedAt,
+      status: pricePolls.status,
+      itemCode: priceSnapshots.itemCode,
+      marketPrice: priceSnapshots.marketPrice,
+      buyMin: priceSnapshots.buyMin,
+      buyMax: priceSnapshots.buyMax,
+      buyAvg: priceSnapshots.buyAvg,
+      sellMin: priceSnapshots.sellMin,
+      sellMax: priceSnapshots.sellMax,
+      sellAvg: priceSnapshots.sellAvg,
+    })
+    .from(pricePolls)
+    .innerJoin(priceSnapshots, eq(priceSnapshots.pollId, pricePolls.id))
+    .where(eq(pricePolls.id, latestPollId));
+
+  const first = rows[0];
+  if (!first) {
+    // Poll may exist with zero snapshots — fall back to poll-only check.
+    const polls = await db
+      .select()
+      .from(pricePolls)
+      .where(sql`${pricePolls.status} IN ('success', 'partial')`)
+      .orderBy(desc(pricePolls.recordedAt), desc(pricePolls.id))
+      .limit(1);
+    const poll = polls[0];
+    if (!poll) return null;
+    return {
+      pollId: poll.id,
+      recordedAt: poll.recordedAt as Date,
+      status: poll.status,
+      items: [],
+    };
+  }
 
   return {
-    pollId: poll.id,
-    recordedAt: poll.recordedAt as Date,
-    status: poll.status,
+    pollId: first.pollId,
+    recordedAt: first.recordedAt as Date,
+    status: first.status,
     items: rows.map((r) => ({
       itemCode: r.itemCode,
       marketPrice: r.marketPrice,

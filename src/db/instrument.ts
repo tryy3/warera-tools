@@ -23,7 +23,7 @@ export function instrumentLibsqlClient(client: Client, logger: Logger): Client {
     const started = performance.now();
     try {
       const result = await execute(stmt);
-      logger.info(
+      logger.debug(
         {
           sql: truncateSql(sqlText(stmt)),
           durationMs: Math.round(performance.now() - started),
@@ -32,7 +32,7 @@ export function instrumentLibsqlClient(client: Client, logger: Logger): Client {
       );
       return result;
     } catch (err) {
-      logger.info(
+      logger.debug(
         {
           sql: truncateSql(sqlText(stmt)),
           durationMs: Math.round(performance.now() - started),
@@ -51,7 +51,7 @@ export function instrumentLibsqlClient(client: Client, logger: Logger): Client {
     const started = performance.now();
     try {
       const result = await batch(stmts, mode);
-      logger.info(
+      logger.debug(
         {
           sql: `batch(${stmts.length})`,
           durationMs: Math.round(performance.now() - started),
@@ -60,7 +60,7 @@ export function instrumentLibsqlClient(client: Client, logger: Logger): Client {
       );
       return result;
     } catch (err) {
-      logger.info(
+      logger.debug(
         {
           sql: `batch(${stmts.length})`,
           durationMs: Math.round(performance.now() - started),

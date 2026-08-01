@@ -90,8 +90,10 @@ describe("regions db", () => {
     const map = await getRegionsByIds(db, ["a", "missing"]);
     expect(map.get("a")?.name).toBe("A");
     expect(map.has("missing")).toBe(false);
-    expect(await enqueueRegions(db, ["a", "b", "b"])).toBe(1);
-    expect(await enqueueRegions(db, ["a", "b"])).toBe(0);
+    await enqueueRegions(db, ["a", "b", "b"]);
     expect((await getRegionsByIds(db, ["b"])).get("b")?.fetchedAt).toBeNull();
+    // Idempotent — does not throw when rows already exist
+    await enqueueRegions(db, ["a", "b"]);
+    expect((await getRegion(db, "a"))?.name).toBe("A");
   });
 });

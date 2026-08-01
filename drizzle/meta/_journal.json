@@ -43,6 +43,13 @@
       "when": 1785593121392,
       "tag": "0005_empty_shinko_yamashiro",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1785595505595,
+      "tag": "0006_kind_puck",
+      "breakpoints": true
     }
   ]
 }

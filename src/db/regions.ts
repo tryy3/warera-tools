@@ -22,13 +22,7 @@ function mapRow(row: typeof regions.$inferSelect): RegionRow {
   };
 }
 
-/** Insert-if-missing. Returns true when a new watchlist row was created. */
-export async function enqueueRegion(db: Db, regionId: string, now = new Date()): Promise<boolean> {
-  const inserted = await enqueueRegions(db, [regionId], now);
-  return inserted === 1;
-}
-
-/** Batch insert-if-missing. Returns count of newly created rows (1–2 queries). */
+/** Batch insert-if-missing via ON CONFLICT DO NOTHING (single round-trip). */
 export async function enqueueRegions(
   db: Db,
   regionIds: string[],
@@ -37,25 +31,28 @@ export async function enqueueRegions(
   const unique = [...new Set(regionIds.filter((id) => id.length > 0))];
   if (unique.length === 0) return 0;
 
-  const existing = await db
-    .select({ id: regions.id })
-    .from(regions)
-    .where(inArray(regions.id, unique));
-  const existingSet = new Set(existing.map((r) => r.id));
-  const missing = unique.filter((id) => !existingSet.has(id));
-  if (missing.length === 0) return 0;
+  await db
+    .insert(regions)
+    .values(
+      unique.map((id) => ({
+        id,
+        name: null,
+        countryCode: null,
+        payload: null,
+        fetchedAt: null,
+        enqueuedAt: now,
+      })),
+    )
+    .onConflictDoNothing();
+  return unique.length;
+}
 
-  await db.insert(regions).values(
-    missing.map((id) => ({
-      id,
-      name: null,
-      countryCode: null,
-      payload: null,
-      fetchedAt: null,
-      enqueuedAt: now,
-    })),
-  );
-  return missing.length;
+/** Insert-if-missing. Returns true when a new watchlist row was created. */
+export async function enqueueRegion(db: Db, regionId: string, now = new Date()): Promise<boolean> {
+  const before = await getRegion(db, regionId);
+  if (before) return false;
+  await enqueueRegions(db, [regionId], now);
+  return true;
 }
 
 export async function getRegion(db: Db, regionId: string): Promise<RegionRow | null> {

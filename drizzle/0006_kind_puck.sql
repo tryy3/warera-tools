@@ -1,0 +1,1 @@
+CREATE INDEX `price_polls_status_recorded_at_idx` ON `price_polls` (`status`,`recorded_at`);

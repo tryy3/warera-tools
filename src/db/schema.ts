@@ -1,4 +1,4 @@
-import { integer, real, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import { index, integer, real, sqliteTable, text } from "drizzle-orm/sqlite-core";
 
 export const jobStatuses = ["success", "error", "running"] as const;
 export type JobStatus = (typeof jobStatuses)[number];
@@ -57,13 +57,17 @@ export const countries = sqliteTable("countries", {
 export const pricePollStatuses = ["success", "partial", "error"] as const;
 export type PricePollStatus = (typeof pricePollStatuses)[number];
 
-export const pricePolls = sqliteTable("price_polls", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
-  recordedAt: integer("recorded_at", { mode: "timestamp_ms" }).notNull(),
-  status: text("status").notNull(),
-  error: text("error"),
-  itemCount: integer("item_count").notNull().default(0),
-});
+export const pricePolls = sqliteTable(
+  "price_polls",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    recordedAt: integer("recorded_at", { mode: "timestamp_ms" }).notNull(),
+    status: text("status").notNull(),
+    error: text("error"),
+    itemCount: integer("item_count").notNull().default(0),
+  },
+  (t) => [index("price_polls_status_recorded_at_idx").on(t.status, t.recordedAt)],
+);
 
 export const priceSnapshots = sqliteTable("price_snapshots", {
   id: integer("id").primaryKey({ autoIncrement: true }),

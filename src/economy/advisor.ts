@@ -109,7 +109,16 @@ export async function buildAdvisor(options: {
   };
 
   let phaseStarted = performance.now();
-  let latest = await getLatestPrices(db);
+  const recipeCodes = listProducibleRecipes().map((r) => r.itemCode);
+
+  // Independent Turso reads in parallel (one RTT each, overlapped).
+  const [latestInitial, existingPack, recommendedByItem] = await Promise.all([
+    getLatestPrices(db),
+    getCompanyPack(db, userId),
+    getRecommendedRegionsByItemCodes(db, recipeCodes),
+  ]);
+
+  let latest = latestInitial;
   if (!latest) {
     await runPricePoll({ db, warera, logger });
     latest = await getLatestPrices(db);
@@ -117,18 +126,16 @@ export async function buildAdvisor(options: {
   const prices = latest ? marketPriceMap(latest) : {};
   const opportunities = listMarketOpportunities(prices);
   const concretePrice = prices.concrete ?? 0;
-  logger.info(
-    { phase: "prices", durationMs: Math.round(performance.now() - phaseStarted) },
-    "advisor",
-  );
 
-  phaseStarted = performance.now();
-  const existingPack = await getCompanyPack(db, userId);
-  const packFresh =
-    existingPack != null && isCompanyPackFresh(existingPack.fetchedAt, existingPack.ttlSeconds);
+  cacheStats.recommendedHit = recommendedByItem.size;
+  cacheStats.recommendedMiss = Math.max(0, recipeCodes.length - recommendedByItem.size);
+
   let companiesRefreshed = false;
   let companiesFetchedAt: number | null = null;
   let packEntries: CompanyPackEntry[];
+
+  const packFresh =
+    existingPack != null && isCompanyPackFresh(existingPack.fetchedAt, existingPack.ttlSeconds);
 
   if (!refresh && packFresh && existingPack) {
     packEntries = existingPack.companies;
@@ -175,22 +182,20 @@ export async function buildAdvisor(options: {
     companiesFetchedAt = fetchedAt.getTime();
     companiesRefreshed = true;
   }
+
   logger.info(
     {
-      phase: "companyPack",
+      phase: "bootstrap",
       durationMs: Math.round(performance.now() - phaseStarted),
-      cache: cacheStats.companyPack,
+      companyPack: cacheStats.companyPack,
       companies: packEntries.length,
+      recommendedHit: cacheStats.recommendedHit,
+      recommendedMiss: cacheStats.recommendedMiss,
     },
     "advisor",
   );
 
   phaseStarted = performance.now();
-  const recipeCodes = listProducibleRecipes().map((r) => r.itemCode);
-  const recommendedByItem = await getRecommendedRegionsByItemCodes(db, recipeCodes);
-  cacheStats.recommendedHit = recommendedByItem.size;
-  cacheStats.recommendedMiss = Math.max(0, recipeCodes.length - recommendedByItem.size);
-
   const regionIdsNeeded = new Set<string>();
   for (const entry of packEntries) {
     if (entry.regionId) regionIdsNeeded.add(entry.regionId);
@@ -200,7 +205,10 @@ export async function buildAdvisor(options: {
   }
 
   const regionsById = await getRegionsByIds(db, [...regionIdsNeeded]);
-  await enqueueRegions(db, [...regionIdsNeeded]);
+  const missingRegionIds = [...regionIdsNeeded].filter((id) => !regionsById.has(id));
+  if (missingRegionIds.length > 0) {
+    await enqueueRegions(db, missingRegionIds);
+  }
 
   const regionInfoCache = new Map<string, RegionInfo>();
   for (const [id, row] of regionsById) {
@@ -221,11 +229,11 @@ export async function buildAdvisor(options: {
 
   logger.info(
     {
-      phase: "prefetchCaches",
+      phase: "prefetchRegions",
       durationMs: Math.round(performance.now() - phaseStarted),
-      recommendedCached: recommendedByItem.size,
       regionsCached: regionInfoCache.size,
       regionIds: regionIdsNeeded.size,
+      regionsEnqueued: missingRegionIds.length,
     },
     "advisor",
   );
