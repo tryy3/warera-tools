@@ -44,7 +44,10 @@ export function instrumentLibsqlClient(client: Client, logger: Logger): Client {
     }
   };
 
-  client.batch = async (stmts: InStatement[], mode?: Parameters<Client["batch"]>[1]): Promise<ResultSet[]> => {
+  client.batch = async (
+    stmts: InStatement[],
+    mode?: Parameters<Client["batch"]>[1],
+  ): Promise<ResultSet[]> => {
     const started = performance.now();
     try {
       const result = await batch(stmts, mode);
