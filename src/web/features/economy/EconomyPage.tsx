@@ -1,17 +1,18 @@
 import { getRouteApi } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
+import { formatDisplayNumber } from "@/lib/formatDisplayNumber";
 import { api } from "../../api";
+import { FlagIcon } from "../../components/FlagIcon";
+import { GoldIcon } from "../../components/GoldIcon";
+import { ItemIcon } from "../../components/ItemIcon";
 import { buildEconomySearch } from "../../lib/economySearch";
 import type { AdvisorResponse, CompanyAdvisorRow, SearchUsersResponse } from "./types";
 
 const economyRoute = getRouteApi("/economy");
 
-function formatNum(value: number | null | undefined, digits = 3): string {
+function formatNum(value: number | null | undefined, digits = 4): string {
   if (value == null || !Number.isFinite(value)) return "—";
-  return value.toLocaleString(undefined, {
-    maximumFractionDigits: digits,
-    minimumFractionDigits: 0,
-  });
+  return formatDisplayNumber(value, digits);
 }
 
 function formatItem(code: string): string {
@@ -27,6 +28,28 @@ function FormulaBox({ label, children }: { label: string; children: string }) {
   );
 }
 
+function GoldAmount({
+  value,
+  digits = 4,
+  prefix = "",
+  suffix = "",
+}: {
+  value: number | null | undefined;
+  digits?: number;
+  prefix?: string;
+  suffix?: string;
+}) {
+  if (value == null || !Number.isFinite(value)) return "—";
+  return (
+    <span className="icon-label">
+      <GoldIcon />
+      {prefix}
+      {formatDisplayNumber(value, digits)}
+      {suffix}
+    </span>
+  );
+}
+
 function CompanyCard({ row }: { row: CompanyAdvisorRow }) {
   const bonusPct = row.company.productionBonus != null ? row.company.productionBonus * 100 : null;
 
@@ -35,18 +58,36 @@ function CompanyCard({ row }: { row: CompanyAdvisorRow }) {
       <header>
         <h3>{row.company.name}</h3>
         <span className="pill positive-pill">
-          {row.currentDailyValue != null ? `+${formatNum(row.currentDailyValue, 3)} G/day` : "—"}
+          {row.currentDailyValue != null ? (
+            <GoldAmount value={row.currentDailyValue} digits={3} prefix="+" suffix="/day" />
+          ) : (
+            "—"
+          )}
         </span>
       </header>
 
       <dl className="economy-stats">
         <div>
           <dt>Material</dt>
-          <dd>{row.company.itemCode ? formatItem(row.company.itemCode) : "—"}</dd>
+          <dd>
+            {row.company.itemCode ? (
+              <span className="icon-label">
+                <ItemIcon itemCode={row.company.itemCode} />
+                {formatItem(row.company.itemCode)}
+              </span>
+            ) : (
+              "—"
+            )}
+          </dd>
         </div>
         <div>
           <dt>Region</dt>
-          <dd>{row.company.regionName ?? row.company.regionId ?? "—"}</dd>
+          <dd>
+            <span className="icon-label">
+              <FlagIcon code={row.company.regionCountryCode} />
+              {row.company.regionName ?? row.company.regionId ?? "—"}
+            </span>
+          </dd>
         </div>
         <div>
           <dt>AE level</dt>
@@ -58,7 +99,9 @@ function CompanyCard({ row }: { row: CompanyAdvisorRow }) {
         </div>
         <div>
           <dt>Profit/PP</dt>
-          <dd>{formatNum(row.currentProfitPerPp, 4)} G</dd>
+          <dd>
+            <GoldAmount value={row.currentProfitPerPp} digits={4} />
+          </dd>
         </div>
         <div>
           <dt>Daily PP</dt>
@@ -82,10 +125,23 @@ function CompanyCard({ row }: { row: CompanyAdvisorRow }) {
         <div className="economy-switch">
           <div className="economy-switch-title">Best switch (raw)</div>
           <p>
-            → <strong>{formatItem(row.bestSwitch.itemCode)}</strong>
-            {row.bestSwitch.bestRegionName || row.bestSwitch.bestRegionId
-              ? ` @ ${row.bestSwitch.bestRegionName ?? row.bestSwitch.bestRegionId}`
-              : " (same region)"}{" "}
+            →{" "}
+            <span className="icon-label">
+              <ItemIcon itemCode={row.bestSwitch.itemCode} />
+              <strong>{formatItem(row.bestSwitch.itemCode)}</strong>
+            </span>
+            {row.bestSwitch.bestRegionName || row.bestSwitch.bestRegionId ? (
+              <>
+                {" "}
+                @{" "}
+                <span className="icon-label">
+                  <FlagIcon code={row.bestSwitch.bestRegionCountryCode} />
+                  {row.bestSwitch.bestRegionName ?? row.bestSwitch.bestRegionId}
+                </span>
+              </>
+            ) : (
+              " (same region)"
+            )}{" "}
             (+{formatNum(row.bestSwitch.bestBonus * 100, 1)}% bonus)
           </p>
           <dl className="economy-stats compact">
@@ -97,7 +153,7 @@ function CompanyCard({ row }: { row: CompanyAdvisorRow }) {
               <dt>Transfer</dt>
               <dd>
                 {row.bestSwitch.transferConcrete} Concrete (~
-                {formatNum(row.bestSwitch.transferGold, 1)} G)
+                <GoldAmount value={row.bestSwitch.transferGold} digits={1} />)
               </dd>
             </div>
             <div>
@@ -301,8 +357,15 @@ export function EconomyPage() {
             <tbody>
               {(advisor?.opportunities ?? []).map((o) => (
                 <tr key={o.itemCode}>
-                  <td>{formatItem(o.itemCode)}</td>
-                  <td className="mono">{formatNum(o.profitPerPp, 4)}</td>
+                  <td>
+                    <span className="icon-label">
+                      <ItemIcon itemCode={o.itemCode} />
+                      {formatItem(o.itemCode)}
+                    </span>
+                  </td>
+                  <td className="mono">
+                    <GoldAmount value={o.profitPerPp} digits={4} />
+                  </td>
                   <td className="mono small muted">{o.formula}</td>
                 </tr>
               ))}

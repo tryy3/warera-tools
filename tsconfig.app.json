@@ -25,5 +25,5 @@
     "erasableSyntaxOnly": true,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["src/web", "src/calculator"]
+  "include": ["src/web", "src/calculator", "src/lib"]
 }
