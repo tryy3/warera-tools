@@ -7,6 +7,11 @@ import { FlagIcon } from "../../components/FlagIcon";
 import { GoldIcon } from "../../components/GoldIcon";
 import { ItemIcon } from "../../components/ItemIcon";
 import { buildEconomySearch } from "../../lib/economySearch";
+import {
+  loadRecentEconomyPlayers,
+  rememberEconomyPlayer,
+  type RecentEconomyPlayer,
+} from "../../lib/recentEconomyPlayers";
 import type { AdvisorResponse, CompanyAdvisorRow, SearchUsersResponse } from "./types";
 
 const economyRoute = getRouteApi("/economy");
@@ -210,6 +215,9 @@ export function EconomyPage() {
   const [polling, setPolling] = useState(false);
   const [refreshingCompanies, setRefreshingCompanies] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [recentPlayers, setRecentPlayers] = useState<RecentEconomyPlayer[]>(() =>
+    loadRecentEconomyPlayers(),
+  );
 
   const displayName = selectedUsername ?? selectedUserId;
 
@@ -293,6 +301,14 @@ export function EconomyPage() {
     }
   }
 
+  function selectPlayer(userId: string, username: string) {
+    void navigate({
+      search: buildEconomySearch({ userId, username }),
+      replace: true,
+    });
+    setRecentPlayers(rememberEconomyPlayer({ userId, username }));
+  }
+
   return (
     <div className="page economy-page">
       <div className="page-header">
@@ -324,6 +340,30 @@ export function EconomyPage() {
           placeholder="Search by username…"
           autoComplete="off"
         />
+        {recentPlayers.length > 0 ? (
+          <div className="economy-recent">
+            <span className="muted small">Recent</span>
+            <ul className="economy-recent-list">
+              {recentPlayers.map((p) => (
+                <li key={p.userId}>
+                  <button
+                    type="button"
+                    className={
+                      selectedUserId === p.userId
+                        ? "economy-recent-btn active"
+                        : "economy-recent-btn"
+                    }
+                    onClick={() => {
+                      selectPlayer(p.userId, p.username);
+                    }}
+                  >
+                    {p.username}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
         {searching ? <p className="muted">Searching…</p> : null}
         {users.length > 0 ? (
           <ul className="economy-user-list">
@@ -333,10 +373,7 @@ export function EconomyPage() {
                   type="button"
                   className={selectedUserId === u.userId ? "economy-user active" : "economy-user"}
                   onClick={() => {
-                    void navigate({
-                      search: buildEconomySearch({ userId: u.userId, username: u.username }),
-                      replace: true,
-                    });
+                    selectPlayer(u.userId, u.username);
                   }}
                 >
                   <span>{u.username}</span>

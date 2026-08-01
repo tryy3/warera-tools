@@ -98,13 +98,7 @@ describe("rememberEconomyPlayer", () => {
     for (let i = 1; i <= 6; i++) {
       rememberEconomyPlayer({ userId: `u${i}`, username: `user${i}` });
     }
-    expect(loadRecentEconomyPlayers().map((p) => p.userId)).toEqual([
-      "u6",
-      "u5",
-      "u4",
-      "u3",
-      "u2",
-    ]);
+    expect(loadRecentEconomyPlayers().map((p) => p.userId)).toEqual(["u6", "u5", "u4", "u3", "u2"]);
   });
 
   it("does not throw when setItem fails", () => {
