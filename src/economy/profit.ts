@@ -70,7 +70,7 @@ function profitForRecipe(recipe: Recipe, prices: Record<string, number>): Profit
       consumedPp: recipe.consumedPp,
       profitPerPp: null,
       missingInputs,
-      formula: `(${marketPrice} G − [${inputsLabel}]) / ${recipe.consumedPp} PP`,
+      formula: `(${formatDisplayNumber(marketPrice)} G − [${inputsLabel}]) / ${recipe.consumedPp} PP`,
     };
   }
 

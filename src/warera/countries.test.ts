@@ -32,4 +32,31 @@ describe("parseWareraCountries", () => {
       }),
     ).toEqual([]);
   });
+
+  it("skips entries when taxes.market is missing or not finite", () => {
+    expect(
+      parseWareraCountries({
+        result: {
+          data: [
+            { _id: "a", name: "NoTaxes", code: "xx" },
+            { _id: "b", name: "NoMarket", code: "yy", taxes: { income: 7 } },
+            { _id: "c", name: "BadMarket", code: "zz", taxes: { market: Number.NaN } },
+            {
+              _id: "d",
+              name: "Ok",
+              code: "ok",
+              taxes: { market: 2 },
+            },
+          ],
+        },
+      }),
+    ).toEqual([
+      {
+        id: "d",
+        name: "Ok",
+        isoCode: "OK",
+        taxRate: 0.02,
+      },
+    ]);
+  });
 });

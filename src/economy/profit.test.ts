@@ -27,6 +27,13 @@ describe("calculateProfitPerPp", () => {
     const result = calculateProfitPerPp("lead", { lead: 0.08560533885010638 });
     expect(result!.formula).toBe("(0.0856 G − 0 G raw) / 1 PP");
   });
+
+  it("rounds marketPrice in missing-inputs formula", () => {
+    const result = calculateProfitPerPp("steel", { steel: 1.623465789 });
+    expect(result!.missingInputs).toContain("iron");
+    expect(result!.formula).toBe("(1.6235 G − [10 iron × ? G]) / 10 PP");
+    expect(result!.formula).not.toContain("1.623465789");
+  });
 });
 
 describe("listMarketOpportunities", () => {
