@@ -17,6 +17,8 @@ async function createMemoryDb(): Promise<Db> {
       name TEXT NOT NULL UNIQUE,
       tax_rate REAL NOT NULL,
       iso_code TEXT,
+      source TEXT NOT NULL DEFAULT 'manual',
+      synced_at INTEGER,
       created_at INTEGER NOT NULL,
       updated_at INTEGER NOT NULL
     )
