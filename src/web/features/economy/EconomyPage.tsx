@@ -1,6 +1,15 @@
 import { getRouteApi } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
+import { Button } from "@/components/ui/button";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { formatDisplayNumber } from "@/lib/formatDisplayNumber";
 import { api } from "../../api";
 import { FlagIcon } from "../../components/FlagIcon";
@@ -274,36 +283,39 @@ export function EconomyPage() {
   }
 
   return (
-    <div className="page economy-page">
-      <div className="page-header">
+    <div className="mx-auto max-w-[1200px] rounded-md border border-border bg-card p-4 pb-6">
+      <div className="mb-3 flex items-center justify-between gap-4">
         <div>
-          <h1>Economy</h1>
-          <p className="muted">
+          <h1 className="mb-0.5 text-[1.35rem] font-semibold tracking-tight">Economy</h1>
+          <p className="m-0 text-muted-foreground">
             AE daily value = AE level × (1 + production bonus) × 24h × Profit/PP. Formulas shown per
             company.
           </p>
         </div>
-        <button
+        <Button
           type="button"
-          className="btn"
+          variant="outline"
+          size="sm"
           disabled={polling}
           onClick={() => void refreshPrices()}
         >
           {polling ? "Refreshing…" : "Refresh prices"}
-        </button>
+        </Button>
       </div>
 
-      {error ? <p className="error-text">{error}</p> : null}
+      {error ? <p className="my-2 text-destructive">{error}</p> : null}
 
-      <section className="economy-search">
-        <label htmlFor="user-search">Find player</label>
+      <section className="my-4 flex max-w-md flex-col gap-1.5">
+        <label htmlFor="user-search" className="text-sm text-muted-foreground">
+          Find player
+        </label>
         <EconomyPlayerSearch selectedUserId={selectedUserId} onSelect={selectPlayer} />
       </section>
 
       {displayName ? (
-        <div className="economy-user-meta">
-          <p className="muted">
-            Showing companies for <strong>{displayName}</strong>
+        <div className="mb-2 flex flex-wrap items-center gap-x-4 gap-y-3">
+          <p className="m-0 min-w-64 flex-1 text-muted-foreground">
+            Showing companies for <strong className="text-foreground">{displayName}</strong>
             {advisor?.recordedAt
               ? ` · prices as of ${new Date(advisor.recordedAt).toLocaleString()}`
               : null}
@@ -311,72 +323,75 @@ export function EconomyPage() {
               ? ` · companies as of ${new Date(advisor.companiesFetchedAt).toLocaleString()}`
               : null}
           </p>
-          <button
+          <Button
             type="button"
-            className="btn"
+            variant="outline"
+            size="sm"
             disabled={!selectedUserId || refreshingCompanies || loadingAdvisor}
             onClick={() => void refreshCompanies()}
           >
             {refreshingCompanies ? "Refreshing…" : "Refresh companies"}
-          </button>
+          </Button>
         </div>
       ) : null}
 
-      {loadingAdvisor ? <p className="muted">Loading advisor…</p> : null}
+      {loadingAdvisor ? <p className="text-muted-foreground">Loading advisor…</p> : null}
 
-      <div className="economy-grid">
-        <section className="economy-col">
-          <h2>Companies</h2>
+      <div className="mt-3 grid grid-cols-1 gap-5 lg:grid-cols-[1.2fr_0.8fr]">
+        <section>
+          <h2 className="mt-0 mb-2 text-[1.05rem] font-semibold">Companies</h2>
           {!advisor && !loadingAdvisor ? (
-            <p className="muted">Search for a player to load companies.</p>
+            <p className="text-muted-foreground">Search for a player to load companies.</p>
           ) : null}
           {advisor?.companies.length === 0 ? (
-            <p className="muted">No companies found for this user.</p>
+            <p className="text-muted-foreground">No companies found for this user.</p>
           ) : null}
-          <div className="economy-company-list">
+          <div className="flex flex-col gap-3">
             {advisor?.companies.map((row) => (
               <CompanyCard key={row.company.id} row={row} />
             ))}
           </div>
         </section>
 
-        <section className="economy-col">
-          <h2>Market opportunities</h2>
-          <p className="muted small">
+        <section>
+          <h2 className="mt-0 mb-2 text-[1.05rem] font-semibold">Market opportunities</h2>
+          <p className="mb-2 text-sm text-muted-foreground">
             Ranked by Profit/PP = (market price − input cost) / consumed PP.
           </p>
-          <table className="economy-table">
-            <thead>
-              <tr>
-                <th>Item</th>
-                <th>G/PP</th>
-                <th>Formula</th>
-              </tr>
-            </thead>
-            <tbody>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Item</TableHead>
+                <TableHead>G/PP</TableHead>
+                <TableHead>Formula</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
               {(advisor?.opportunities ?? []).map((o) => (
-                <tr key={o.itemCode}>
-                  <td>
-                    <span className="icon-label">
+                <TableRow key={o.itemCode}>
+                  <TableCell>
+                    <span className="inline-flex items-center gap-1.5">
                       <ItemIcon itemCode={o.itemCode} />
                       {formatItem(o.itemCode)}
                     </span>
-                  </td>
-                  <td className="mono">
+                  </TableCell>
+                  <TableCell className="font-mono">
                     <GoldAmount value={o.profitPerPp} digits={4} />
-                  </td>
-                  <td className="mono small muted">{o.formula}</td>
-                </tr>
+                  </TableCell>
+                  <TableCell className="font-mono text-sm text-muted-foreground">
+                    {o.formula}
+                  </TableCell>
+                </TableRow>
               ))}
               {!advisor?.opportunities?.length ? (
-                <tr>
-                  <td colSpan={3} className="muted">
+                <TableRow>
+                  <TableCell colSpan={3} className="text-muted-foreground">
                     No price data yet — refresh prices.
-                  </td>
-                </tr>
+                  </TableCell>
+                </TableRow>
               ) : null}
-            </tbody>
-          </table>
+            </TableBody>
+          </Table>
         </section>
       </div>
     </div>
