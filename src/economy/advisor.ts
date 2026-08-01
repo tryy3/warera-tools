@@ -8,7 +8,15 @@ import {
   type AeDailyBreakdown,
   type ProfitPpBreakdown,
 } from "../economy";
+import {
+  getCompanyPack,
+  isCompanyPackFresh,
+  upsertCompanyPack,
+  type CompanyPackEntry,
+} from "../db/company-packs";
 import { getLatestPrices, marketPriceMap } from "../db/prices";
+import { getRecommendedRegion, upsertRecommendedRegion } from "../db/recommended-regions";
+import { enqueueRegion, getRegion, upsertRegionFetched } from "../db/regions";
 import type { Db } from "../db/client";
 import { runPricePoll } from "../jobs/price-poll/run";
 import type { Logger } from "../logging/logger";
@@ -19,6 +27,7 @@ import {
   fetchRegionInfo,
   type CompanySummary,
   type ProductionBonusDetails,
+  type RecommendedRegion,
   type RegionInfo,
 } from "../warera/companies";
 import type { WareraRequester } from "../warera/prices";
@@ -53,17 +62,39 @@ export type CompanyAdvisorRow = {
   bestSwitch: SwitchRecommendation | null;
 };
 
+function entryToCompany(entry: CompanyPackEntry): {
+  company: CompanySummary;
+  bonusDetails: ProductionBonusDetails | null;
+} {
+  return {
+    company: {
+      id: entry.id,
+      name: entry.name,
+      itemCode: entry.itemCode,
+      regionId: entry.regionId,
+      regionName: null,
+      regionCountryCode: null,
+      aeLevel: entry.aeLevel,
+      productionBonus: entry.productionBonus,
+    },
+    bonusDetails: entry.bonusDetails,
+  };
+}
+
 export async function buildAdvisor(options: {
   db: Db;
   warera: WareraRequester;
   logger: Logger;
   userId: string;
+  refresh?: boolean;
 }): Promise<{
   recordedAt: string | null;
+  companiesFetchedAt: number | null;
+  companiesRefreshed: boolean;
   opportunities: ProfitPpBreakdown[];
   companies: CompanyAdvisorRow[];
 }> {
-  const { db, warera, logger, userId } = options;
+  const { db, warera, logger, userId, refresh = false } = options;
 
   let latest = await getLatestPrices(db);
   if (!latest) {
@@ -74,41 +105,115 @@ export async function buildAdvisor(options: {
   const opportunities = listMarketOpportunities(prices);
   const concretePrice = prices.concrete ?? 0;
 
-  let companies = await fetchCompaniesByUserId(warera, userId);
+  const existingPack = await getCompanyPack(db, userId);
+  const packFresh =
+    existingPack != null && isCompanyPackFresh(existingPack.fetchedAt, existingPack.ttlSeconds);
+  let companiesRefreshed = false;
+  let companiesFetchedAt: number | null = null;
+  let packEntries: CompanyPackEntry[];
+
+  if (!refresh && packFresh && existingPack) {
+    packEntries = existingPack.companies;
+    companiesFetchedAt = existingPack.fetchedAt.getTime();
+  } else {
+    const live = await fetchCompaniesByUserId(warera, userId);
+    const enrichedLive = await Promise.all(
+      live.map(async (c) => {
+        const bonusDetails =
+          c.productionBonus != null ? null : await fetchCompanyProductionBonus(warera, c.id);
+        const productionBonus = bonusDetails?.total ?? c.productionBonus ?? null;
+        return {
+          id: c.id,
+          name: c.name,
+          itemCode: c.itemCode,
+          regionId: c.regionId,
+          aeLevel: c.aeLevel,
+          productionBonus,
+          bonusDetails:
+            bonusDetails ??
+            (productionBonus != null
+              ? {
+                  total: productionBonus,
+                  strategicBonus: 0,
+                  depositBonus: 0,
+                  ethicSpecializationBonus: 0,
+                  ethicDepositBonus: 0,
+                  formula: `total ${productionBonus * 100}%`,
+                }
+              : null),
+        } satisfies CompanyPackEntry;
+      }),
+    );
+    const fetchedAt = new Date();
+    await upsertCompanyPack(db, { userId, companies: enrichedLive, fetchedAt });
+    for (const entry of enrichedLive) {
+      if (entry.regionId) await enqueueRegion(db, entry.regionId, fetchedAt);
+    }
+    packEntries = enrichedLive;
+    companiesFetchedAt = fetchedAt.getTime();
+    companiesRefreshed = true;
+  }
 
   const regionInfoCache = new Map<string, RegionInfo>();
   async function regionInfo(regionId: string | null): Promise<RegionInfo> {
     if (!regionId) return { name: null, countryCode: null };
     if (regionInfoCache.has(regionId)) return regionInfoCache.get(regionId)!;
+
+    const cached = await getRegion(db, regionId);
+    if (cached?.fetchedAt != null) {
+      const info = { name: cached.name, countryCode: cached.countryCode };
+      regionInfoCache.set(regionId, info);
+      return info;
+    }
+
     const info = await fetchRegionInfo(warera, regionId);
+    const now = new Date();
+    await enqueueRegion(db, regionId, now);
+    await upsertRegionFetched(db, {
+      id: regionId,
+      name: info.name,
+      countryCode: info.countryCode,
+      fetchedAt: now,
+    });
     regionInfoCache.set(regionId, info);
     return info;
   }
 
-  const enriched = await Promise.all(
-    companies.map(async (c) => {
-      const bonusDetails =
-        c.productionBonus != null ? null : await fetchCompanyProductionBonus(warera, c.id);
-      const productionBonus = bonusDetails?.total ?? c.productionBonus;
-      const info = await regionInfo(c.regionId);
-      return {
-        company: {
-          ...c,
-          regionName: c.regionName ?? info.name,
-          regionCountryCode: c.regionCountryCode ?? info.countryCode,
-          productionBonus: productionBonus ?? null,
-        },
-        bonusDetails,
-      };
-    }),
-  );
+  const bestRegionCache = new Map<string, RecommendedRegion | null>();
 
-  const bestRegionCache = new Map<string, Awaited<ReturnType<typeof fetchBestRecommendedRegion>>>();
-
-  async function bestRegion(itemCode: string) {
+  async function bestRegion(itemCode: string): Promise<RecommendedRegion | null> {
     if (bestRegionCache.has(itemCode)) return bestRegionCache.get(itemCode)!;
+
+    const cached = await getRecommendedRegion(db, itemCode);
+    if (cached) {
+      const region: RecommendedRegion = {
+        regionId: cached.regionId,
+        regionName: cached.regionName,
+        bonus: cached.bonus ?? 0,
+      };
+      bestRegionCache.set(itemCode, region);
+      await enqueueRegion(db, region.regionId);
+      return region;
+    }
+
     try {
       const region = await fetchBestRecommendedRegion(warera, itemCode);
+      if (region) {
+        const now = new Date();
+        await upsertRecommendedRegion(db, {
+          itemCode,
+          regionId: region.regionId,
+          regionName: region.regionName,
+          bonus: region.bonus,
+          payload: {
+            regionId: region.regionId,
+            regionName: region.regionName,
+            bonus: region.bonus,
+          },
+          fetchedAt: now,
+        });
+        await enqueueRegion(db, region.regionId, now);
+      }
       bestRegionCache.set(itemCode, region);
       return region;
     } catch (err) {
@@ -122,7 +227,15 @@ export async function buildAdvisor(options: {
   }
 
   const rows: CompanyAdvisorRow[] = [];
-  for (const { company, bonusDetails } of enriched) {
+  for (const entry of packEntries) {
+    const { company: baseCompany, bonusDetails } = entryToCompany(entry);
+    const info = await regionInfo(baseCompany.regionId);
+    const company: CompanySummary = {
+      ...baseCompany,
+      regionName: info.name,
+      regionCountryCode: info.countryCode,
+    };
+
     const currentBonus = company.productionBonus ?? 0;
     const profitBreakdown = company.itemCode
       ? calculateProfitPerPp(company.itemCode, prices)
@@ -139,7 +252,6 @@ export async function buildAdvisor(options: {
       if (breakdown?.profitPerPp == null) continue;
 
       const region = await bestRegion(recipe.itemCode);
-      // Prefer recommended-region bonus; if unavailable, compare retask at current bonus.
       const bonus = region?.bonus ?? currentBonus;
       const ae = explainAeDaily(company.aeLevel, bonus, breakdown.profitPerPp);
       const dailyValue = ae.dailyValue;
@@ -152,7 +264,6 @@ export async function buildAdvisor(options: {
       const needsRetask = company.itemCode == null || retask;
       const needsRelocate = assumeRelocate;
 
-      // Without a recommended region, only consider material retask in place.
       if (region == null && !needsRetask) continue;
       if (region == null && needsRelocate) continue;
       if (!needsRetask && !needsRelocate) continue;
@@ -198,18 +309,7 @@ export async function buildAdvisor(options: {
 
     rows.push({
       company,
-      bonusDetails:
-        bonusDetails ??
-        (company.productionBonus != null
-          ? {
-              total: company.productionBonus,
-              strategicBonus: 0,
-              depositBonus: 0,
-              ethicSpecializationBonus: 0,
-              ethicDepositBonus: 0,
-              formula: `total ${company.productionBonus * 100}%`,
-            }
-          : null),
+      bonusDetails,
       profitBreakdown,
       aeBreakdown,
       currentProfitPerPp: currentPp,
@@ -220,6 +320,8 @@ export async function buildAdvisor(options: {
 
   return {
     recordedAt: latest?.recordedAt.toISOString() ?? null,
+    companiesFetchedAt,
+    companiesRefreshed,
     opportunities,
     companies: rows,
   };
