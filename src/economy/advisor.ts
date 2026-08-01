@@ -95,7 +95,17 @@ export async function buildAdvisor(options: {
   companies: CompanyAdvisorRow[];
 }> {
   const { db, warera, logger, userId, refresh = false } = options;
+  const advisorStarted = performance.now();
+  const cacheStats = {
+    companyPack: "miss" as "hit" | "miss" | "refresh",
+    recommendedHit: 0,
+    recommendedMiss: 0,
+    regionHit: 0,
+    regionMiss: 0,
+    regionLiveFetch: 0,
+  };
 
+  let phaseStarted = performance.now();
   let latest = await getLatestPrices(db);
   if (!latest) {
     await runPricePoll({ db, warera, logger });
@@ -104,7 +114,12 @@ export async function buildAdvisor(options: {
   const prices = latest ? marketPriceMap(latest) : {};
   const opportunities = listMarketOpportunities(prices);
   const concretePrice = prices.concrete ?? 0;
+  logger.info(
+    { phase: "prices", durationMs: Math.round(performance.now() - phaseStarted) },
+    "advisor",
+  );
 
+  phaseStarted = performance.now();
   const existingPack = await getCompanyPack(db, userId);
   const packFresh =
     existingPack != null && isCompanyPackFresh(existingPack.fetchedAt, existingPack.ttlSeconds);
@@ -115,7 +130,9 @@ export async function buildAdvisor(options: {
   if (!refresh && packFresh && existingPack) {
     packEntries = existingPack.companies;
     companiesFetchedAt = existingPack.fetchedAt.getTime();
+    cacheStats.companyPack = "hit";
   } else {
+    cacheStats.companyPack = refresh ? "refresh" : "miss";
     const live = await fetchCompaniesByUserId(warera, userId);
     const enrichedLive = await Promise.all(
       live.map(async (c) => {
@@ -153,6 +170,15 @@ export async function buildAdvisor(options: {
     companiesFetchedAt = fetchedAt.getTime();
     companiesRefreshed = true;
   }
+  logger.info(
+    {
+      phase: "companyPack",
+      durationMs: Math.round(performance.now() - phaseStarted),
+      cache: cacheStats.companyPack,
+      companies: packEntries.length,
+    },
+    "advisor",
+  );
 
   const regionInfoCache = new Map<string, RegionInfo>();
   async function regionInfo(regionId: string | null): Promise<RegionInfo> {
@@ -161,11 +187,14 @@ export async function buildAdvisor(options: {
 
     const cached = await getRegion(db, regionId);
     if (cached?.fetchedAt != null) {
+      cacheStats.regionHit += 1;
       const info = { name: cached.name, countryCode: cached.countryCode };
       regionInfoCache.set(regionId, info);
       return info;
     }
 
+    cacheStats.regionMiss += 1;
+    cacheStats.regionLiveFetch += 1;
     const info = await fetchRegionInfo(warera, regionId);
     const now = new Date();
     await enqueueRegion(db, regionId, now);
@@ -186,6 +215,7 @@ export async function buildAdvisor(options: {
 
     const cached = await getRecommendedRegion(db, itemCode);
     if (cached) {
+      cacheStats.recommendedHit += 1;
       const region: RecommendedRegion = {
         regionId: cached.regionId,
         regionName: cached.regionName,
@@ -196,6 +226,7 @@ export async function buildAdvisor(options: {
       return region;
     }
 
+    cacheStats.recommendedMiss += 1;
     try {
       const region = await fetchBestRecommendedRegion(warera, itemCode);
       if (region) {
@@ -225,6 +256,8 @@ export async function buildAdvisor(options: {
       return null;
     }
   }
+
+  phaseStarted = performance.now();
 
   const rows: CompanyAdvisorRow[] = [];
   for (const entry of packEntries) {
@@ -317,6 +350,25 @@ export async function buildAdvisor(options: {
       bestSwitch,
     });
   }
+
+  logger.info(
+    {
+      phase: "switchScan",
+      durationMs: Math.round(performance.now() - phaseStarted),
+      companies: packEntries.length,
+      ...cacheStats,
+    },
+    "advisor",
+  );
+
+  logger.info(
+    {
+      phase: "total",
+      durationMs: Math.round(performance.now() - advisorStarted),
+      ...cacheStats,
+    },
+    "advisor",
+  );
 
   return {
     recordedAt: latest?.recordedAt.toISOString() ?? null,

@@ -17,7 +17,7 @@ import { createApp } from "./app";
 async function main(): Promise<void> {
   const config = loadConfig();
   const logger = createLogger(config);
-  const { db, client } = createDb(config);
+  const { db, client } = createDb(config, logger);
 
   await migrateDb(db);
   await seedDefaultCountries(db);
