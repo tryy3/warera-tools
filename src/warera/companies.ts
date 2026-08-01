@@ -219,11 +219,19 @@ export async function fetchRegionInfo(
   regionId: string,
 ): Promise<RegionInfo> {
   try {
-    const json = await warera.request<unknown>(wareraProcedurePath("region.getById", { regionId }));
-    return parseRegionInfo(unwrapTrpcData(json));
+    return await fetchRegionInfoOrThrow(warera, regionId);
   } catch {
     return { name: null, countryCode: null };
   }
+}
+
+/** Throws on upstream failure — used by region-sync job. */
+export async function fetchRegionInfoOrThrow(
+  warera: WareraRequester,
+  regionId: string,
+): Promise<RegionInfo> {
+  const json = await warera.request<unknown>(wareraProcedurePath("region.getById", { regionId }));
+  return parseRegionInfo(unwrapTrpcData(json));
 }
 
 export async function fetchRegionName(

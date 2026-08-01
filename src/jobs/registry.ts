@@ -3,10 +3,18 @@ import { jobs } from "../db/schema";
 import { countrySyncJob } from "./country-sync";
 import { exampleHeartbeatJob } from "./example-heartbeat";
 import { pricePollJob } from "./price-poll";
+import { recommendedRegionsPollJob } from "./recommended-regions-poll";
+import { regionSyncJob } from "./region-sync";
 import type { JobDefinition } from "./types";
 
 export function listJobDefinitions(): JobDefinition[] {
-  return [exampleHeartbeatJob, pricePollJob, countrySyncJob];
+  return [
+    exampleHeartbeatJob,
+    pricePollJob,
+    countrySyncJob,
+    recommendedRegionsPollJob,
+    regionSyncJob,
+  ];
 }
 
 export async function syncJobsToDb(db: Db, defs: JobDefinition[]): Promise<void> {

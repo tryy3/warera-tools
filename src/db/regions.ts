@@ -24,19 +24,17 @@ function mapRow(row: typeof regions.$inferSelect): RegionRow {
 
 /** Insert-if-missing. Returns true when a new watchlist row was created. */
 export async function enqueueRegion(db: Db, regionId: string, now = new Date()): Promise<boolean> {
-  const result = await db
-    .insert(regions)
-    .values({
-      id: regionId,
-      name: null,
-      countryCode: null,
-      payload: null,
-      fetchedAt: null,
-      enqueuedAt: now,
-    })
-    .onConflictDoNothing()
-    .returning({ id: regions.id });
-  return result.length > 0;
+  const existing = await getRegion(db, regionId);
+  if (existing) return false;
+  await db.insert(regions).values({
+    id: regionId,
+    name: null,
+    countryCode: null,
+    payload: null,
+    fetchedAt: null,
+    enqueuedAt: now,
+  });
+  return true;
 }
 
 export async function getRegion(db: Db, regionId: string): Promise<RegionRow | null> {
