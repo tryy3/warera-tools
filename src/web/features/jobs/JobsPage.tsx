@@ -1,4 +1,13 @@
 import { useEffect, useState } from "react";
+import { Button } from "@/components/ui/button";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { api } from "../../api";
 import type { Job, JobRun, JobRunsResponse, JobsResponse, RunJobResponse } from "./types";
 
@@ -101,105 +110,139 @@ export function JobsPage() {
   }
 
   return (
-    <section className="page">
-      <div className="page-header">
-        <h1>Jobs</h1>
-        <button type="button" onClick={() => void loadJobs()} disabled={loading}>
+    <section className="mx-auto max-w-[1100px] rounded-md border border-border bg-card p-4 pb-6">
+      <div className="mb-3 flex items-center justify-between gap-4">
+        <h1 className="m-0 text-[1.35rem] font-semibold tracking-tight">Jobs</h1>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => void loadJobs()}
+          disabled={loading}
+        >
           Refresh
-        </button>
+        </Button>
       </div>
 
-      {error ? <p className="error">{error}</p> : null}
-      {loading ? <p className="muted">Loading jobs…</p> : null}
+      {error ? <p className="my-2 text-destructive">{error}</p> : null}
+      {loading ? <p className="text-muted-foreground">Loading jobs…</p> : null}
 
       {!loading && jobs.length === 0 && !error ? (
-        <p className="muted">No jobs registered.</p>
+        <p className="text-muted-foreground">No jobs registered.</p>
       ) : null}
 
       {jobs.length > 0 ? (
-        <table className="jobs-table">
-          <thead>
-            <tr>
-              <th>Name</th>
-              <th>Enabled</th>
-              <th>Cron</th>
-              <th>Last status</th>
-              <th>Last started</th>
-              <th>Last finished</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Name</TableHead>
+              <TableHead>Enabled</TableHead>
+              <TableHead>Cron</TableHead>
+              <TableHead>Last status</TableHead>
+              <TableHead>Last started</TableHead>
+              <TableHead>Last finished</TableHead>
+              <TableHead>Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
             {jobs.map((job) => {
               const selected = selectedId === job.id;
               const busy = busyId === job.id;
               return (
-                <tr key={job.id} className={selected ? "selected" : undefined}>
-                  <td>
-                    <button type="button" className="linkish" onClick={() => selectJob(job.id)}>
+                <TableRow
+                  key={job.id}
+                  data-state={selected ? "selected" : undefined}
+                  className={selected ? "bg-primary/15" : undefined}
+                >
+                  <TableCell>
+                    <Button
+                      type="button"
+                      variant="link"
+                      className="h-auto p-0 font-semibold"
+                      onClick={() => selectJob(job.id)}
+                    >
                       {job.name}
-                    </button>
-                    {job.description ? <div className="muted small">{job.description}</div> : null}
-                    <div className="muted small mono">{job.id}</div>
-                  </td>
-                  <td>{job.enabled ? "yes" : "no"}</td>
-                  <td className="mono">{job.cron}</td>
-                  <td>{job.lastStatus ?? "—"}</td>
-                  <td>{formatTs(job.lastStartedAt)}</td>
-                  <td>{formatTs(job.lastFinishedAt)}</td>
-                  <td>
-                    <div className="actions">
-                      <button type="button" disabled={busy} onClick={() => void toggleEnabled(job)}>
+                    </Button>
+                    {job.description ? (
+                      <div className="text-sm text-muted-foreground">{job.description}</div>
+                    ) : null}
+                    <div className="font-mono text-sm text-muted-foreground">{job.id}</div>
+                  </TableCell>
+                  <TableCell>{job.enabled ? "yes" : "no"}</TableCell>
+                  <TableCell className="font-mono">{job.cron}</TableCell>
+                  <TableCell>{job.lastStatus ?? "—"}</TableCell>
+                  <TableCell>{formatTs(job.lastStartedAt)}</TableCell>
+                  <TableCell>{formatTs(job.lastFinishedAt)}</TableCell>
+                  <TableCell>
+                    <div className="flex flex-wrap gap-1.5">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        disabled={busy}
+                        onClick={() => void toggleEnabled(job)}
+                      >
                         {job.enabled ? "Disable" : "Enable"}
-                      </button>
-                      <button type="button" disabled={busy} onClick={() => void runNow(job)}>
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        disabled={busy}
+                        onClick={() => void runNow(job)}
+                      >
                         Run now
-                      </button>
-                      <button type="button" onClick={() => selectJob(job.id)}>
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => selectJob(job.id)}
+                      >
                         {selected ? "Hide runs" : "Runs"}
-                      </button>
+                      </Button>
                     </div>
-                  </td>
-                </tr>
+                  </TableCell>
+                </TableRow>
               );
             })}
-          </tbody>
-        </table>
+          </TableBody>
+        </Table>
       ) : null}
 
       {selectedId ? (
-        <section className="runs-panel">
-          <h2>Recent runs — {selectedId}</h2>
-          {runsError ? <p className="error">{runsError}</p> : null}
-          {runsLoading ? <p className="muted">Loading runs…</p> : null}
+        <section className="mt-4">
+          <h2 className="mb-2 text-[1.05rem] font-semibold">Recent runs — {selectedId}</h2>
+          {runsError ? <p className="my-2 text-destructive">{runsError}</p> : null}
+          {runsLoading ? <p className="text-muted-foreground">Loading runs…</p> : null}
           {!runsLoading && runs.length === 0 && !runsError ? (
-            <p className="muted">No runs yet.</p>
+            <p className="text-muted-foreground">No runs yet.</p>
           ) : null}
           {runs.length > 0 ? (
-            <table className="jobs-table">
-              <thead>
-                <tr>
-                  <th>ID</th>
-                  <th>Status</th>
-                  <th>Started</th>
-                  <th>Finished</th>
-                  <th>Duration</th>
-                  <th>Message</th>
-                </tr>
-              </thead>
-              <tbody>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>ID</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Started</TableHead>
+                  <TableHead>Finished</TableHead>
+                  <TableHead>Duration</TableHead>
+                  <TableHead>Message</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
                 {runs.map((run) => (
-                  <tr key={run.id}>
-                    <td>{run.id}</td>
-                    <td>{run.status}</td>
-                    <td>{formatTs(run.startedAt)}</td>
-                    <td>{formatTs(run.finishedAt)}</td>
-                    <td>{run.durationMs != null ? `${run.durationMs} ms` : "—"}</td>
-                    <td>{run.message ?? "—"}</td>
-                  </tr>
+                  <TableRow key={run.id}>
+                    <TableCell>{run.id}</TableCell>
+                    <TableCell>{run.status}</TableCell>
+                    <TableCell>{formatTs(run.startedAt)}</TableCell>
+                    <TableCell>{formatTs(run.finishedAt)}</TableCell>
+                    <TableCell>{run.durationMs != null ? `${run.durationMs} ms` : "—"}</TableCell>
+                    <TableCell>{run.message ?? "—"}</TableCell>
+                  </TableRow>
                 ))}
-              </tbody>
-            </table>
+              </TableBody>
+            </Table>
           ) : null}
         </section>
       ) : null}
