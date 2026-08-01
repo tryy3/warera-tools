@@ -16,6 +16,7 @@
     "test": "vp test"
   },
   "dependencies": {
+    "@base-ui/react": "^1.6.0",
     "@fontsource-variable/geist": "^5.3.0",
     "@hono/node-server": "^2.0.12",
     "@libsql/client": "^0.17.4",
