@@ -1,3 +1,4 @@
+import { formatDisplayNumber } from "../lib/formatDisplayNumber";
 import { getRecipe, listProducibleRecipes, type Recipe } from "./recipes";
 
 export type ProfitPpBreakdown = {
@@ -26,7 +27,8 @@ function formatInputs(recipe: Recipe, prices: Record<string, number>): string {
   return recipe.inputs
     .map((input) => {
       const p = prices[input.itemCode];
-      const priceLabel = p != null && Number.isFinite(p) ? `${p} G` : "? G";
+      const priceLabel =
+        p != null && Number.isFinite(p) ? `${formatDisplayNumber(p)} G` : "? G";
       return `${input.quantity} ${input.itemCode} × ${priceLabel}`;
     })
     .join(" + ");
@@ -83,7 +85,7 @@ function profitForRecipe(recipe: Recipe, prices: Record<string, number>): Profit
     consumedPp: recipe.consumedPp,
     profitPerPp,
     missingInputs,
-    formula: `(${marketPrice} G − ${inputCost} G raw) / ${recipe.consumedPp} PP`,
+    formula: `(${formatDisplayNumber(marketPrice)} G − ${formatDisplayNumber(inputCost)} G raw) / ${recipe.consumedPp} PP`,
   };
 }
 
@@ -129,7 +131,7 @@ export function explainAeDaily(
     ppPerHour,
     dailyPp,
     dailyValue,
-    formula: `(${aeLevel} AE × (1 + ${bonusPct}% Bonus) × ${hoursPerDay}h) × ${profitPerPp} G/PP`,
+    formula: `(${aeLevel} AE × (1 + ${formatDisplayNumber(bonusPct, 4)}% Bonus) × ${hoursPerDay}h) × ${formatDisplayNumber(profitPerPp)} G/PP`,
   };
 }
 
@@ -146,7 +148,9 @@ export function transferCostGold(
     concreteUnits,
     gold,
     formula:
-      parts.length === 0 ? "0 Concrete" : `(${parts.join(" + ")}) × ${concretePrice} G Concrete`,
+      parts.length === 0
+        ? "0 Concrete"
+        : `(${parts.join(" + ")}) × ${formatDisplayNumber(concretePrice)} G Concrete`,
   };
 }
 

@@ -22,6 +22,11 @@ describe("calculateProfitPerPp", () => {
     const result = calculateProfitPerPp("lead", { lead: 0.086 });
     expect(result!.profitPerPp).toBeCloseTo(0.086);
   });
+
+  it("embeds rounded numbers in profit formula", () => {
+    const result = calculateProfitPerPp("lead", { lead: 0.08560533885010638 });
+    expect(result!.formula).toBe("(0.0856 G − 0 G raw) / 1 PP");
+  });
 });
 
 describe("listMarketOpportunities", () => {
@@ -61,6 +66,14 @@ describe("aeDailyValue / transfer", () => {
     expect(explained.dailyPp).toBeCloseTo(6 * 1.505 * 24);
     expect(explained.dailyValue).toBeCloseTo(6 * 1.505 * 24 * 0.0856);
     expect(explained.formula).toContain("50.5%");
+  });
+
+  it("embeds rounded numbers in AE formula", () => {
+    const explained = explainAeDaily(6, 0.505, 0.08560533885010638);
+    expect(explained.formula).toContain("0.0856");
+    expect(explained.formula).not.toContain("0.08560533885010638");
+    // numeric outputs remain full precision
+    expect(explained.dailyValue).toBeCloseTo(6 * 1.505 * 24 * 0.08560533885010638);
   });
 
   it("transfer cost uses concrete price", () => {

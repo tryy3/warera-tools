@@ -1,3 +1,4 @@
+import { formatDisplayNumber } from "../lib/formatDisplayNumber";
 import { unwrapTrpcData, wareraProcedurePath } from "./trpc";
 import type { WareraRequester } from "./prices";
 
@@ -189,7 +190,7 @@ export async function fetchCompanyProductionBonus(
       depositBonus,
       ethicSpecializationBonus,
       ethicDepositBonus,
-      formula: `strategic ${strategicBonus * 100}% + deposit ${depositBonus * 100}% + ethics ${ethicSpecializationBonus * 100}% + ethics-deposit ${ethicDepositBonus * 100}% = ${total * 100}%`,
+      formula: `strategic ${formatDisplayNumber(strategicBonus * 100)}% + deposit ${formatDisplayNumber(depositBonus * 100)}% + ethics ${formatDisplayNumber(ethicSpecializationBonus * 100)}% + ethics-deposit ${formatDisplayNumber(ethicDepositBonus * 100)}% = ${formatDisplayNumber(total * 100)}%`,
     };
   } catch {
     return null;
