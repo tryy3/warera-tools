@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { formatDisplayNumber } from "@/lib/formatDisplayNumber";
 import { PRICE_HISTORY_RANGES, type PriceHistoryRange } from "@/market/ranges";
-import { api } from "../../api";
+import { ApiError, api } from "../../api";
 import { GoldIcon } from "../../components/GoldIcon";
 import { ItemIcon } from "../../components/ItemIcon";
 import { formatItem } from "./formatItem";
@@ -94,14 +94,13 @@ export function MarketItemPage() {
       })
       .catch((err: unknown) => {
         if (cancelled) return;
-        const message = err instanceof Error ? err.message : String(err);
-        if (/no price history/i.test(message) || /not found/i.test(message)) {
+        if (err instanceof ApiError && (err.status === 404 || err.code === "not_found")) {
           setNotFound(true);
           setData(null);
-        } else {
-          setError(message);
-          setData(null);
+          return;
         }
+        setError(err instanceof Error ? err.message : String(err));
+        setData(null);
       })
       .finally(() => {
         if (!cancelled) setLoading(false);

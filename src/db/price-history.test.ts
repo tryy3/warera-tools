@@ -117,4 +117,40 @@ describe("getItemPriceHistory", () => {
     ]);
     expect(await getItemPriceHistory(db, "steel", "7d", now)).toBeNull();
   });
+
+  it("includes partial polls", async () => {
+    const pollId = await insertPricePoll(db, {
+      recordedAt: now,
+      status: "partial",
+      itemCount: 1,
+    });
+    await insertPriceSnapshots(db, pollId, [
+      {
+        itemCode: "steel",
+        marketPrice: 2.5,
+        buyMin: 2.4,
+        buyMax: 2.4,
+        buyAvg: 2.4,
+        sellMin: 2.6,
+        sellMax: 2.6,
+        sellAvg: 2.6,
+      },
+    ]);
+
+    const history = await getItemPriceHistory(db, "steel", "7d", now);
+    expect(history).not.toBeNull();
+    expect(history!.points).toHaveLength(1);
+    expect(history!.latest?.marketPrice).toBe(2.5);
+  });
+
+  it("filters history by item code", async () => {
+    await seedSnapshot(db, now, "grain", 0.5, 0.4, 0.6);
+
+    expect(await getItemPriceHistory(db, "steel", "7d", now)).toBeNull();
+
+    const grain = await getItemPriceHistory(db, "grain", "7d", now);
+    expect(grain).not.toBeNull();
+    expect(grain!.points).toHaveLength(1);
+    expect(grain!.latest?.marketPrice).toBe(0.5);
+  });
 });
