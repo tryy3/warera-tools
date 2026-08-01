@@ -509,69 +509,6 @@ button:disabled {
   background: var(--raised);
 }
 
-.economy-recent {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-}
-
-.economy-recent-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.35rem;
-}
-
-.economy-recent-btn {
-  font: inherit;
-  font-size: 0.875rem;
-  color: var(--text);
-  background: var(--raised);
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  padding: 0.2rem 0.5rem;
-  cursor: pointer;
-}
-
-.economy-recent-btn:hover,
-.economy-recent-btn.active {
-  background: var(--accent-soft);
-  border-color: var(--accent, var(--border));
-}
-
-.economy-user-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  overflow: hidden;
-}
-
-.economy-user {
-  width: 100%;
-  display: flex;
-  justify-content: space-between;
-  gap: 1rem;
-  border: none;
-  border-bottom: 1px solid var(--border);
-  background: var(--raised);
-  color: var(--text);
-  padding: 0.45rem 0.65rem;
-  text-align: left;
-}
-
-.economy-user-list li:last-child .economy-user {
-  border-bottom: none;
-}
-
-.economy-user:hover,
-.economy-user.active {
-  background: var(--accent-soft);
-}
-
 .economy-grid {
   display: grid;
   grid-template-columns: 1.2fr 0.8fr;

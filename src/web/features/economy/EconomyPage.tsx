@@ -7,12 +7,8 @@ import { FlagIcon } from "../../components/FlagIcon";
 import { GoldIcon } from "../../components/GoldIcon";
 import { ItemIcon } from "../../components/ItemIcon";
 import { buildEconomySearch } from "../../lib/economySearch";
-import {
-  loadRecentEconomyPlayers,
-  rememberEconomyPlayer,
-  type RecentEconomyPlayer,
-} from "../../lib/recentEconomyPlayers";
-import type { AdvisorResponse, CompanyAdvisorRow, SearchUsersResponse } from "./types";
+import { EconomyPlayerSearch } from "./EconomyPlayerSearch";
+import type { AdvisorResponse, CompanyAdvisorRow } from "./types";
 
 const economyRoute = getRouteApi("/economy");
 
@@ -207,44 +203,13 @@ export function EconomyPage() {
   const selectedUserId = search.userId ?? null;
   const selectedUsername = search.username ?? null;
 
-  const [query, setQuery] = useState("");
-  const [users, setUsers] = useState<SearchUsersResponse["users"]>([]);
   const [advisor, setAdvisor] = useState<AdvisorResponse | null>(null);
-  const [searching, setSearching] = useState(false);
   const [loadingAdvisor, setLoadingAdvisor] = useState(false);
   const [polling, setPolling] = useState(false);
   const [refreshingCompanies, setRefreshingCompanies] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [recentPlayers, setRecentPlayers] = useState<RecentEconomyPlayer[]>(() =>
-    loadRecentEconomyPlayers(),
-  );
 
   const displayName = selectedUsername ?? selectedUserId;
-
-  useEffect(() => {
-    const q = query.trim();
-    if (q.length < 2) {
-      setUsers([]);
-      return;
-    }
-    const handle = window.setTimeout(() => {
-      void (async () => {
-        setSearching(true);
-        setError(null);
-        try {
-          const data = await api<SearchUsersResponse>(
-            `/api/economy/search?q=${encodeURIComponent(q)}`,
-          );
-          setUsers(data.users);
-        } catch (err) {
-          setError(err instanceof Error ? err.message : String(err));
-        } finally {
-          setSearching(false);
-        }
-      })();
-    }, 300);
-    return () => window.clearTimeout(handle);
-  }, [query]);
 
   async function loadAdvisor(userId: string) {
     setLoadingAdvisor(true);
@@ -306,7 +271,6 @@ export function EconomyPage() {
       search: buildEconomySearch({ userId, username }),
       replace: true,
     });
-    setRecentPlayers(rememberEconomyPlayer({ userId, username }));
   }
 
   return (
@@ -333,56 +297,7 @@ export function EconomyPage() {
 
       <section className="economy-search">
         <label htmlFor="user-search">Find player</label>
-        <input
-          id="user-search"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search by username…"
-          autoComplete="off"
-        />
-        {recentPlayers.length > 0 ? (
-          <div className="economy-recent">
-            <span className="muted small">Recent</span>
-            <ul className="economy-recent-list">
-              {recentPlayers.map((p) => (
-                <li key={p.userId}>
-                  <button
-                    type="button"
-                    className={
-                      selectedUserId === p.userId
-                        ? "economy-recent-btn active"
-                        : "economy-recent-btn"
-                    }
-                    onClick={() => {
-                      selectPlayer(p.userId, p.username);
-                    }}
-                  >
-                    {p.username}
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </div>
-        ) : null}
-        {searching ? <p className="muted">Searching…</p> : null}
-        {users.length > 0 ? (
-          <ul className="economy-user-list">
-            {users.map((u) => (
-              <li key={u.userId}>
-                <button
-                  type="button"
-                  className={selectedUserId === u.userId ? "economy-user active" : "economy-user"}
-                  onClick={() => {
-                    selectPlayer(u.userId, u.username);
-                  }}
-                >
-                  <span>{u.username}</span>
-                  <span className="muted mono">{u.userId.slice(-6)}</span>
-                </button>
-              </li>
-            ))}
-          </ul>
-        ) : null}
+        <EconomyPlayerSearch selectedUserId={selectedUserId} onSelect={selectPlayer} />
       </section>
 
       {displayName ? (
