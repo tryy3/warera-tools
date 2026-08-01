@@ -1,3 +1,4 @@
+export { formatDisplayNumber } from "./format";
 export {
   RETASK_CONCRETE,
   RELOCATE_CONCRETE,
