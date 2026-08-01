@@ -12,8 +12,8 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as SplatRouteImport } from './routes/$'
 import { Route as CalculatorRouteImport } from './routes/calculator'
+import { Route as CompaniesRouteImport } from './routes/companies'
 import { Route as CountriesRouteImport } from './routes/countries'
-import { Route as EconomyRouteImport } from './routes/economy'
 import { Route as JobsRouteImport } from './routes/jobs'
 
 const IndexRoute = IndexRouteImport.update({
@@ -31,14 +31,14 @@ const CalculatorRoute = CalculatorRouteImport.update({
   path: '/calculator',
   getParentRoute: () => rootRouteImport,
 } as any)
+const CompaniesRoute = CompaniesRouteImport.update({
+  id: '/companies',
+  path: '/companies',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const CountriesRoute = CountriesRouteImport.update({
   id: '/countries',
   path: '/countries',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const EconomyRoute = EconomyRouteImport.update({
-  id: '/economy',
-  path: '/economy',
   getParentRoute: () => rootRouteImport,
 } as any)
 const JobsRoute = JobsRouteImport.update({
@@ -51,16 +51,16 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/$': typeof SplatRoute
   '/calculator': typeof CalculatorRoute
+  '/companies': typeof CompaniesRoute
   '/countries': typeof CountriesRoute
-  '/economy': typeof EconomyRoute
   '/jobs': typeof JobsRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/$': typeof SplatRoute
   '/calculator': typeof CalculatorRoute
+  '/companies': typeof CompaniesRoute
   '/countries': typeof CountriesRoute
-  '/economy': typeof EconomyRoute
   '/jobs': typeof JobsRoute
 }
 export interface FileRoutesById {
@@ -68,22 +68,22 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/$': typeof SplatRoute
   '/calculator': typeof CalculatorRoute
+  '/companies': typeof CompaniesRoute
   '/countries': typeof CountriesRoute
-  '/economy': typeof EconomyRoute
   '/jobs': typeof JobsRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/$' | '/calculator' | '/countries' | '/economy' | '/jobs'
+  fullPaths: '/' | '/$' | '/calculator' | '/companies' | '/countries' | '/jobs'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/$' | '/calculator' | '/countries' | '/economy' | '/jobs'
+  to: '/' | '/$' | '/calculator' | '/companies' | '/countries' | '/jobs'
   id:
     | '__root__'
     | '/'
     | '/$'
     | '/calculator'
+    | '/companies'
     | '/countries'
-    | '/economy'
     | '/jobs'
   fileRoutesById: FileRoutesById
 }
@@ -91,8 +91,8 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   SplatRoute: typeof SplatRoute
   CalculatorRoute: typeof CalculatorRoute
+  CompaniesRoute: typeof CompaniesRoute
   CountriesRoute: typeof CountriesRoute
-  EconomyRoute: typeof EconomyRoute
   JobsRoute: typeof JobsRoute
 }
 
@@ -119,18 +119,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CalculatorRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/companies': {
+      id: '/companies'
+      path: '/companies'
+      fullPath: '/companies'
+      preLoaderRoute: typeof CompaniesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/countries': {
       id: '/countries'
       path: '/countries'
       fullPath: '/countries'
       preLoaderRoute: typeof CountriesRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/economy': {
-      id: '/economy'
-      path: '/economy'
-      fullPath: '/economy'
-      preLoaderRoute: typeof EconomyRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/jobs': {
@@ -147,8 +147,8 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   SplatRoute: SplatRoute,
   CalculatorRoute: CalculatorRoute,
+  CompaniesRoute: CompaniesRoute,
   CountriesRoute: CountriesRoute,
-  EconomyRoute: EconomyRoute,
   JobsRoute: JobsRoute,
 }
 export const routeTree = rootRouteImport

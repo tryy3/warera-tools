@@ -17,11 +17,11 @@ import { api } from "../../api";
 import { FlagIcon } from "../../components/FlagIcon";
 import { GoldIcon } from "../../components/GoldIcon";
 import { ItemIcon } from "../../components/ItemIcon";
-import { buildEconomySearch } from "../../lib/economySearch";
-import { EconomyPlayerSearch } from "./EconomyPlayerSearch";
+import { buildCompaniesSearch } from "../../lib/companiesSearch";
+import { CompaniesPlayerSearch } from "./CompaniesPlayerSearch";
 import type { AdvisorResponse, CompanyAdvisorRow } from "./types";
 
-const economyRoute = getRouteApi("/economy");
+const companiesRoute = getRouteApi("/companies");
 
 function formatNum(value: number | null | undefined, digits = 4): string {
   if (value == null || !Number.isFinite(value)) return "—";
@@ -241,9 +241,9 @@ function CompanyCard({ row }: { row: CompanyAdvisorRow }) {
   );
 }
 
-export function EconomyPage() {
-  const search = economyRoute.useSearch();
-  const navigate = economyRoute.useNavigate();
+export function CompaniesPage() {
+  const search = companiesRoute.useSearch();
+  const navigate = companiesRoute.useNavigate();
   const selectedUserId = search.userId ?? null;
   const selectedUsername = search.username ?? null;
 
@@ -312,7 +312,7 @@ export function EconomyPage() {
 
   function selectPlayer(userId: string, username: string) {
     void navigate({
-      search: buildEconomySearch({ userId, username }),
+      search: buildCompaniesSearch({ userId, username }),
       replace: true,
     });
   }
@@ -321,7 +321,7 @@ export function EconomyPage() {
     <div className="mx-auto max-w-[1200px] rounded-md border border-border bg-card p-4 pb-6">
       <div className="mb-3 flex items-center justify-between gap-4">
         <div>
-          <h1 className="mb-0.5 text-[1.35rem] font-semibold tracking-tight">Economy</h1>
+          <h1 className="mb-0.5 text-[1.35rem] font-semibold tracking-tight">Companies</h1>
           <p className="m-0 text-muted-foreground">
             AE daily value = AE level × (1 + production bonus) × 24h × Profit/PP. Formulas shown per
             company.
@@ -344,7 +344,7 @@ export function EconomyPage() {
         <label htmlFor="user-search" className="text-sm text-muted-foreground">
           Find player
         </label>
-        <EconomyPlayerSearch selectedUserId={selectedUserId} onSelect={selectPlayer} />
+        <CompaniesPlayerSearch selectedUserId={selectedUserId} onSelect={selectPlayer} />
       </section>
 
       {displayName ? (

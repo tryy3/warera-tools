@@ -1,10 +1,10 @@
-export type EconomySearch = {
+export type CompaniesSearch = {
   userId?: string;
   username?: string;
 };
 
-export function parseEconomySearch(search: Record<string, unknown>): EconomySearch {
-  const out: EconomySearch = {};
+export function parseCompaniesSearch(search: Record<string, unknown>): CompaniesSearch {
+  const out: CompaniesSearch = {};
 
   if (typeof search.userId === "string") {
     const userId = search.userId.trim();
@@ -19,12 +19,12 @@ export function parseEconomySearch(search: Record<string, unknown>): EconomySear
   return out;
 }
 
-export function buildEconomySearch(input: {
+export function buildCompaniesSearch(input: {
   userId: string | null;
   username: string | null;
-}): EconomySearch {
+}): CompaniesSearch {
   if (!input.userId) return {};
-  const out: EconomySearch = { userId: input.userId };
+  const out: CompaniesSearch = { userId: input.userId };
   if (input.username) out.username = input.username;
   return out;
 }

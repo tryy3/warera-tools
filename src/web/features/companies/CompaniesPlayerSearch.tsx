@@ -13,13 +13,13 @@ import {
 } from "@/components/ui/combobox";
 import { api } from "../../api";
 import {
-  loadRecentEconomyPlayers,
-  rememberEconomyPlayer,
-  type RecentEconomyPlayer,
-} from "../../lib/recentEconomyPlayers";
+  loadRecentCompaniesPlayers,
+  rememberCompaniesPlayer,
+  type RecentCompaniesPlayer,
+} from "../../lib/recentCompaniesPlayers";
 import type { SearchUsersResponse } from "./types";
 
-export type EconomyPlayerOption = {
+export type CompaniesPlayerOption = {
   userId: string;
   username: string;
   source: "recent" | "result";
@@ -27,7 +27,7 @@ export type EconomyPlayerOption = {
 
 type PlayerGroup = {
   value: string;
-  items: EconomyPlayerOption[];
+  items: CompaniesPlayerOption[];
 };
 
 type Props = {
@@ -35,9 +35,9 @@ type Props = {
   onSelect: (userId: string, username: string) => void;
 };
 
-export function EconomyPlayerSearch({ selectedUserId, onSelect }: Props) {
+export function CompaniesPlayerSearch({ selectedUserId, onSelect }: Props) {
   const [inputValue, setInputValue] = useState("");
-  const [recent, setRecent] = useState<RecentEconomyPlayer[]>(() => loadRecentEconomyPlayers());
+  const [recent, setRecent] = useState<RecentCompaniesPlayer[]>(() => loadRecentCompaniesPlayers());
   const [results, setResults] = useState<SearchUsersResponse["users"]>([]);
   const [searching, setSearching] = useState(false);
 
@@ -68,7 +68,7 @@ export function EconomyPlayerSearch({ selectedUserId, onSelect }: Props) {
 
   const recentIds = useMemo(() => new Set(recent.map((p) => p.userId)), [recent]);
 
-  const recentOptions: EconomyPlayerOption[] = useMemo(
+  const recentOptions: CompaniesPlayerOption[] = useMemo(
     () =>
       recent.map((p) => ({
         userId: p.userId,
@@ -78,7 +78,7 @@ export function EconomyPlayerSearch({ selectedUserId, onSelect }: Props) {
     [recent],
   );
 
-  const resultOptions: EconomyPlayerOption[] = useMemo(
+  const resultOptions: CompaniesPlayerOption[] = useMemo(
     () =>
       results
         .filter((u) => !recentIds.has(u.userId))
@@ -101,10 +101,10 @@ export function EconomyPlayerSearch({ selectedUserId, onSelect }: Props) {
     return groups;
   }, [recentOptions, resultOptions]);
 
-  function handleSelect(option: EconomyPlayerOption | null) {
+  function handleSelect(option: CompaniesPlayerOption | null) {
     if (!option) return;
     onSelect(option.userId, option.username);
-    setRecent(rememberEconomyPlayer({ userId: option.userId, username: option.username }));
+    setRecent(rememberCompaniesPlayer({ userId: option.userId, username: option.username }));
     setInputValue("");
     setResults([]);
   }
@@ -125,11 +125,13 @@ export function EconomyPlayerSearch({ selectedUserId, onSelect }: Props) {
       onInputValueChange={setInputValue}
       value={null}
       onValueChange={(next) => {
-        handleSelect(next as EconomyPlayerOption | null);
+        handleSelect(next as CompaniesPlayerOption | null);
       }}
-      itemToStringLabel={(item: EconomyPlayerOption) => item.username}
-      itemToStringValue={(item: EconomyPlayerOption) => item.username}
-      isItemEqualToValue={(a: EconomyPlayerOption, b: EconomyPlayerOption) => a.userId === b.userId}
+      itemToStringLabel={(item: CompaniesPlayerOption) => item.username}
+      itemToStringValue={(item: CompaniesPlayerOption) => item.username}
+      isItemEqualToValue={(a: CompaniesPlayerOption, b: CompaniesPlayerOption) =>
+        a.userId === b.userId
+      }
     >
       <ComboboxInput
         id="user-search"
@@ -145,7 +147,7 @@ export function EconomyPlayerSearch({ selectedUserId, onSelect }: Props) {
             <ComboboxGroup key={group.value} items={group.items}>
               <ComboboxLabel>{group.value === "recent" ? "Recent" : "Results"}</ComboboxLabel>
               <ComboboxCollection>
-                {(item: EconomyPlayerOption) => (
+                {(item: CompaniesPlayerOption) => (
                   <ComboboxItem
                     key={`${item.source}-${item.userId}`}
                     value={item}
