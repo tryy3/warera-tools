@@ -84,6 +84,8 @@ export type SearchUsersResponse = {
 
 export type AdvisorResponse = {
   recordedAt: string | null;
+  companiesFetchedAt: number | null;
+  companiesRefreshed: boolean;
   opportunities: Opportunity[];
   companies: CompanyAdvisorRow[];
 };

@@ -28,11 +28,7 @@ export type CompanyPackRecord = {
   ttlSeconds: number;
 };
 
-export function isCompanyPackFresh(
-  fetchedAt: Date,
-  ttlSeconds: number,
-  now = new Date(),
-): boolean {
+export function isCompanyPackFresh(fetchedAt: Date, ttlSeconds: number, now = new Date()): boolean {
   return now.getTime() - fetchedAt.getTime() < ttlSeconds * 1000;
 }
 

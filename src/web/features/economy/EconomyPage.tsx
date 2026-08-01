@@ -208,6 +208,7 @@ export function EconomyPage() {
   const [searching, setSearching] = useState(false);
   const [loadingAdvisor, setLoadingAdvisor] = useState(false);
   const [polling, setPolling] = useState(false);
+  const [refreshingCompanies, setRefreshingCompanies] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const displayName = selectedUsername ?? selectedUserId;
@@ -276,6 +277,22 @@ export function EconomyPage() {
     }
   }
 
+  async function refreshCompanies() {
+    if (!selectedUserId) return;
+    setRefreshingCompanies(true);
+    setError(null);
+    try {
+      const data = await api<AdvisorResponse>(
+        `/api/economy/advisor?userId=${encodeURIComponent(selectedUserId)}&refresh=1`,
+      );
+      setAdvisor(data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setRefreshingCompanies(false);
+    }
+  }
+
   return (
     <div className="page economy-page">
       <div className="page-header">
@@ -332,12 +349,25 @@ export function EconomyPage() {
       </section>
 
       {displayName ? (
-        <p className="muted">
-          Showing companies for <strong>{displayName}</strong>
-          {advisor?.recordedAt
-            ? ` · prices as of ${new Date(advisor.recordedAt).toLocaleString()}`
-            : null}
-        </p>
+        <div className="economy-user-meta">
+          <p className="muted">
+            Showing companies for <strong>{displayName}</strong>
+            {advisor?.recordedAt
+              ? ` · prices as of ${new Date(advisor.recordedAt).toLocaleString()}`
+              : null}
+            {advisor?.companiesFetchedAt
+              ? ` · companies as of ${new Date(advisor.companiesFetchedAt).toLocaleString()}`
+              : null}
+          </p>
+          <button
+            type="button"
+            className="btn"
+            disabled={!selectedUserId || refreshingCompanies || loadingAdvisor}
+            onClick={() => void refreshCompanies()}
+          >
+            {refreshingCompanies ? "Refreshing…" : "Refresh companies"}
+          </button>
+        </div>
       ) : null}
 
       {loadingAdvisor ? <p className="muted">Loading advisor…</p> : null}

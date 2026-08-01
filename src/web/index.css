@@ -424,6 +424,19 @@ button:disabled {
   margin: 0;
 }
 
+.economy-user-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem 1rem;
+  margin: 0.5rem 0 0;
+}
+
+.economy-user-meta .muted {
+  margin: 0;
+  flex: 1 1 16rem;
+}
+
 .btn {
   border: 1px solid var(--border);
   background: var(--raised);

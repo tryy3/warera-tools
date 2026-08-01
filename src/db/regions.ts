@@ -44,16 +44,14 @@ export async function getRegion(db: Db, regionId: string): Promise<RegionRow | n
 
 export async function listRegionsForSync(db: Db): Promise<RegionRow[]> {
   const rows = await db.select().from(regions);
-  return rows
-    .map(mapRow)
-    .toSorted((a, b) => {
-      if (a.fetchedAt == null && b.fetchedAt != null) return -1;
-      if (a.fetchedAt != null && b.fetchedAt == null) return 1;
-      if (a.fetchedAt == null && b.fetchedAt == null) {
-        return a.enqueuedAt.getTime() - b.enqueuedAt.getTime();
-      }
-      return a.fetchedAt!.getTime() - b.fetchedAt!.getTime();
-    });
+  return rows.map(mapRow).toSorted((a, b) => {
+    if (a.fetchedAt == null && b.fetchedAt != null) return -1;
+    if (a.fetchedAt != null && b.fetchedAt == null) return 1;
+    if (a.fetchedAt == null && b.fetchedAt == null) {
+      return a.enqueuedAt.getTime() - b.enqueuedAt.getTime();
+    }
+    return a.fetchedAt!.getTime() - b.fetchedAt!.getTime();
+  });
 }
 
 export async function upsertRegionFetched(

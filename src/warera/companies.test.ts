@@ -111,7 +111,7 @@ describe("fetchCompanyProductionBonus", () => {
         },
       },
     }));
-    await fetchCompanyProductionBonus({ request }, "company-1");
+    await fetchCompanyProductionBonus({ request } as never, "company-1");
     expect(request).toHaveBeenCalledWith(
       expect.stringContaining("company.getProductionBonus"),
       expect.objectContaining({ baseUrl: "https://api2.warera.io/trpc" }),

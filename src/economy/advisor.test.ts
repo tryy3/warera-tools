@@ -191,7 +191,7 @@ describe("buildAdvisor caching", () => {
 
     const result = await buildAdvisor({
       db,
-      warera: { request },
+      warera: { request } as never,
       logger: logger as never,
       userId: "u1",
     });
@@ -268,7 +268,7 @@ describe("buildAdvisor caching", () => {
 
     const result = await buildAdvisor({
       db,
-      warera: { request },
+      warera: { request } as never,
       logger: logger as never,
       userId: "u1",
       refresh: true,
@@ -320,7 +320,7 @@ describe("buildAdvisor caching", () => {
 
     await buildAdvisor({
       db,
-      warera: { request },
+      warera: { request } as never,
       logger: logger as never,
       userId: "u1",
     });

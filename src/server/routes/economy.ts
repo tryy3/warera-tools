@@ -38,8 +38,10 @@ export function economyRoutes(deps: EconomyRouteDeps) {
     if (!userId) {
       throw new HttpError(400, "invalid_query", "userId is required");
     }
+    const refreshRaw = (c.req.query("refresh") ?? "").trim().toLowerCase();
+    const refresh = refreshRaw === "1" || refreshRaw === "true";
     try {
-      const result = await buildAdvisor({ db, warera, logger, userId });
+      const result = await buildAdvisor({ db, warera, logger, userId, refresh });
       return c.json(result);
     } catch (err) {
       throw new HttpError(

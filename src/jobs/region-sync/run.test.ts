@@ -36,7 +36,13 @@ describe("runRegionSync", () => {
     const result = await runRegionSync({
       db,
       warera: { request } as never,
-      logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn(), child: vi.fn() } as never,
+      logger: {
+        info: vi.fn(),
+        warn: vi.fn(),
+        error: vi.fn(),
+        debug: vi.fn(),
+        child: vi.fn(),
+      } as never,
     });
     expect(result).toEqual({ regionCount: 0, status: "success", errors: 0 });
     expect(request).not.toHaveBeenCalled();
@@ -52,7 +58,13 @@ describe("runRegionSync", () => {
     const result = await runRegionSync({
       db,
       warera: warera as never,
-      logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn(), child: vi.fn() } as never,
+      logger: {
+        info: vi.fn(),
+        warn: vi.fn(),
+        error: vi.fn(),
+        debug: vi.fn(),
+        child: vi.fn(),
+      } as never,
     });
     expect(result.status).toBe("success");
     expect(result.regionCount).toBe(1);
@@ -74,7 +86,13 @@ describe("runRegionSync", () => {
     const result = await runRegionSync({
       db,
       warera: warera as never,
-      logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn(), child: vi.fn() } as never,
+      logger: {
+        info: vi.fn(),
+        warn: vi.fn(),
+        error: vi.fn(),
+        debug: vi.fn(),
+        child: vi.fn(),
+      } as never,
     });
     expect(result.status).toBe("partial");
     expect((await getRegion(db, "ok"))?.name).toBe("OkCity");
