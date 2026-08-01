@@ -1,7 +1,9 @@
 import { getRouteApi } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table,
   TableBody,
@@ -32,18 +34,23 @@ function formatItem(code: string): string {
 
 function FormulaBox({ label, children }: { label: string; children: string }) {
   return (
-    <div className="formula-box">
-      <div className="formula-label">{label}</div>
-      <code className="formula-text">{children}</code>
+    <div className="mt-2 rounded border border-dashed border-primary/35 bg-black/20 px-2.5 py-2">
+      <div className="mb-0.5 text-[0.7em] tracking-wider text-primary uppercase">{label}</div>
+      <code className="block font-mono text-[0.78em] leading-snug break-words whitespace-pre-wrap text-foreground">
+        {children}
+      </code>
     </div>
   );
 }
 
 function FormulaDetails({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <details className="formula-details">
-      <summary className="formula-details-summary">{label}</summary>
-      <div className="formula-details-body">{children}</div>
+    <details className="group mt-2 rounded border border-dashed border-primary/35 bg-black/20 px-2.5 py-1.5">
+      <summary className="cursor-pointer list-none text-[0.75em] tracking-wider text-primary uppercase [&::-webkit-details-marker]:hidden">
+        <span className="inline-block transition-transform group-open:rotate-90">▸ </span>
+        {label}
+      </summary>
+      <div className="pb-1 [&_.mt-2:first-child]:mt-1.5">{children}</div>
     </details>
   );
 }
@@ -61,7 +68,7 @@ function GoldAmount({
 }) {
   if (value == null || !Number.isFinite(value)) return "—";
   return (
-    <span className="icon-label">
+    <span className="inline-flex items-center gap-1.5">
       <GoldIcon />
       {prefix}
       {formatDisplayNumber(value, digits)}
@@ -74,135 +81,165 @@ function CompanyCard({ row }: { row: CompanyAdvisorRow }) {
   const bonusPct = row.company.productionBonus != null ? row.company.productionBonus * 100 : null;
 
   return (
-    <article className="economy-card">
-      <header>
-        <h3>{row.company.name}</h3>
-        <span className="pill positive-pill">
+    <Card className="gap-0 border-border bg-secondary py-0 shadow-none">
+      <CardHeader className="flex flex-row items-center justify-between gap-2 px-3.5 pt-3 pb-2">
+        <CardTitle className="text-base font-semibold">{row.company.name}</CardTitle>
+        <Badge variant="outline" className="border-success/45 font-normal text-success">
           {row.currentDailyValue != null ? (
             <GoldAmount value={row.currentDailyValue} digits={3} prefix="+" suffix="/day" />
           ) : (
             "—"
           )}
-        </span>
-      </header>
+        </Badge>
+      </CardHeader>
 
-      <dl className="economy-stats">
-        <div>
-          <dt>Material</dt>
-          <dd>
-            {row.company.itemCode ? (
-              <span className="icon-label">
-                <ItemIcon itemCode={row.company.itemCode} />
-                {formatItem(row.company.itemCode)}
-              </span>
-            ) : (
-              "—"
-            )}
-          </dd>
-        </div>
-        <div>
-          <dt>Region</dt>
-          <dd>
-            <span className="icon-label">
-              <FlagIcon code={row.company.regionCountryCode} />
-              {row.company.regionName ?? row.company.regionId ?? "—"}
-            </span>
-          </dd>
-        </div>
-        <div>
-          <dt>AE level</dt>
-          <dd>{row.company.aeLevel}</dd>
-        </div>
-        <div>
-          <dt>Bonus</dt>
-          <dd>{bonusPct != null ? `${formatNum(bonusPct, 1)}%` : "—"}</dd>
-        </div>
-        <div>
-          <dt>Profit/PP</dt>
-          <dd>
-            <GoldAmount value={row.currentProfitPerPp} digits={4} />
-          </dd>
-        </div>
-        <div>
-          <dt>Daily PP</dt>
-          <dd>{row.aeBreakdown ? formatNum(row.aeBreakdown.dailyPp, 1) : "—"}</dd>
-        </div>
-      </dl>
-
-      {row.bonusDetails || row.profitBreakdown || row.aeBreakdown ? (
-        <FormulaDetails label="How calculated">
-          {row.bonusDetails ? (
-            <FormulaBox label="Production bonus">{row.bonusDetails.formula}</FormulaBox>
-          ) : null}
-          {row.profitBreakdown ? (
-            <FormulaBox label="Profit / PP">{row.profitBreakdown.formula}</FormulaBox>
-          ) : null}
-          {row.aeBreakdown ? (
-            <FormulaBox label="AE / day">{`${row.aeBreakdown.formula} = ${formatNum(row.aeBreakdown.dailyValue, 4)} G`}</FormulaBox>
-          ) : null}
-        </FormulaDetails>
-      ) : null}
-
-      {row.bestSwitch ? (
-        <div className="economy-switch">
-          <div className="economy-switch-title">Best switch (raw)</div>
-          <div className="economy-switch-summary">
-            <span className="economy-switch-arrow">→</span>
-            <span className="icon-label">
-              <ItemIcon itemCode={row.bestSwitch.itemCode} />
-              <strong>{formatItem(row.bestSwitch.itemCode)}</strong>
-            </span>
-            {row.bestSwitch.bestRegionName || row.bestSwitch.bestRegionId ? (
-              <>
-                <span className="economy-switch-at">@</span>
-                <span className="icon-label">
-                  <FlagIcon code={row.bestSwitch.bestRegionCountryCode} />
-                  {row.bestSwitch.bestRegionName ?? row.bestSwitch.bestRegionId}
+      <CardContent className="px-3.5 pb-3">
+        <dl className="m-0 grid grid-cols-[repeat(auto-fill,minmax(7rem,1fr))] gap-x-3.5 gap-y-1.5">
+          <div>
+            <dt className="m-0 text-[0.75em] tracking-wide text-muted-foreground uppercase">
+              Material
+            </dt>
+            <dd className="mt-0.5 mb-0">
+              {row.company.itemCode ? (
+                <span className="inline-flex items-center gap-1.5">
+                  <ItemIcon itemCode={row.company.itemCode} />
+                  {formatItem(row.company.itemCode)}
                 </span>
-              </>
-            ) : (
-              <span>(same region)</span>
-            )}
-            <span className="economy-switch-bonus">
-              (+{formatNum(row.bestSwitch.bestBonus * 100, 1)}% bonus)
-            </span>
+              ) : (
+                "—"
+              )}
+            </dd>
           </div>
-          <dl className="economy-stats compact">
-            <div>
-              <dt>Δ / day</dt>
-              <dd className="positive">+{formatNum(row.bestSwitch.dailyDelta, 2)} G</dd>
-            </div>
-            <div>
-              <dt>Transfer</dt>
-              <dd className="economy-transfer">
-                <span>{row.bestSwitch.transferConcrete} Concrete</span>
-                <span className="economy-transfer-gold">
-                  ~ <GoldAmount value={row.bestSwitch.transferGold} digits={1} />
-                </span>
-              </dd>
-            </div>
-            <div>
-              <dt>Payback</dt>
-              <dd>
-                {row.bestSwitch.paybackDays != null
-                  ? `${formatNum(row.bestSwitch.paybackDays, 1)}d`
-                  : "—"}
-              </dd>
-            </div>
-          </dl>
-          <FormulaDetails label="Switch math">
-            <FormulaBox label="Alt Profit / PP">{row.bestSwitch.profitFormula}</FormulaBox>
-            <FormulaBox label="Alt AE / day">{row.bestSwitch.aeFormula}</FormulaBox>
-            <FormulaBox label="Transfer cost">{row.bestSwitch.transferFormula}</FormulaBox>
-            {row.bestSwitch.paybackFormula ? (
-              <FormulaBox label="Payback">{row.bestSwitch.paybackFormula}</FormulaBox>
+          <div>
+            <dt className="m-0 text-[0.75em] tracking-wide text-muted-foreground uppercase">
+              Region
+            </dt>
+            <dd className="mt-0.5 mb-0">
+              <span className="inline-flex items-center gap-1.5">
+                <FlagIcon code={row.company.regionCountryCode} />
+                {row.company.regionName ?? row.company.regionId ?? "—"}
+              </span>
+            </dd>
+          </div>
+          <div>
+            <dt className="m-0 text-[0.75em] tracking-wide text-muted-foreground uppercase">
+              AE level
+            </dt>
+            <dd className="mt-0.5 mb-0">{row.company.aeLevel}</dd>
+          </div>
+          <div>
+            <dt className="m-0 text-[0.75em] tracking-wide text-muted-foreground uppercase">
+              Bonus
+            </dt>
+            <dd className="mt-0.5 mb-0">
+              {bonusPct != null ? `${formatNum(bonusPct, 1)}%` : "—"}
+            </dd>
+          </div>
+          <div>
+            <dt className="m-0 text-[0.75em] tracking-wide text-muted-foreground uppercase">
+              Profit/PP
+            </dt>
+            <dd className="mt-0.5 mb-0">
+              <GoldAmount value={row.currentProfitPerPp} digits={4} />
+            </dd>
+          </div>
+          <div>
+            <dt className="m-0 text-[0.75em] tracking-wide text-muted-foreground uppercase">
+              Daily PP
+            </dt>
+            <dd className="mt-0.5 mb-0">
+              {row.aeBreakdown ? formatNum(row.aeBreakdown.dailyPp, 1) : "—"}
+            </dd>
+          </div>
+        </dl>
+
+        {row.bonusDetails || row.profitBreakdown || row.aeBreakdown ? (
+          <FormulaDetails label="How calculated">
+            {row.bonusDetails ? (
+              <FormulaBox label="Production bonus">{row.bonusDetails.formula}</FormulaBox>
+            ) : null}
+            {row.profitBreakdown ? (
+              <FormulaBox label="Profit / PP">{row.profitBreakdown.formula}</FormulaBox>
+            ) : null}
+            {row.aeBreakdown ? (
+              <FormulaBox label="AE / day">{`${row.aeBreakdown.formula} = ${formatNum(row.aeBreakdown.dailyValue, 4)} G`}</FormulaBox>
             ) : null}
           </FormulaDetails>
-        </div>
-      ) : (
-        <p className="muted small">No profitable switch found with current prices.</p>
-      )}
-    </article>
+        ) : null}
+
+        {row.bestSwitch ? (
+          <div className="mt-3 border-t border-border pt-2.5">
+            <div className="mb-1 text-[0.8em] tracking-wider text-primary uppercase">
+              Best switch (raw)
+            </div>
+            <div className="mb-1.5 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[0.95em] leading-snug">
+              <span className="text-muted-foreground">→</span>
+              <span className="inline-flex items-center gap-1.5">
+                <ItemIcon itemCode={row.bestSwitch.itemCode} />
+                <strong>{formatItem(row.bestSwitch.itemCode)}</strong>
+              </span>
+              {row.bestSwitch.bestRegionName || row.bestSwitch.bestRegionId ? (
+                <>
+                  <span className="text-muted-foreground">@</span>
+                  <span className="inline-flex items-center gap-1.5">
+                    <FlagIcon code={row.bestSwitch.bestRegionCountryCode} />
+                    {row.bestSwitch.bestRegionName ?? row.bestSwitch.bestRegionId}
+                  </span>
+                </>
+              ) : (
+                <span>(same region)</span>
+              )}
+              <span className="text-muted-foreground">
+                (+{formatNum(row.bestSwitch.bestBonus * 100, 1)}% bonus)
+              </span>
+            </div>
+            <dl className="mt-1.5 m-0 grid grid-cols-[repeat(auto-fill,minmax(7rem,1fr))] gap-x-3.5 gap-y-1.5">
+              <div>
+                <dt className="m-0 text-[0.75em] tracking-wide text-muted-foreground uppercase">
+                  Δ / day
+                </dt>
+                <dd className="mt-0.5 mb-0 text-success">
+                  +{formatNum(row.bestSwitch.dailyDelta, 2)} G
+                </dd>
+              </div>
+              <div>
+                <dt className="m-0 text-[0.75em] tracking-wide text-muted-foreground uppercase">
+                  Transfer
+                </dt>
+                <dd className="mt-0.5 mb-0 flex flex-col items-start gap-0.5">
+                  <span>{row.bestSwitch.transferConcrete} Concrete</span>
+                  <span className="text-[0.92em] text-muted-foreground">
+                    ~ <GoldAmount value={row.bestSwitch.transferGold} digits={1} />
+                  </span>
+                </dd>
+              </div>
+              <div>
+                <dt className="m-0 text-[0.75em] tracking-wide text-muted-foreground uppercase">
+                  Payback
+                </dt>
+                <dd className="mt-0.5 mb-0">
+                  {row.bestSwitch.paybackDays != null
+                    ? `${formatNum(row.bestSwitch.paybackDays, 1)}d`
+                    : "—"}
+                </dd>
+              </div>
+            </dl>
+            <FormulaDetails label="Switch math">
+              <FormulaBox label="Alt Profit / PP">{row.bestSwitch.profitFormula}</FormulaBox>
+              <FormulaBox label="Alt AE / day">{row.bestSwitch.aeFormula}</FormulaBox>
+              <FormulaBox label="Transfer cost">{row.bestSwitch.transferFormula}</FormulaBox>
+              {row.bestSwitch.paybackFormula ? (
+                <FormulaBox label="Payback">{row.bestSwitch.paybackFormula}</FormulaBox>
+              ) : null}
+            </FormulaDetails>
+          </div>
+        ) : (
+          <p className="mt-2 text-sm text-muted-foreground">
+            No profitable switch found with current prices.
+          </p>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 
