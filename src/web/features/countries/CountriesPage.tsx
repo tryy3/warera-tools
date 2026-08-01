@@ -1,4 +1,14 @@
 import { useEffect, useState, type FormEvent } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { api } from "../../api";
 import { FlagIcon } from "../../components/FlagIcon";
 import type { CountriesResponse, Country } from "./types";
@@ -132,40 +142,50 @@ export function CountriesPage() {
   }
 
   return (
-    <section className="page">
-      <div className="page-header">
-        <h1>Countries</h1>
-        <button type="button" onClick={() => void loadCountries()} disabled={loading}>
+    <section className="mx-auto max-w-[1100px] rounded-md border border-border bg-card p-4 pb-6">
+      <div className="mb-3 flex items-center justify-between gap-4">
+        <h1 className="m-0 text-[1.35rem] font-semibold tracking-tight">Countries</h1>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => void loadCountries()}
+          disabled={loading}
+        >
           Refresh
-        </button>
+        </Button>
       </div>
 
-      {error ? <p className="error">{error}</p> : null}
-      {loading ? <p className="muted">Loading countries…</p> : null}
+      {error ? <p className="my-2 text-destructive">{error}</p> : null}
+      {loading ? <p className="text-muted-foreground">Loading countries…</p> : null}
 
       {!loading && countries.length === 0 && !error ? (
-        <p className="muted">No countries yet.</p>
+        <p className="text-muted-foreground">No countries yet.</p>
       ) : null}
 
       {countries.length > 0 ? (
-        <table className="jobs-table">
-          <thead>
-            <tr>
-              <th>Name</th>
-              <th>ISO</th>
-              <th>Tax %</th>
-              <th>Edit</th>
-            </tr>
-          </thead>
-          <tbody>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Name</TableHead>
+              <TableHead>ISO</TableHead>
+              <TableHead>Tax %</TableHead>
+              <TableHead>Edit</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
             {countries.map((country) => {
               const isWarera = country.source === "warera";
               const editing = !isWarera && editingId === country.id;
               return (
-                <tr key={country.id} className={editing ? "selected" : undefined}>
-                  <td>
+                <TableRow
+                  key={country.id}
+                  className={editing ? "bg-primary/15" : undefined}
+                  data-state={editing ? "selected" : undefined}
+                >
+                  <TableCell>
                     {editing ? (
-                      <input
+                      <Input
                         type="text"
                         value={editName}
                         onChange={(e) => setEditName(e.target.value)}
@@ -175,14 +195,14 @@ export function CountriesPage() {
                     ) : (
                       <>
                         {country.name}
-                        <div className="muted small mono">{country.id}</div>
+                        <div className="font-mono text-sm text-muted-foreground">{country.id}</div>
                       </>
                     )}
-                  </td>
-                  <td>
+                  </TableCell>
+                  <TableCell>
                     {editing ? (
                       <>
-                        <input
+                        <Input
                           type="text"
                           value={editIsoCode}
                           onChange={(e) => setEditIsoCode(e.target.value)}
@@ -191,7 +211,9 @@ export function CountriesPage() {
                           placeholder="SE"
                           aria-label="ISO country code"
                         />
-                        <div className="muted small">Optional ISO 3166-1 alpha-2 (e.g. SE)</div>
+                        <div className="text-sm text-muted-foreground">
+                          Optional ISO 3166-1 alpha-2 (e.g. SE)
+                        </div>
                       </>
                     ) : country.isoCode ? (
                       <span className="icon-label">
@@ -201,10 +223,10 @@ export function CountriesPage() {
                     ) : (
                       "—"
                     )}
-                  </td>
-                  <td>
+                  </TableCell>
+                  <TableCell>
                     {editing ? (
-                      <input
+                      <Input
                         type="number"
                         step="any"
                         min="0"
@@ -219,45 +241,59 @@ export function CountriesPage() {
                         maximumFractionDigits: 4,
                       })
                     )}
-                  </td>
-                  <td>
+                  </TableCell>
+                  <TableCell>
                     {isWarera ? (
-                      <span className="muted small">Synced</span>
+                      <span className="text-sm text-muted-foreground">Synced</span>
                     ) : (
-                      <div className="actions">
+                      <div className="flex flex-wrap gap-1.5">
                         {editing ? (
                           <>
-                            <button type="button" disabled={busy} onClick={() => void saveEdit()}>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              disabled={busy}
+                              onClick={() => void saveEdit()}
+                            >
                               Save
-                            </button>
-                            <button type="button" disabled={busy} onClick={cancelEdit}>
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              disabled={busy}
+                              onClick={cancelEdit}
+                            >
                               Cancel
-                            </button>
+                            </Button>
                           </>
                         ) : (
-                          <button
+                          <Button
                             type="button"
+                            variant="outline"
+                            size="sm"
                             disabled={busy || editingId != null}
                             onClick={() => startEdit(country)}
                           >
                             Edit
-                          </button>
+                          </Button>
                         )}
                       </div>
                     )}
-                  </td>
-                </tr>
+                  </TableCell>
+                </TableRow>
               );
             })}
-          </tbody>
-        </table>
+          </TableBody>
+        </Table>
       ) : null}
 
-      <h2>Add country</h2>
-      <form className="country-form" onSubmit={(e) => void handleAdd(e)}>
-        <label>
+      <h2 className="mt-5 mb-2 text-[1.05rem] font-semibold">Add country</h2>
+      <form className="mt-2 flex flex-wrap items-end gap-3" onSubmit={(e) => void handleAdd(e)}>
+        <label className="flex flex-col gap-1 text-sm text-muted-foreground">
           Name
-          <input
+          <Input
             type="text"
             value={addName}
             onChange={(e) => setAddName(e.target.value)}
@@ -265,9 +301,9 @@ export function CountriesPage() {
             required
           />
         </label>
-        <label>
+        <label className="flex flex-col gap-1 text-sm text-muted-foreground">
           Tax %
-          <input
+          <Input
             type="number"
             step="any"
             min="0"
@@ -278,9 +314,9 @@ export function CountriesPage() {
             required
           />
         </label>
-        <label>
+        <label className="flex flex-col gap-1 text-sm text-muted-foreground">
           ISO
-          <input
+          <Input
             type="text"
             value={addIsoCode}
             onChange={(e) => setAddIsoCode(e.target.value)}
@@ -289,11 +325,13 @@ export function CountriesPage() {
             placeholder="SE"
             aria-label="ISO country code"
           />
-          <span className="muted small">Optional ISO 3166-1 alpha-2 (e.g. SE)</span>
+          <span className="text-sm text-muted-foreground">
+            Optional ISO 3166-1 alpha-2 (e.g. SE)
+          </span>
         </label>
-        <button type="submit" disabled={busy}>
+        <Button type="submit" variant="outline" size="sm" disabled={busy}>
           Add
-        </button>
+        </Button>
       </form>
     </section>
   );
