@@ -79,3 +79,28 @@ export const priceSnapshots = sqliteTable("price_snapshots", {
   sellMax: real("sell_max"),
   sellAvg: real("sell_avg"),
 });
+
+export const recommendedRegions = sqliteTable("recommended_regions", {
+  itemCode: text("item_code").primaryKey(),
+  regionId: text("region_id").notNull(),
+  regionName: text("region_name"),
+  bonus: real("bonus"),
+  payload: text("payload", { mode: "json" }).$type<Record<string, unknown> | null>(),
+  fetchedAt: integer("fetched_at", { mode: "timestamp_ms" }).notNull(),
+});
+
+export const regions = sqliteTable("regions", {
+  id: text("id").primaryKey(),
+  name: text("name"),
+  countryCode: text("country_code"),
+  payload: text("payload", { mode: "json" }).$type<Record<string, unknown> | null>(),
+  fetchedAt: integer("fetched_at", { mode: "timestamp_ms" }),
+  enqueuedAt: integer("enqueued_at", { mode: "timestamp_ms" }).notNull(),
+});
+
+export const companyPacks = sqliteTable("company_packs", {
+  userId: text("user_id").primaryKey(),
+  payload: text("payload", { mode: "json" }).notNull().$type<unknown>(),
+  fetchedAt: integer("fetched_at", { mode: "timestamp_ms" }).notNull(),
+  ttlSeconds: integer("ttl_seconds").notNull().default(600),
+});
