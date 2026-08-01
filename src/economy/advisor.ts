@@ -16,9 +16,10 @@ import {
   fetchBestRecommendedRegion,
   fetchCompaniesByUserId,
   fetchCompanyProductionBonus,
-  fetchRegionName,
+  fetchRegionInfo,
   type CompanySummary,
   type ProductionBonusDetails,
+  type RegionInfo,
 } from "../warera/companies";
 import type { WareraRequester } from "../warera/prices";
 
@@ -26,6 +27,7 @@ export type SwitchRecommendation = {
   itemCode: string;
   bestRegionId: string | null;
   bestRegionName: string | null;
+  bestRegionCountryCode: string | null;
   bestBonus: number;
   profitPerPp: number;
   dailyValue: number;
@@ -74,13 +76,13 @@ export async function buildAdvisor(options: {
 
   let companies = await fetchCompaniesByUserId(warera, userId);
 
-  const regionNameCache = new Map<string, string | null>();
-  async function regionName(regionId: string | null): Promise<string | null> {
-    if (!regionId) return null;
-    if (regionNameCache.has(regionId)) return regionNameCache.get(regionId)!;
-    const name = await fetchRegionName(warera, regionId);
-    regionNameCache.set(regionId, name);
-    return name;
+  const regionInfoCache = new Map<string, RegionInfo>();
+  async function regionInfo(regionId: string | null): Promise<RegionInfo> {
+    if (!regionId) return { name: null, countryCode: null };
+    if (regionInfoCache.has(regionId)) return regionInfoCache.get(regionId)!;
+    const info = await fetchRegionInfo(warera, regionId);
+    regionInfoCache.set(regionId, info);
+    return info;
   }
 
   const enriched = await Promise.all(
@@ -88,11 +90,12 @@ export async function buildAdvisor(options: {
       const bonusDetails =
         c.productionBonus != null ? null : await fetchCompanyProductionBonus(warera, c.id);
       const productionBonus = bonusDetails?.total ?? c.productionBonus;
-      const name = c.regionName ?? (await regionName(c.regionId));
+      const info = await regionInfo(c.regionId);
       return {
         company: {
           ...c,
-          regionName: name,
+          regionName: c.regionName ?? info.name,
+          regionCountryCode: c.regionCountryCode ?? info.countryCode,
           productionBonus: productionBonus ?? null,
         },
         bonusDetails,
@@ -160,10 +163,13 @@ export async function buildAdvisor(options: {
         relocate: needsRelocate,
       });
       const days = paybackDays(transfer.gold, dailyDelta);
+      const bestRegionId = region?.regionId ?? null;
+      const bestInfo = await regionInfo(bestRegionId);
       const candidate: SwitchRecommendation = {
         itemCode: recipe.itemCode,
-        bestRegionId: region?.regionId ?? null,
-        bestRegionName: region?.regionName ?? null,
+        bestRegionId,
+        bestRegionName: region?.regionName ?? bestInfo.name,
+        bestRegionCountryCode: bestInfo.countryCode,
         bestBonus: bonus,
         profitPerPp: breakdown.profitPerPp,
         dailyValue,

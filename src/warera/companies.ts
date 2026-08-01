@@ -8,8 +8,14 @@ export type CompanySummary = {
   itemCode: string | null;
   regionId: string | null;
   regionName: string | null;
+  regionCountryCode: string | null;
   aeLevel: number;
   productionBonus: number | null;
+};
+
+export type RegionInfo = {
+  name: string | null;
+  countryCode: string | null;
 };
 
 function asRecord(value: unknown): Record<string, unknown> | null {
@@ -80,6 +86,7 @@ export function parseCompany(raw: unknown): CompanySummary | null {
     itemCode,
     regionId,
     regionName,
+    regionCountryCode: null,
     aeLevel: Math.max(1, Math.min(7, Math.trunc(aeLevel))),
     productionBonus:
       productionBonus == null
@@ -197,18 +204,33 @@ export async function fetchCompanyProductionBonus(
   }
 }
 
+export function parseRegionInfo(data: unknown): RegionInfo {
+  const obj = asRecord(data);
+  if (!obj) return { name: null, countryCode: null };
+  return {
+    name: pickString(obj, ["name", "mainCity"]),
+    countryCode: pickString(obj, ["countryCode"]),
+  };
+}
+
+export async function fetchRegionInfo(
+  warera: WareraRequester,
+  regionId: string,
+): Promise<RegionInfo> {
+  try {
+    const json = await warera.request<unknown>(wareraProcedurePath("region.getById", { regionId }));
+    return parseRegionInfo(unwrapTrpcData(json));
+  } catch {
+    return { name: null, countryCode: null };
+  }
+}
+
 export async function fetchRegionName(
   warera: WareraRequester,
   regionId: string,
 ): Promise<string | null> {
-  try {
-    const json = await warera.request<unknown>(wareraProcedurePath("region.getById", { regionId }));
-    const data = unwrapTrpcData(json);
-    const obj = asRecord(data);
-    return obj ? pickString(obj, ["name", "mainCity"]) : null;
-  } catch {
-    return null;
-  }
+  const info = await fetchRegionInfo(warera, regionId);
+  return info.name;
 }
 
 export type RecommendedRegion = {

@@ -43,6 +43,7 @@ export type SwitchRecommendation = {
   itemCode: string;
   bestRegionId: string | null;
   bestRegionName: string | null;
+  bestRegionCountryCode: string | null;
   bestBonus: number;
   profitPerPp: number;
   dailyValue: number;
@@ -65,6 +66,7 @@ export type CompanyAdvisorRow = {
     itemCode: string | null;
     regionId: string | null;
     regionName: string | null;
+    regionCountryCode: string | null;
     aeLevel: number;
     productionBonus: number | null;
   };

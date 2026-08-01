@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vite-plus/test";
-import { extractCompanyIds, parseCompany, parseRecommendedRegions } from "./companies";
+import {
+  extractCompanyIds,
+  parseCompany,
+  parseRecommendedRegions,
+  parseRegionInfo,
+} from "./companies";
 
 describe("extractCompanyIds", () => {
   it("reads string ids from items", () => {
@@ -39,9 +44,33 @@ describe("parseCompany", () => {
       itemCode: "lead",
       regionId: "6813b70d9403bc4170a5db6a",
       regionName: null,
+      regionCountryCode: null,
       aeLevel: 6,
       productionBonus: null,
     });
+  });
+});
+
+describe("parseRegionInfo", () => {
+  it("reads countryCode from region.getById shape", () => {
+    expect(
+      parseRegionInfo({
+        name: "Turkistan",
+        countryCode: "kz",
+        country: "6813…",
+      }),
+    ).toEqual({ name: "Turkistan", countryCode: "kz" });
+  });
+
+  it("falls back to mainCity and null countryCode", () => {
+    expect(parseRegionInfo({ mainCity: "Somewhere" })).toEqual({
+      name: "Somewhere",
+      countryCode: null,
+    });
+  });
+
+  it("returns nulls for non-objects", () => {
+    expect(parseRegionInfo(null)).toEqual({ name: null, countryCode: null });
   });
 });
 
