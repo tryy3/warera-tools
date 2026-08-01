@@ -212,7 +212,12 @@ describe("countriesRoutes", () => {
       syncedAt: new Date("2026-01-01T00:00:00.000Z"),
     });
 
-    for (const patchBody of [{ taxRate: 0.05 }, { name: "Suomi" }, { isoCode: "SF" }]) {
+    for (const patchBody of [
+      { taxRate: 0.05 },
+      { name: "Suomi" },
+      { isoCode: "SF" },
+      { isoCode: null },
+    ]) {
       const res = await app.request("/finland", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
