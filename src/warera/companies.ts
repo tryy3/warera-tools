@@ -175,6 +175,7 @@ export async function fetchCompanyProductionBonus(
   try {
     const json = await warera.request<unknown>(
       wareraProcedurePath("company.getProductionBonus", { companyId }),
+      { baseUrl: "https://api2.warera.io/trpc" },
     );
     const data = unwrapTrpcData(json);
     const obj = asRecord(data);

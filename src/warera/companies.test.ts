@@ -1,6 +1,7 @@
-import { describe, expect, it } from "vite-plus/test";
+import { describe, expect, it, vi } from "vite-plus/test";
 import {
   extractCompanyIds,
+  fetchCompanyProductionBonus,
   parseCompany,
   parseRecommendedRegions,
   parseRegionInfo,
@@ -94,5 +95,26 @@ describe("parseRecommendedRegions", () => {
         },
       }),
     ).toEqual([{ regionId: "reg-a", regionName: "Somewhere", bonus: 0.505 }]);
+  });
+});
+
+describe("fetchCompanyProductionBonus", () => {
+  it("calls api2 directly (skips gateway)", async () => {
+    const request = vi.fn(async () => ({
+      result: {
+        data: {
+          total: 50.5,
+          strategicBonus: 10,
+          depositBonus: 20,
+          ethicSpecializationBonus: 15,
+          ethicDepositBonus: 5.5,
+        },
+      },
+    }));
+    await fetchCompanyProductionBonus({ request }, "company-1");
+    expect(request).toHaveBeenCalledWith(
+      expect.stringContaining("company.getProductionBonus"),
+      expect.objectContaining({ baseUrl: "https://api2.warera.io/trpc" }),
+    );
   });
 });
