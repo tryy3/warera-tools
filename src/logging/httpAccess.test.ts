@@ -1,5 +1,7 @@
 import { Hono } from "hono";
+import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { describe, expect, it, vi } from "vite-plus/test";
+import { HttpError, errorPayload } from "../server/errors";
 import { httpAccess } from "./httpAccess";
 import type { Logger } from "./types";
 
@@ -59,6 +61,32 @@ describe("httpAccess", () => {
     await app.request("/api/boom");
     expect(child.error).toHaveBeenCalledWith(
       expect.objectContaining({ status: 500 }),
+      "http request",
+    );
+  });
+
+  it("logs thrown HttpError at warn after onError sets status", async () => {
+    const { logger, child } = mockLogger();
+    const app = new Hono();
+    app.use("/api/*", httpAccess(logger));
+    app.onError((err, c) => {
+      const { status, body } = errorPayload(err);
+      return c.json(body, status as ContentfulStatusCode);
+    });
+    app.get("/api/missing", () => {
+      throw new HttpError(404, "not_found", "Not found");
+    });
+
+    await app.request("/api/missing");
+
+    expect(child.warn).toHaveBeenCalledWith(
+      expect.objectContaining({
+        method: "GET",
+        path: "/api/missing",
+        status: 404,
+        durationMs: expect.any(Number),
+        requestId: expect.any(String),
+      }),
       "http request",
     );
   });

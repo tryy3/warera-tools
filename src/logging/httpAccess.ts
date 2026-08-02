@@ -10,23 +10,25 @@ export function httpAccess(logger: Logger): MiddlewareHandler {
       bindings: { requestId },
     });
 
-    await next();
+    try {
+      await next();
+    } finally {
+      const status = c.res.status;
+      const fields = {
+        method: c.req.method,
+        path: c.req.path,
+        status,
+        durationMs: Math.round(performance.now() - started),
+        requestId,
+      };
 
-    const status = c.res.status;
-    const fields = {
-      method: c.req.method,
-      path: c.req.path,
-      status,
-      durationMs: Math.round(performance.now() - started),
-      requestId,
-    };
-
-    if (status >= 500) {
-      reqLog.error(fields, "http request");
-    } else if (status >= 400) {
-      reqLog.warn(fields, "http request");
-    } else {
-      reqLog.debug(fields, "http request");
+      if (status >= 500) {
+        reqLog.error(fields, "http request");
+      } else if (status >= 400) {
+        reqLog.warn(fields, "http request");
+      } else {
+        reqLog.debug(fields, "http request");
+      }
     }
   };
 }
