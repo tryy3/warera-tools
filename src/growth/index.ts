@@ -1,4 +1,10 @@
 export {
+  goldCostAfterInventory,
+  waitHoursToAfford,
+  type MaterialSpend,
+  type Wallet,
+} from "./afford";
+export {
   CONCRETE_PER_COMPANY_INDEX,
   MAX_AE_LEVEL,
   MAX_COMPANIES,
