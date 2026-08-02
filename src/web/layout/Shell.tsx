@@ -8,6 +8,7 @@ import {
   navigationMenuTriggerStyle,
 } from "@/components/ui/navigation-menu";
 import { cn } from "@/lib/utils";
+import { ShellPlayerBar } from "./ShellPlayerBar";
 
 type ShellProps = {
   children: ReactNode;
@@ -51,6 +52,7 @@ export function Shell({ children }: ShellProps) {
             ))}
           </NavigationMenuList>
         </NavigationMenu>
+        <ShellPlayerBar />
       </header>
       <main className="flex-1 p-5">{children}</main>
     </div>
