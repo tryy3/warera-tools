@@ -1,8 +1,9 @@
 # tslog Migration & Logging Hardening — Design
 
 **Date:** 2026-08-02  
-**Status:** Approved for implementation  
-**Depends on:** existing server `Logger` injection patterns (`src/logging/logger.ts` consumers)
+**Status:** Implemented  
+**Depends on:** existing server `Logger` injection patterns (`src/logging/logger.ts` consumers)  
+**Agent guidance:** root `AGENTS.md` Logging section
 
 ## Goal
 
@@ -118,9 +119,9 @@ Add a concise section covering:
 
 ## Success criteria
 
-- [ ] `pino` and `pino-pretty` removed from dependencies
-- [ ] Server and browser logger factories in place
-- [ ] Incoming HTTP access logs + web `api` logs work as specified
-- [ ] `LOG_MASK_SECRETS` / `LOG_FILE` documented and wired (file inert when unset)
-- [ ] Light retag applied; AGENTS.md logging section present
-- [ ] `vp check` and `vp test` pass
+- [x] `pino` and `pino-pretty` removed from dependencies
+- [x] Server and browser logger factories in place
+- [x] Incoming HTTP access logs + web `api` logs work as specified
+- [x] `LOG_MASK_SECRETS` / `LOG_FILE` documented and wired (file inert when unset)
+- [x] Light retag applied; AGENTS.md logging section present
+- [x] `vp check` and `vp test` pass

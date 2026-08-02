@@ -19,6 +19,54 @@ Docs are local at `node_modules/vite-plus/docs` or online at https://viteplus.de
 
 <!--VITE PLUS END-->
 
+## Architecture
+
+Single package, one Node process: Hono API + static SPA + in-process Croner jobs. Turso (libSQL) + Drizzle. No auth yet (localhost); plan BetterAuth when adding auth. Production later may use Docker — keep multi-user / deploy options open without building them now.
+
+| Area | Location |
+| --- | --- |
+| Server / API | `src/server/` |
+| Web SPA | `src/web/` (features under `src/web/features/`) |
+| Domain math | `src/calculator/`, `src/economy/`, `src/growth/`, `src/market/` |
+| WarEra client | `src/warera/` — allowlist + gateway prefs: `.agents/skills/warera-api/` |
+| Game formulas | `.agents/skills/warera-game-mechanics/` |
+| Jobs | `src/jobs/<job-id>/` |
+| DB | `src/db/`, migrations in `drizzle/` |
+
+Browser talks only to the Hono API. Notifications: Discord **webhooks** only (`src/discord/`).
+
+Deep feature designs live under `docs/superpowers/specs/`. Specs can drift from code — prefer this file + skills + source of truth in code when they conflict.
+
+## Data tiers
+
+Classify new persisted / fetched data before inventing a one-off cache. Full model: `docs/superpowers/specs/2026-08-02-data-tier-caching-strategy-design.md`.
+
+| Tier | Who refreshes | Examples |
+| --- | --- | --- |
+| **Global** | Croner jobs (+ rare manual poll) | Market prices / history, recommended regions by item |
+| **Geo** | Jobs over watchlist; cold miss live-fills | Regions, countries; **MU** later (same pattern) |
+| **User** | Shell Load/Refresh → server TTL | Selected player, `company_packs` |
+
+Rules:
+
+1. Jobs own Global and Geo. Tool pages must not live-scrape WarEra for those when tables are warm.
+2. User data is demand-driven (no per-user cron). Shell player Load/Refresh is the control — keep it always visible.
+3. Prefer shared TanStack Query keys for data reused across tools when live freshness is not critical (e.g. prices). Avoid loading heavy Geo dumps into the client unless a tool needs a narrow slice.
+4. Event-driven Geo (`enqueueGeoRefresh` from battles/laws/etc.) is planned; not implemented yet. Jobs remain the bulk WarEra callers.
+
+### Storage style (case by case)
+
+- **Dedicated tables + jobs** when the domain needs history, watchlists, or structured queries (prices, regions, company packs).
+- **Generic `cache` KV** (`src/db/cache.ts`) is fine for simple TTL key/value until a domain outgrows it.
+- Do not add a parallel ad-hoc cache for something that already fits an existing tier/table pattern.
+
+## Web UI
+
+- TanStack Router (file routes under `src/web/routes/`).
+- TanStack Query for shared client cache (memory-only; pack TTL aligned with server ~10m).
+- **Charts:** default to TanStack Charts (`@tanstack/react-charts`) unless a clear gap forces another library.
+- shadcn/ui as plumbing; keep the existing dark war-command look.
+
 ## Logging
 
 This project uses [tslog v5](https://tslog.js.org/) for structured logging.
@@ -54,3 +102,15 @@ Respect `LOG_MASK_SECRETS` (default **on** in production). Set `LOG_MASK_SECRETS
 ### File sink
 
 Optional `LOG_FILE=logs/app.log` enables a JSON file transport. Leave unset in normal development.
+
+## Commands
+
+| Task | Command |
+| --- | --- |
+| Install | `vp install` |
+| Dev (API + WebUI) | `vp run dev` |
+| Check | `vp check` |
+| Test | `vp test` |
+| Build | `vp run build` |
+
+Prefer file-scoped Vitest when iterating: `vp test path/to/file.test.ts`.

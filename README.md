@@ -45,7 +45,7 @@ vp run dev             # preferred: API :8787 + Vite WebUI :5173
 - API listens on `http://127.0.0.1:8787`
 - WebUI at `http://127.0.0.1:5173` (Vite proxies `/api` → `:8787`)
 
-WebUI tabs: **Calculator** (gear vs scrap), **Economy** (company Profit/PP + switch payback), and **Countries** (market tax rates). Market prices are polled hourly into a local history table (`price-poll` job) from `itemTrading.getPrices` + top orders; Calculator scraps and Economy both read that history. Gateway usage needs `WARERA_API_KEY`.
+WebUI: **Calculator** (gear vs scrap), **Companies** (advisor Profit/PP + switch payback), **Growth**, **Market** (prices + history charts), **Countries**, and **Jobs**. Market prices are polled hourly into local history (`price-poll`) from `itemTrading.getPrices` + top orders; Calculator and Companies read that history. Select a player in the shell header to Load company data for Companies/Growth. Gateway usage needs `WARERA_API_KEY`.
 
 API-only: `pnpm dev:server`. WebUI-only: `pnpm dev:web`.
 

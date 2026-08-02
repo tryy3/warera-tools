@@ -22,8 +22,8 @@ Primary audience for now: single user on a local NixOS machine. Later possible: 
 | Package manager | Prefer pnpm if Vite+ sets it up cleanly; otherwise npm |
 | Database | [Turso](https://turso.tech/) (libSQL) + Drizzle ORM |
 | Jobs | Cron expressions with seconds support; persist last-run + run history |
-| Logging | pino structured logs to console; file transport later |
-| Notifications | Discord webhooks only (bot later if needed) |
+| Logging | tslog v5 structured logs (see [tslog migration](./2026-08-02-tslog-migration-design.md) and root `AGENTS.md`) |
+| Notifications | Discord webhooks only |
 | Auth | None for now; localhost default; structure for BetterAuth later |
 | Game API | Allowed public tRPC only (official https://api2.warera.io/docs/); prefer `https://gateway.warerastats.io/trpc`, fallback `https://api2.warera.io/trpc` |
 | Nix | `flake.nix` + devenv; system packages via flake when not npm deps |
@@ -53,7 +53,7 @@ warera/
 `src/server/index.ts`:
 
 1. Load config from environment
-2. Initialize pino logger
+2. Initialize tslog logger (`src/logging/`)
 3. Connect to Turso via Drizzle
 4. Apply migrations
 5. Register code-defined jobs (upsert into DB)
@@ -145,12 +145,12 @@ Location: `src/warera/`
 - Only procedures listed in official docs/OpenAPI are allowed (in-game/private hosts are out of bounds)
 - Auth from `WARERA_API_KEY`: `X-API-Key` for gateway; `Authorization: Bearer` for api2
 - Soft global rate limit under gateway/upstream caps (configurable, default 120/min; gateway advertises ~200/min)
-- Structured pino context on requests (`path`, status, latency)
-- Cache helpers: `getCached` / `setCached` / `getOrFetch`
-- Caching convention for later features:
+- Structured log context on requests (`path`, status, latency)
+- Cache helpers: `getCached` / `setCached` / `getOrFetch` on the generic `cache` table; domain tables + jobs for structured data (see [data-tier caching](./2026-08-02-data-tier-caching-strategy-design.md))
+- Caching convention:
   - Live data (trades/offers): no cache or very short TTL; prefer api2 when gateway staleness matters
-  - Stable data (items, equipment stats): longer TTL + explicit refresh; gateway is a good default
-- Foundation does not implement real trade/calculator endpoints — only client infrastructure
+  - Stable / shared data: jobs + dedicated tables or longer TTL; gateway is a good default
+- Gear / equipment **listing prices** are not exposed on the public API yet — calculators use scrap/market item prices where available
 
 Sources of truth:
 
@@ -178,10 +178,10 @@ Location: `src/discord/`
 
 ## Logging
 
-- pino from process start
+- tslog from process start (server factory + optional browser lite)
 - Structured fields (job id, request path, etc.)
-- Destination for foundation: console only
-- Keep logger construction centralized so a file transport can be added for “production” later without rewriting call sites
+- Console by default; optional `LOG_FILE` JSON sink; `LOG_MASK_SECRETS` in production
+- Details: [tslog migration design](./2026-08-02-tslog-migration-design.md), root `AGENTS.md`
 
 ## Config / secrets
 
@@ -219,11 +219,10 @@ Bind HTTP to localhost by default.
 
 ## Out of scope (foundation)
 
-- Trade monitors, calculators, and other real game tools
-- Discord bot
-- BetterAuth / multi-user accounts
-- Docker
-- File log transport
+- Trade monitors and other tools blocked on missing public API surface (e.g. gear listing prices)
+- Discord bot (webhooks only; revisit if needed)
+- BetterAuth / multi-user accounts (planned when auth is added)
+- Docker (planned for production deploy)
 - Calling undocumented or in-game-only endpoints outside the official api2 allowlist
 
 ## Success criteria

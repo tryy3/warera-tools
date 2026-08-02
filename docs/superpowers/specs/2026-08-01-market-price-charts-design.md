@@ -22,7 +22,7 @@ Inspired by [war-era.vercel.app/economy](https://war-era.vercel.app/economy).
 | Overview card fields | Market price + top buy + top sell (no G/PP) |
 | Change stats | Detail header only: Δ 24h and Δ 7d (absolute + %) |
 | Overview grouping | Raw materials / Manufactured goods / Other (from recipes) |
-| Chart library | `@tanstack/charts` + `@tanstack/react-charts` (pre-alpha; intentional trial) |
+| Chart library | `@tanstack/charts` + `@tanstack/react-charts` (default chart stack going forward) |
 | Data fetching | Existing `api()` helper; no TanStack Query in v1 |
 | Server economy APIs | Keep `/api/economy/*` paths (no rename churn) |
 | Schema | No change; query existing polls/snapshots |
@@ -156,4 +156,4 @@ Response shape (conceptual):
 
 ## Dependencies note
 
-TanStack Charts is pre-alpha; APIs may change. Acceptable for this trial; pin versions in `package.json` and isolate chart code in a small market feature module so a swap later is localized.
+TanStack Charts is pre-alpha; APIs may change. Pin versions in `package.json` and keep chart UI in feature modules. Prefer TanStack Charts for new charts unless a real gap forces another library.

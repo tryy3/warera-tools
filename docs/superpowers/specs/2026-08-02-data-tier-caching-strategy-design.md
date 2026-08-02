@@ -25,10 +25,11 @@ Define how WarEra Toolkit fetches, stores, and refreshes data across tools so we
 | Global + Geo refresh | Croner jobs over full datasets or watchlists; pages read our DB/API |
 | User identity | Selected WarEra player (`userId` + `username`); not site auth |
 | User client cache | `@tanstack/react-query`, **memory only** (no pack persistence across reload) |
-| Load UX | Always-visible shell control: player search + Load/Refresh |
+| Load UX | Always-visible shell control: player search + Load/Refresh (do not hide on Global tools) |
 | User resources in v1 | Existing payloads only — company pack + selected player identity; **no new WarEra endpoints** |
 | First implementation slice | Client foundation: QueryClient + shell + migrate Companies & Growth |
-| Event-driven Geo | Spec stub only (`enqueueGeoRefresh`); no listeners in first slice |
+| Event-driven Geo | Planned (`enqueueGeoRefresh`); not implemented yet |
+| Storage style | Case by case: dedicated tables when history/watchlist/query shape needs it; generic `cache` KV OK for simple TTL until a domain outgrows it |
 
 ## Tier model
 
@@ -50,8 +51,10 @@ Define how WarEra Toolkit fetches, stores, and refreshes data across tools so we
 When adding a resource, pick the tier by answers:
 
 - Needed by many users the same way, independent of who is selected? → **Global**
-- About a place/org that changes infrequently but is shared? → **Geo**
+- About a place/org that changes infrequently but is shared? → **Geo** (including **MU** when we add it)
 - Different for each selected player / must stay fresher on demand? → **User**
+
+Then pick storage: dedicated table + job if the domain needs structured queries, watchlists, or history; otherwise the generic `cache` KV is acceptable. Prefer extending an existing tier pattern over inventing a parallel cache.
 
 ## Architecture
 
@@ -134,8 +137,6 @@ enqueueGeoRefresh(input: {
 - `GET ...&refresh=1` busts **only** that user’s company pack.
 - No new bootstrap mega-endpoint and no new WarEra procedures for this strategy.
 
-Optional later (not first slice): tag job definitions with `tier: "global" | "geo" | "user"` for admin/Jobs UI.
-
 ## Client (User shared cache)
 
 ### Wiring
@@ -158,7 +159,7 @@ In `Shell` header (in addition to nav):
 - **Load** / **Refresh** — first load fetches into Query cache; explicit action uses `refresh=1` for the company pack.
 - Status: loaded player, loading, error, and optionally “updated … ago” from `dataUpdatedAt`.
 
-If the control becomes distracting on pure Global tools, we may hide or collapse it later; v1 keeps it always on.
+Keep the control always on. Redesign only via a dedicated UX task if it becomes a problem.
 
 ### Query keys (v1)
 
@@ -200,7 +201,7 @@ Ordered work after this spec is approved:
 4. Migrate Companies and Growth to shell selection + shared cache.
 5. Leave Global manual actions (e.g. Market refresh prices) as-is.
 
-Server job taxonomy tags and `enqueueGeoRefresh` implementation can follow in a later slice; documenting the stub is enough here.
+`enqueueGeoRefresh` remains a planned follow-up; documenting the stub is enough until event producers exist.
 
 ## Error handling
 
@@ -223,11 +224,11 @@ Server job taxonomy tags and `enqueueGeoRefresh` implementation can follow in a 
 - Site authentication / API-key user accounts.
 - Persisting company packs across full page reload.
 - New WarEra endpoints or a monolithic session dump API.
-- Implementing battle/law (or other) event listeners.
-- MU sync job and schema.
-- Moving Global/Geo page reads onto TanStack Query (optional later).
-- Hiding shell player UI on non-user pages.
+- Implementing battle/law (or other) event listeners (`enqueueGeoRefresh` producers).
+- MU sync job and schema (when needed: Geo table + job + watchlist, same cold-miss pattern).
+- Moving every Global/Geo read onto TanStack Query. Prefer TQ for **widely reused** server-backed data where live freshness is not required (e.g. prices across Market / Calculator / Companies). Avoid pulling heavy Geo dumps (full countries list) into the client unless a tool needs a narrow slice.
 - Changing price-poll cadence, Profit/PP formulas, or advisor math.
+- Job definition `tier` tags for the Jobs UI (revisit only if filtering becomes necessary).
 
 ## Success criteria
 

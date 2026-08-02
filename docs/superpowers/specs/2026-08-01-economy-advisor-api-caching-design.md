@@ -12,7 +12,7 @@ Cut WarEra API chatter on the Economy advisor page. Today only market prices are
 
 | Topic | Choice |
 | --- | --- |
-| Storage style | Dedicated tables + Croner jobs (mirror `price-poll` / `country-sync`), not the generic `cache` KV |
+| Storage style | Dedicated tables + Croner jobs for these domains (mirror `price-poll` / `country-sync`). Generic `cache` KV remains available for simpler TTL cases elsewhere — see [data-tier caching](./2026-08-02-data-tier-caching-strategy-design.md) |
 | Recommended regions | Hourly job over **all** recipe item codes (~18); live miss fills + upserts |
 | Regions | Table presence **is** the watchlist; request paths enqueue unknown ids; hourly job refreshes known rows |
 | Cold miss | Live-fetch, persist, serve — never wait for the next hourly tick |
@@ -114,7 +114,7 @@ Response additions (minimal):
 - `companiesFetchedAt` — ms epoch of the pack used (same style as other API timestamps in this app)
 - `companiesRefreshed` — `true` when this request fetched a new pack (miss or `refresh=1`)
 
-UI: **Refresh companies** control on the Economy page for the selected user (same interaction pattern as scraps/price refresh). Does not trigger price poll or region jobs.
+UI: company pack refresh is the shell **Load/Refresh** control (see [data-tier caching](./2026-08-02-data-tier-caching-strategy-design.md)). `refresh=1` does not trigger price poll or region jobs.
 
 ## Client
 
