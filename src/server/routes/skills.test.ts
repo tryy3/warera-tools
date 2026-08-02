@@ -228,6 +228,61 @@ describe("GET /bootstrap", () => {
     expect(body.job.status).toBe("unemployed");
   });
 
+  it("soft-fails wage lookup while still returning skills and companies", async () => {
+    await upsertCompanyPack(db, {
+      userId: "u1",
+      companies: [
+        {
+          id: "c1",
+          name: "Mine",
+          itemCode: "iron",
+          regionId: "reg-home",
+          aeLevel: 3,
+          productionBonus: 0.1,
+          bonusDetails: null,
+        },
+      ],
+      fetchedAt: new Date(),
+    });
+
+    const request = vi.fn(async (path: string) => {
+      if (path.includes("user.getUserLite")) {
+        return {
+          result: {
+            data: {
+              _id: "u1",
+              username: "Alice",
+              leveling: liteFixture,
+              skills: {
+                energy: { level: 2, total: 50 },
+                production: { level: 3, total: 19 },
+              },
+            },
+          },
+        };
+      }
+      if (path.includes("user.getUserById")) {
+        return { result: { data: { _id: "u1", company: "job-co" } } };
+      }
+      if (path.includes("worker.getWorkers")) {
+        throw new Error("wage lookup failed");
+      }
+      throw new Error(`unexpected warera call: ${path}`);
+    });
+
+    const res = await appFor(db, request).request("http://localhost/bootstrap?userId=u1");
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      skills: Record<string, { level: number; value: number }>;
+      companies: Array<{ id?: string }>;
+      job: { status: string };
+    };
+    expect(body.skills.energy).toEqual({ level: 2, value: 50 });
+    expect(body.companies).toHaveLength(1);
+    expect(body.companies[0]?.id).toBe("c1");
+    expect(body.job.status).toBe("lookupFailed");
+  });
+
   it("accepts refresh=1", async () => {
     await upsertCompanyPack(db, {
       userId: "u1",

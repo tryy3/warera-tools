@@ -58,4 +58,38 @@ describe("optimizeEcoSkills", () => {
     expect(r.levels).toEqual(current);
     expect(r.deltaGPerDay).toBeCloseTo(0);
   });
+
+  it("does not spend SP when every candidate has ΔG ≤ 0", () => {
+    const current = { energy: 1, entrepreneurship: 1, production: 1, companies: 0 };
+    const r = optimizeEcoSkills({
+      mode: "unspent",
+      currentLevels: current,
+      availableSkillPoints: 10,
+      totalSkillPoints: 20,
+      netWage: 0,
+      companies: [],
+    });
+    expect(r.levels).toEqual(current);
+    expect(r.deltaGPerDay).toBeCloseTo(0);
+  });
+
+  it("full reset prefers companies on equal score when under-slotted", () => {
+    // AE daily each = 10 * 24 * 0.1 = 24; energy L0→L1 also yields ΔG=24 at netWage=1.
+    // Without the tie-break, energy (first in ECO_SKILL_IDS) would win.
+    const threeSlots = [
+      { id: "a", name: "a", aeLevel: 10, productionBonus: 0, profitPerPp: 0.1 },
+      { id: "b", name: "b", aeLevel: 10, productionBonus: 0, profitPerPp: 0.1 },
+      { id: "c", name: "c", aeLevel: 10, productionBonus: 0, profitPerPp: 0.1 },
+    ];
+    const r = optimizeEcoSkills({
+      mode: "full_eco_reset",
+      currentLevels: { energy: 5, entrepreneurship: 5, production: 5, companies: 5 },
+      availableSkillPoints: 0,
+      totalSkillPoints: 1,
+      netWage: 1,
+      companies: threeSlots,
+    });
+    expect(r.levels.companies).toBe(1);
+    expect(r.levels.energy).toBe(0);
+  });
 });
