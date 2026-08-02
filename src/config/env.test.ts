@@ -19,4 +19,48 @@ describe("parseConfig", () => {
     });
     expect(cfg.port).toBe(9000);
   });
+
+  it("defaults logMaskSecrets on in production and off otherwise", () => {
+    expect(
+      parseConfig({
+        TURSO_DATABASE_URL: "file:test.db",
+        NODE_ENV: "production",
+      }).logMaskSecrets,
+    ).toBe(true);
+    expect(
+      parseConfig({
+        TURSO_DATABASE_URL: "file:test.db",
+        NODE_ENV: "development",
+      }).logMaskSecrets,
+    ).toBe(false);
+  });
+
+  it("honors LOG_MASK_SECRETS override", () => {
+    expect(
+      parseConfig({
+        TURSO_DATABASE_URL: "file:test.db",
+        NODE_ENV: "production",
+        LOG_MASK_SECRETS: "false",
+      }).logMaskSecrets,
+    ).toBe(false);
+    expect(
+      parseConfig({
+        TURSO_DATABASE_URL: "file:test.db",
+        NODE_ENV: "development",
+        LOG_MASK_SECRETS: "true",
+      }).logMaskSecrets,
+    ).toBe(true);
+  });
+
+  it("parses optional LOG_FILE", () => {
+    expect(
+      parseConfig({ TURSO_DATABASE_URL: "file:test.db" }).logFile,
+    ).toBeUndefined();
+    expect(
+      parseConfig({
+        TURSO_DATABASE_URL: "file:test.db",
+        LOG_FILE: "logs/app.log",
+      }).logFile,
+    ).toBe("logs/app.log");
+  });
 });
