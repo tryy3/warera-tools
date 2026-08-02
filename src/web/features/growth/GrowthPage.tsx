@@ -10,6 +10,10 @@ import { cn } from "@/lib/utils";
 import { api } from "../../api";
 import { buildGrowthSearch } from "../../lib/growthSearch";
 import { CompaniesPlayerSearch } from "../companies/CompaniesPlayerSearch";
+import { formatItem } from "../market/formatItem";
+import { GrowthFactoryList } from "./GrowthFactoryList";
+import { GrowthPathChart } from "./GrowthPathChart";
+import { GrowthStepLog } from "./GrowthStepLog";
 import type {
   EditableFactory,
   FocusedPath,
@@ -18,10 +22,6 @@ import type {
 } from "./types";
 
 const growthRoute = getRouteApi("/growth");
-
-function formatItem(code: string): string {
-  return code.replace(/([A-Z])/g, " $1").replace(/^./, (c) => c.toUpperCase());
-}
 
 function formatTimeToGoal(result: GrowthPlanResult): string {
   if (result.stuck || (result.hitIterLimit && !result.complete)) return "stuck";
@@ -58,9 +58,16 @@ function companiesToEditable(bootstrap: GrowthBootstrapResponse): EditableFactor
   return bootstrap.companies.map((c) => ({
     id: c.id,
     name: c.name,
+    itemCode: c.itemCode,
     aeLevel: c.aeLevel,
     goldPerAePerDay: c.goldPerAePerDay,
   }));
+}
+
+function parseNumberInput(raw: string, fallback = 0): number {
+  if (raw === "" || raw === "-" || raw === "." || raw === "-.") return fallback;
+  const n = Number(raw);
+  return Number.isFinite(n) ? n : fallback;
 }
 
 export function GrowthPage() {
@@ -180,14 +187,17 @@ export function GrowthPage() {
     );
   }
 
+  function removeFactory(id: string) {
+    setFactories((prev) => prev.filter((f) => f.id !== id));
+  }
+
   return (
     <div className="mx-auto max-w-[1200px] rounded-md border border-border bg-card p-4 pb-6">
       <div className="mb-3 flex items-center justify-between gap-4">
         <div>
           <h1 className="mb-0.5 text-[1.35rem] font-semibold tracking-tight">Growth</h1>
           <p className="m-0 text-muted-foreground">
-            Compare Optimal vs Upgrades-only paths to an N×AE7 goal. Chart and step log land in the
-            next pass.
+            Compare Optimal vs Upgrades-only paths to an N×AE7 goal.
           </p>
         </div>
         <Button
@@ -343,61 +353,19 @@ export function GrowthPage() {
             </p>
           </section>
 
-          <section className="mt-6 rounded-md border border-dashed border-border px-3.5 py-3">
-            <h2 className="mt-0 mb-1 text-[1.05rem] font-semibold">Chart</h2>
-            <p className="m-0 text-sm text-muted-foreground">
-              Placeholder — production curve for both paths (Task 6). Focused:{" "}
-              <strong className="text-foreground">
-                {focusedPath === "optimal" ? "Optimal" : "Upgrades-only"}
-              </strong>
-              {focusedPlan
-                ? ` · ${focusedPlan.series.length} series points · ${formatTimeToGoal(focusedPlan)}`
-                : " · no plan"}
-            </p>
+          <section className="mt-6">
+            <h2 className="mt-0 mb-2 text-[1.05rem] font-semibold">Production curve</h2>
+            <GrowthPathChart optimal={optimalPlan} upgradesOnly={upgradesOnlyPlan} />
           </section>
 
-          <section className="mt-4 rounded-md border border-dashed border-border px-3.5 py-3">
-            <h2 className="mt-0 mb-1 text-[1.05rem] font-semibold">Step log</h2>
-            <p className="m-0 text-sm text-muted-foreground">
-              Placeholder — buy/upgrade guide for the focused path (Task 6).
-              {focusedPlan
-                ? ` ${focusedPlan.steps.length} steps ready · complete=${focusedPlan.complete} stuck=${focusedPlan.stuck}`
-                : " No steps yet."}
-            </p>
-          </section>
-
-          <section className="mt-4 rounded-md border border-dashed border-border px-3.5 py-3">
-            <h2 className="mt-0 mb-2 text-[1.05rem] font-semibold">Factories</h2>
-            <p className="mb-3 text-sm text-muted-foreground">
-              What-if AE levels ({factories.length} factories). Full list UI in Task 6.
-            </p>
-            {factories.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No companies for this player.</p>
-            ) : (
-              <ul className="m-0 flex list-none flex-col gap-2 p-0">
-                {factories.map((f) => (
-                  <li key={f.id} className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-sm">
-                    <span className="min-w-40 font-medium">{f.name}</span>
-                    <span className="text-muted-foreground">
-                      {f.goldPerAePerDay.toFixed(3)} G/AE/day
-                    </span>
-                    <Label htmlFor={`ae-${f.id}`} className="text-muted-foreground">
-                      AE
-                    </Label>
-                    <Input
-                      id={`ae-${f.id}`}
-                      type="number"
-                      min={1}
-                      max={7}
-                      className="w-20"
-                      value={f.aeLevel}
-                      onChange={(e) => updateFactoryLevel(f.id, Number(e.target.value) || 1)}
-                    />
-                  </li>
-                ))}
-              </ul>
-            )}
-          </section>
+          <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
+            <GrowthFactoryList
+              factories={factories}
+              onAeLevelChange={updateFactoryLevel}
+              onRemove={removeFactory}
+            />
+            <GrowthStepLog path={focusedPath} result={focusedPlan} factories={factories} />
+          </div>
         </>
       ) : null}
     </div>
@@ -466,6 +434,7 @@ function Field({
   max?: number;
   step?: number | "any";
 }) {
+  const safeValue = Number.isFinite(value) ? value : 0;
   return (
     <div className="flex flex-col gap-1.5">
       <Label htmlFor={id}>{label}</Label>
@@ -475,8 +444,8 @@ function Field({
         min={min}
         max={max}
         step={step}
-        value={Number.isFinite(value) ? value : 0}
-        onChange={(e) => onChange(Number(e.target.value))}
+        value={safeValue}
+        onChange={(e) => onChange(parseNumberInput(e.target.value, 0))}
       />
     </div>
   );

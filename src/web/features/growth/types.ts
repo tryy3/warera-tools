@@ -4,6 +4,7 @@ export type { GrowthPathMode, GrowthPlanResult, GrowthPlanStep } from "@/growth/
 export type EditableFactory = {
   id: string;
   name: string;
+  itemCode: string | null;
   aeLevel: number;
   goldPerAePerDay: number;
 };
