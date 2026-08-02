@@ -62,6 +62,8 @@ export function ShellPlayerBar() {
               ? ` · ${new Date(companiesQuery.dataUpdatedAt).toLocaleString()}`
               : null}
           </span>
+        ) : companiesQuery.isFetching ? (
+          <span className="truncate">{player.username} · loading…</span>
         ) : (
           <span className="truncate">{player.username} · not loaded</span>
         )}

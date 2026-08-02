@@ -4,7 +4,7 @@ import { api } from "../api";
 export function growthBootstrapPath(userId: string, refresh: boolean): string {
   const qs = new URLSearchParams({ userId });
   if (refresh) qs.set("refresh", "1");
-  return `/api/growth/bootstrap?${qs}`;
+  return `/api/growth/bootstrap?${qs.toString().replace(/\+/g, "%20")}`;
 }
 
 export function fetchGrowthBootstrap(

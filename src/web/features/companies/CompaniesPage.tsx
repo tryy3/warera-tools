@@ -343,7 +343,7 @@ export function CompaniesPage() {
           {!player ? (
             <p className="text-muted-foreground">Load a player in the header.</p>
           ) : !advisor && !companiesQuery.isFetching ? (
-            <p className="text-muted-foreground">{queryError ?? "Load a player in the header."}</p>
+            <p className="text-muted-foreground">{queryError ?? "Use Load in the header."}</p>
           ) : null}
           {advisor?.companies.length === 0 ? (
             <p className="text-muted-foreground">No companies found for this user.</p>
