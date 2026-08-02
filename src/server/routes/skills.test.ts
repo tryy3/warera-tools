@@ -159,7 +159,7 @@ function userLiteMock() {
   });
 }
 
-function appFor(db: Db, request = userLiteMock()) {
+function appFor(db: Db, request: (path: string) => Promise<unknown> = userLiteMock()) {
   const app = new Hono();
   app.onError((err, c) => {
     const { status, body } = errorPayload(err);

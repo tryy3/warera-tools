@@ -17,11 +17,7 @@ describe("dailyActionsFromBar", () => {
 
 describe("calculateDailyIncome", () => {
   it("matches work + self-work + capped AE", () => {
-    const companies = [
-      cos("a", 6, 0.5, 0.1),
-      cos("b", 6, 0.5, 0.1),
-      cos("c", 5, 0.5, 0.1),
-    ];
+    const companies = [cos("a", 6, 0.5, 0.1), cos("b", 6, 0.5, 0.1), cos("c", 5, 0.5, 0.1)];
     // companies value at level 0 = 2 → only top 2 AE companies
     const r = calculateDailyIncome({
       levels: { energy: 1, entrepreneurship: 1, production: 1, companies: 0 },

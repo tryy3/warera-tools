@@ -33,9 +33,7 @@ function selfWorkGPerDayFor(
   selfWorkActions: number,
   ppPerAction: number,
 ): number {
-  return (
-    selfWorkActions * ppPerAction * (1 + company.productionBonus) * company.profitPerPp
-  );
+  return selfWorkActions * ppPerAction * (1 + company.productionBonus) * company.profitPerPp;
 }
 
 export function pickBestSelfWorkCompany(

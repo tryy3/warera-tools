@@ -51,9 +51,7 @@ export function ShellPlayerBar() {
           <span>No player</span>
         ) : companiesQuery.isError ? (
           <span className="text-destructive">
-            {companiesQuery.error instanceof Error
-              ? companiesQuery.error.message
-              : "Load failed"}
+            {companiesQuery.error instanceof Error ? companiesQuery.error.message : "Load failed"}
           </span>
         ) : hasData ? (
           <span className="truncate">

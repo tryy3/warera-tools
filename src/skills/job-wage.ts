@@ -35,12 +35,7 @@ export function parseIncomeTaxRate(countryPayload: unknown): number {
   const obj = asRecord(countryPayload);
   if (!obj) return 0;
   const taxes = asRecord(obj.taxes);
-  const candidates = [
-    taxes?.income,
-    taxes?.incomeTax,
-    obj.incomeTax,
-    obj.income,
-  ];
+  const candidates = [taxes?.income, taxes?.incomeTax, obj.incomeTax, obj.income];
   for (const raw of candidates) {
     if (typeof raw === "number" && Number.isFinite(raw)) {
       return percentToFraction(raw);
@@ -49,10 +44,7 @@ export function parseIncomeTaxRate(countryPayload: unknown): number {
   return 0;
 }
 
-async function fetchIncomeTaxRate(
-  warera: WareraRequester,
-  companyId: string,
-): Promise<number> {
+async function fetchIncomeTaxRate(warera: WareraRequester, companyId: string): Promise<number> {
   const company = await fetchCompanyById(warera, companyId);
   if (!company?.regionId) return 0;
 
@@ -88,10 +80,7 @@ function workerForUser(workers: WorkerRow[], userId: string): WorkerRow | undefi
   return workers.find((w) => w.userId === userId);
 }
 
-export async function resolveJobWage(
-  warera: WareraRequester,
-  userId: string,
-): Promise<SkillsJob> {
+export async function resolveJobWage(warera: WareraRequester, userId: string): Promise<SkillsJob> {
   try {
     const { companyId: userCompanyId } = await fetchUserById(warera, userId);
 

@@ -4,7 +4,7 @@ import { loadPlayerData } from "./loadPlayerData";
 import { queryKeys } from "./keys";
 
 const { fetchAdvisorMock } = vi.hoisted(() => ({
-  fetchAdvisorMock: vi.fn(async () => ({
+  fetchAdvisorMock: vi.fn(async (_userId: string, _refresh: boolean) => ({
     recordedAt: null,
     companiesFetchedAt: 1,
     companiesRefreshed: true,
@@ -25,9 +25,13 @@ describe("loadPlayerData", () => {
   it("fetches advisor with refresh=1 and invalidates bootstrap caches", async () => {
     const queryClient = new QueryClient();
     const fetchQuery = vi.spyOn(queryClient, "fetchQuery").mockImplementation(async (options) => {
-      return options.queryFn();
+      const queryFn = options.queryFn as (() => Promise<unknown>) | undefined;
+      if (!queryFn) throw new Error("expected queryFn");
+      return queryFn();
     });
-    const invalidateQueries = vi.spyOn(queryClient, "invalidateQueries").mockResolvedValue(undefined);
+    const invalidateQueries = vi
+      .spyOn(queryClient, "invalidateQueries")
+      .mockResolvedValue(undefined);
 
     await loadPlayerData(queryClient, "u1");
 

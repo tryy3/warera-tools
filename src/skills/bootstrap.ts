@@ -59,10 +59,7 @@ function mapSkills(
   return skills;
 }
 
-function companyProfitPerPp(
-  itemCode: string | null,
-  prices: Record<string, number>,
-): number {
+function companyProfitPerPp(itemCode: string | null, prices: Record<string, number>): number {
   if (itemCode == null) return 0;
   const ppp = calculateProfitPerPp(itemCode, prices)?.profitPerPp;
   return ppp != null && Number.isFinite(ppp) ? ppp : 0;

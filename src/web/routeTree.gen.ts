@@ -17,6 +17,7 @@ import { Route as CountriesRouteImport } from './routes/countries'
 import { Route as GrowthRouteImport } from './routes/growth'
 import { Route as JobsRouteImport } from './routes/jobs'
 import { Route as MarketRouteImport } from './routes/market'
+import { Route as SkillsRouteImport } from './routes/skills'
 import { Route as MarketItemCodeRouteImport } from './routes/market_.$itemCode'
 
 const IndexRoute = IndexRouteImport.update({
@@ -59,6 +60,11 @@ const MarketRoute = MarketRouteImport.update({
   path: '/market',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SkillsRoute = SkillsRouteImport.update({
+  id: '/skills',
+  path: '/skills',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const MarketItemCodeRoute = MarketItemCodeRouteImport.update({
   id: '/market_/$itemCode',
   path: '/market/$itemCode',
@@ -74,6 +80,7 @@ export interface FileRoutesByFullPath {
   '/growth': typeof GrowthRoute
   '/jobs': typeof JobsRoute
   '/market': typeof MarketRoute
+  '/skills': typeof SkillsRoute
   '/market/$itemCode': typeof MarketItemCodeRoute
 }
 export interface FileRoutesByTo {
@@ -85,6 +92,7 @@ export interface FileRoutesByTo {
   '/growth': typeof GrowthRoute
   '/jobs': typeof JobsRoute
   '/market': typeof MarketRoute
+  '/skills': typeof SkillsRoute
   '/market/$itemCode': typeof MarketItemCodeRoute
 }
 export interface FileRoutesById {
@@ -97,6 +105,7 @@ export interface FileRoutesById {
   '/growth': typeof GrowthRoute
   '/jobs': typeof JobsRoute
   '/market': typeof MarketRoute
+  '/skills': typeof SkillsRoute
   '/market_/$itemCode': typeof MarketItemCodeRoute
 }
 export interface FileRouteTypes {
@@ -110,6 +119,7 @@ export interface FileRouteTypes {
     | '/growth'
     | '/jobs'
     | '/market'
+    | '/skills'
     | '/market/$itemCode'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -121,6 +131,7 @@ export interface FileRouteTypes {
     | '/growth'
     | '/jobs'
     | '/market'
+    | '/skills'
     | '/market/$itemCode'
   id:
     | '__root__'
@@ -132,6 +143,7 @@ export interface FileRouteTypes {
     | '/growth'
     | '/jobs'
     | '/market'
+    | '/skills'
     | '/market_/$itemCode'
   fileRoutesById: FileRoutesById
 }
@@ -144,6 +156,7 @@ export interface RootRouteChildren {
   GrowthRoute: typeof GrowthRoute
   JobsRoute: typeof JobsRoute
   MarketRoute: typeof MarketRoute
+  SkillsRoute: typeof SkillsRoute
   MarketItemCodeRoute: typeof MarketItemCodeRoute
 }
 
@@ -205,6 +218,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof MarketRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/skills': {
+      id: '/skills'
+      path: '/skills'
+      fullPath: '/skills'
+      preLoaderRoute: typeof SkillsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/market_/$itemCode': {
       id: '/market_/$itemCode'
       path: '/market/$itemCode'
@@ -224,6 +244,7 @@ const rootRouteChildren: RootRouteChildren = {
   GrowthRoute: GrowthRoute,
   JobsRoute: JobsRoute,
   MarketRoute: MarketRoute,
+  SkillsRoute: SkillsRoute,
   MarketItemCodeRoute: MarketItemCodeRoute,
 }
 export const routeTree = rootRouteImport

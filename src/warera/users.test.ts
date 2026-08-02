@@ -1,10 +1,5 @@
 import { describe, expect, it, vi } from "vite-plus/test";
-import {
-  fetchUserById,
-  fetchUserLite,
-  parseUserByIdCompany,
-  parseUserLiteSkills,
-} from "./users";
+import { fetchUserById, fetchUserLite, parseUserByIdCompany, parseUserLiteSkills } from "./users";
 
 describe("parseUserLiteSkills", () => {
   it("parses getUserLite leveling and skill levels/values", () => {

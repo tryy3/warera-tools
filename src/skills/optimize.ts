@@ -71,12 +71,7 @@ export function optimizeEcoSkills(input: {
     budget -= bestCost;
   }
 
-  const totalGPerDay = incomeFor(
-    levels,
-    input.netWage,
-    input.companies,
-    input.selfWorkCompanyId,
-  );
+  const totalGPerDay = incomeFor(levels, input.netWage, input.companies, input.selfWorkCompanyId);
 
   return {
     levels,

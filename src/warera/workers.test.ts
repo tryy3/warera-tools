@@ -1,10 +1,5 @@
 import { describe, expect, it, vi } from "vite-plus/test";
-import {
-  fetchWorkOfferWage,
-  fetchWorkers,
-  parseWorkOfferWage,
-  parseWorkers,
-} from "./workers";
+import { fetchWorkOfferWage, fetchWorkers, parseWorkOfferWage, parseWorkers } from "./workers";
 
 describe("parseWorkers", () => {
   it("maps userId and wagePerPp from array rows", () => {
@@ -48,7 +43,7 @@ describe("parseWorkOfferWage", () => {
 
 describe("fetchWorkers / fetchWorkOfferWage", () => {
   it("calls worker.getWorkers with companyId and/or userId", async () => {
-    const request = vi.fn(async () => ({
+    const request = vi.fn(async (_path: string) => ({
       result: { data: [{ userId: "u1", wagePerPp: 0.5, companyId: "co-1" }] },
     }));
     const rows = await fetchWorkers({ request } as never, { userId: "u1", companyId: "co-1" });
@@ -59,7 +54,7 @@ describe("fetchWorkers / fetchWorkOfferWage", () => {
   });
 
   it("calls workOffer.getWorkOfferByCompanyId", async () => {
-    const request = vi.fn(async () => ({
+    const request = vi.fn(async (_path: string) => ({
       result: { data: { wagePerPp: 0.33 } },
     }));
     const wage = await fetchWorkOfferWage({ request } as never, "co-1");

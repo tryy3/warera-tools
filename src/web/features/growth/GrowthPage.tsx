@@ -257,7 +257,8 @@ export function GrowthPage() {
         <>
           {pricesMissing ? (
             <p className="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
-              Steel and/or Concrete prices are missing — use Refresh prices on Companies, then Load or Refresh in the header.
+              Steel and/or Concrete prices are missing — use Refresh prices on Companies, then Load
+              or Refresh in the header.
             </p>
           ) : null}
 
