@@ -1,19 +1,35 @@
 import { getRouteApi } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import {
+  ArrowUpCircle,
+  CalendarDays,
+  Coins,
+  Factory,
+  Gauge,
+  RefreshCw,
+  Settings2,
+  Sparkles,
+  Target,
+  TrendingUp,
+  Wallet,
+} from "lucide-react";
+import { useEffect, useState, type ReactNode } from "react";
 import { goldPerAePerDayFromProfit } from "@/growth/income";
-import { planGrowthPath } from "@/growth/plan";
+import { DEFAULT_MAX_ITERATIONS, planGrowthPath } from "@/growth/plan";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { api } from "../../api";
+import { GoldIcon } from "../../components/GoldIcon";
+import { ItemIcon } from "../../components/ItemIcon";
 import { buildGrowthSearch } from "../../lib/growthSearch";
 import { CompaniesPlayerSearch } from "../companies/CompaniesPlayerSearch";
 import { formatItem } from "../market/formatItem";
+import { formatGold, formatPlanStatus } from "./format";
 import { GrowthFactoryList } from "./GrowthFactoryList";
 import { GrowthPathChart } from "./GrowthPathChart";
 import { GrowthStepLog } from "./GrowthStepLog";
+import { PATH_THEME } from "./pathTheme";
 import type {
   EditableFactory,
   FocusedPath,
@@ -23,35 +39,22 @@ import type {
 
 const growthRoute = getRouteApi("/growth");
 
-function formatTimeToGoal(result: GrowthPlanResult): string {
-  if (result.stuck || (result.hitIterLimit && !result.complete)) return "stuck";
-  if (!result.complete || result.timeToGoalHours == null) return "—";
-  if (result.timeToGoalHours <= 0) return "done";
-  const total = Math.round(result.timeToGoalHours);
-  const days = Math.floor(total / 24);
-  const hours = total % 24;
-  if (days === 0) return `${hours}h`;
-  return `${days}d ${hours}h`;
-}
+const PATH_ORDER = ["cheapest", "income_roi", "upgrade_first"] as const satisfies FocusedPath[];
 
-function pickFasterPath(
-  optimal: GrowthPlanResult | null,
-  upgradesOnly: GrowthPlanResult | null,
-): FocusedPath {
-  if (!optimal && !upgradesOnly) return "optimal";
-  if (!optimal) return "upgrades_only";
-  if (!upgradesOnly) return "optimal";
-
-  const optimalOk = optimal.complete && !optimal.stuck && optimal.timeToGoalHours != null;
-  const upgradesOk =
-    upgradesOnly.complete && !upgradesOnly.stuck && upgradesOnly.timeToGoalHours != null;
-
-  if (optimalOk && upgradesOk) {
-    return optimal.timeToGoalHours! <= upgradesOnly.timeToGoalHours! ? "optimal" : "upgrades_only";
+function pickFasterPath(plans: Record<FocusedPath, GrowthPlanResult | null>): FocusedPath {
+  let best: FocusedPath = "cheapest";
+  let bestTime = Number.POSITIVE_INFINITY;
+  let found = false;
+  for (const key of PATH_ORDER) {
+    const plan = plans[key];
+    if (!plan?.complete || plan.stuck || plan.timeToGoalHours == null) continue;
+    found = true;
+    if (plan.timeToGoalHours < bestTime) {
+      bestTime = plan.timeToGoalHours;
+      best = key;
+    }
   }
-  if (optimalOk) return "optimal";
-  if (upgradesOk) return "upgrades_only";
-  return "optimal";
+  return found ? best : "cheapest";
 }
 
 function companiesToEditable(bootstrap: GrowthBootstrapResponse): EditableFactory[] {
@@ -88,6 +91,7 @@ export function GrowthPage() {
   const [extraGoldPerDay, setExtraGoldPerDay] = useState(0);
   const [newItemCode, setNewItemCode] = useState("");
   const [bonus, setBonus] = useState(0);
+  const [maxIterations, setMaxIterations] = useState(DEFAULT_MAX_ITERATIONS);
   const [factories, setFactories] = useState<EditableFactory[]>([]);
   const [focusedOverride, setFocusedOverride] = useState<FocusedPath | null>(null);
 
@@ -103,6 +107,7 @@ export function GrowthPage() {
     setExtraGoldPerDay(0);
     setNewItemCode(data.bestItem?.itemCode ?? data.opportunitiesLite[0]?.itemCode ?? "");
     setBonus(data.bestItem?.suggestedBonus ?? 0);
+    setMaxIterations(DEFAULT_MAX_ITERATIONS);
     setFactories(companiesToEditable(data));
   }
 
@@ -154,8 +159,11 @@ export function GrowthPage() {
     bootstrap?.bestItem?.profitPerPp ??
     null;
 
-  let optimalPlan: GrowthPlanResult | null = null;
-  let upgradesOnlyPlan: GrowthPlanResult | null = null;
+  const plans: Record<FocusedPath, GrowthPlanResult | null> = {
+    cheapest: null,
+    income_roi: null,
+    upgrade_first: null,
+  };
 
   if (bootstrap && !pricesMissing && selectedProfitPerPp != null) {
     const newFactoryGoldPerAePerDay = goldPerAePerDayFromProfit(selectedProfitPerPp, bonus);
@@ -173,13 +181,17 @@ export function GrowthPage() {
       },
       extraGoldPerDay,
       newFactoryGoldPerAePerDay,
+      maxIterations,
     };
-    optimalPlan = planGrowthPath({ ...shared, mode: "optimal" });
-    upgradesOnlyPlan = planGrowthPath({ ...shared, mode: "upgrades_only" });
+    for (const mode of PATH_ORDER) {
+      plans[mode] = planGrowthPath({ ...shared, mode });
+    }
   }
 
-  const focusedPath = focusedOverride ?? pickFasterPath(optimalPlan, upgradesOnlyPlan);
-  const focusedPlan = focusedPath === "optimal" ? optimalPlan : upgradesOnlyPlan;
+  const focusedPath = focusedOverride ?? pickFasterPath(plans);
+  const focusedPlan = plans[focusedPath];
+  const newFactoryDaily =
+    selectedProfitPerPp != null ? goldPerAePerDayFromProfit(selectedProfitPerPp, bonus) : null;
 
   function updateFactoryLevel(id: string, aeLevel: number) {
     setFactories((prev) =>
@@ -192,88 +204,108 @@ export function GrowthPage() {
   }
 
   return (
-    <div className="mx-auto max-w-[1200px] rounded-md border border-border bg-card p-4 pb-6">
-      <div className="mb-3 flex items-center justify-between gap-4">
-        <div>
-          <h1 className="mb-0.5 text-[1.35rem] font-semibold tracking-tight">Growth</h1>
-          <p className="m-0 text-muted-foreground">
-            Compare Optimal vs Upgrades-only paths to an N×AE7 goal.
-          </p>
-        </div>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          disabled={!selectedUserId || refreshing || loading}
-          onClick={() => {
-            if (selectedUserId) void loadBootstrap(selectedUserId, true);
+    <div className="mx-auto max-w-[1200px] space-y-5 pb-8">
+      <header className="relative overflow-hidden rounded-2xl border border-border bg-card px-5 py-5">
+        <div
+          className="pointer-events-none absolute inset-0 opacity-70"
+          style={{
+            background:
+              "radial-gradient(ellipse 50% 80% at 0% 0%, rgba(45,212,191,0.12), transparent 55%), radial-gradient(ellipse 45% 70% at 100% 0%, rgba(251,191,36,0.12), transparent 50%)",
           }}
-        >
-          {refreshing ? "Refreshing…" : "Refresh companies"}
-        </Button>
-      </div>
+          aria-hidden
+        />
+        <div className="relative flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <p className="mb-1 inline-flex items-center gap-1.5 text-xs font-medium tracking-[0.14em] text-muted-foreground uppercase">
+              <Sparkles className="size-3.5 text-teal-300" aria-hidden />
+              Factory race
+            </p>
+            <h1 className="mb-1 text-2xl font-semibold tracking-tight">Growth planner</h1>
+            <p className="m-0 max-w-xl text-sm text-muted-foreground">
+              Pick a goal like {goalN}×AE7, then compare Cheapest-first, Income ROI, and
+              Upgrade-first (AE7 ASAP).
+            </p>
+          </div>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="gap-1.5"
+            disabled={!selectedUserId || refreshing || loading}
+            onClick={() => {
+              if (selectedUserId) void loadBootstrap(selectedUserId, true);
+            }}
+          >
+            <RefreshCw className={cn("size-3.5", refreshing && "animate-spin")} aria-hidden />
+            {refreshing ? "Refreshing…" : "Refresh"}
+          </Button>
+        </div>
+      </header>
 
-      {error ? <p className="my-2 text-destructive">{error}</p> : null}
+      {error ? <p className="text-destructive">{error}</p> : null}
 
-      <section className="my-4 flex max-w-md flex-col gap-1.5">
-        <label htmlFor="growth-user-search" className="text-sm text-muted-foreground">
+      <section className="max-w-md space-y-1.5">
+        <Label htmlFor="growth-user-search" className="text-muted-foreground">
           Find player
-        </label>
+        </Label>
         <CompaniesPlayerSearch selectedUserId={selectedUserId} onSelect={selectPlayer} />
+        {displayName ? (
+          <p className="text-sm text-muted-foreground">
+            Planning for <strong className="text-foreground">{displayName}</strong>
+          </p>
+        ) : null}
       </section>
 
-      {displayName ? (
-        <p className="mb-3 text-muted-foreground">
-          Planning for <strong className="text-foreground">{displayName}</strong>
-          {bootstrap?.recordedAt
-            ? ` · prices as of ${new Date(bootstrap.recordedAt).toLocaleString()}`
-            : null}
-          {bootstrap?.companiesFetchedAt
-            ? ` · companies as of ${new Date(bootstrap.companiesFetchedAt).toLocaleString()}`
-            : null}
-        </p>
-      ) : null}
-
-      {loading ? <p className="text-muted-foreground">Loading growth bootstrap…</p> : null}
+      {loading ? <p className="text-muted-foreground">Loading factories…</p> : null}
 
       {!selectedUserId && !loading ? (
-        <p className="text-muted-foreground">
-          Search for a player to load factories and plan paths.
+        <p className="rounded-xl border border-dashed border-border px-4 py-8 text-center text-muted-foreground">
+          Search for a player to load factories and race the paths.
         </p>
       ) : null}
 
       {bootstrap && !loading ? (
         <>
           {pricesMissing ? (
-            <p className="my-2 text-destructive">
-              Steel and/or Concrete market prices are missing or zero — refresh prices, then reload
-              this player. Planning is paused until both prices are available.
+            <p className="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+              Steel and/or Concrete prices are missing — refresh prices, then reload this player.
             </p>
           ) : null}
 
-          <section className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <section className="grid grid-cols-1 gap-3 lg:grid-cols-3">
             <PathCard
-              title="Optimal"
-              description="May buy up to 12 companies as income accelerators."
-              result={optimalPlan}
-              active={focusedPath === "optimal"}
-              onSelect={() => setFocusedOverride("optimal")}
+              path="cheapest"
+              icon={<Wallet className="size-5" aria-hidden />}
+              result={plans.cheapest}
+              active={focusedPath === "cheapest"}
+              onSelect={() => setFocusedOverride("cheapest")}
             />
             <PathCard
-              title="Upgrades-only"
-              description="Buys only up to the goal count N; never beyond."
-              result={upgradesOnlyPlan}
-              active={focusedPath === "upgrades_only"}
-              onSelect={() => setFocusedOverride("upgrades_only")}
+              path="income_roi"
+              icon={<TrendingUp className="size-5" aria-hidden />}
+              result={plans.income_roi}
+              active={focusedPath === "income_roi"}
+              onSelect={() => setFocusedOverride("income_roi")}
+            />
+            <PathCard
+              path="upgrade_first"
+              icon={<ArrowUpCircle className="size-5" aria-hidden />}
+              result={plans.upgrade_first}
+              active={focusedPath === "upgrade_first"}
+              onSelect={() => setFocusedOverride("upgrade_first")}
             />
           </section>
 
-          <section className="mt-5">
-            <h2 className="mt-0 mb-2 text-[1.05rem] font-semibold">Overrides</h2>
+          <section className="rounded-xl border border-border bg-card/80 p-4">
+            <div className="mb-3 flex items-center gap-2">
+              <Target className="size-4 text-sky-300" aria-hidden />
+              <h2 className="m-0 text-base font-semibold">Goal & assumptions</h2>
+            </div>
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
               <Field
                 id="goal-n"
-                label="Goal N (AE7 count)"
+                label="Goal (×AE7)"
+                icon={<Factory className="size-3.5" aria-hidden />}
                 type="number"
                 min={1}
                 max={12}
@@ -283,6 +315,7 @@ export function GrowthPage() {
               <Field
                 id="start-balance"
                 label="Start gold"
+                icon={<GoldIcon className="size-3.5" />}
                 type="number"
                 min={0}
                 step="any"
@@ -310,6 +343,7 @@ export function GrowthPage() {
               <Field
                 id="extra-gold"
                 label="Extra gold / day"
+                icon={<Coins className="size-3.5" aria-hidden />}
                 type="number"
                 min={0}
                 step="any"
@@ -318,15 +352,17 @@ export function GrowthPage() {
               />
               <Field
                 id="bonus"
-                label="New co. bonus (fraction)"
+                label="New co. bonus"
                 type="number"
                 min={0}
                 step={0.01}
                 value={bonus}
                 onChange={setBonus}
               />
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor="new-item">New company item</Label>
+              <div className="flex flex-col gap-1.5 sm:col-span-2">
+                <Label htmlFor="new-item" className="inline-flex items-center gap-1.5">
+                  New company item
+                </Label>
                 <select
                   id="new-item"
                   className="h-8 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
@@ -338,27 +374,83 @@ export function GrowthPage() {
                   ) : null}
                   {bootstrap.opportunitiesLite.map((o) => (
                     <option key={o.itemCode} value={o.itemCode}>
-                      {formatItem(o.itemCode)} ({o.profitPerPp.toFixed(4)} G/PP)
+                      {formatItem(o.itemCode)} ({formatGold(o.profitPerPp, 3)} G/PP)
                     </option>
                   ))}
                 </select>
               </div>
             </div>
-            <p className="mt-2 text-sm text-muted-foreground">
-              Steel {steelPrice != null ? `${steelPrice} G` : "—"} · Concrete{" "}
-              {concretePrice != null ? `${concretePrice} G` : "—"}
-              {selectedProfitPerPp != null
-                ? ` · new factory ${goldPerAePerDayFromProfit(selectedProfitPerPp, bonus).toFixed(3)} G/AE/day`
-                : null}
-            </p>
+            <div className="mt-3 flex flex-wrap gap-2 text-xs">
+              <MetaChip
+                icon={
+                  steelPrice != null && newItemCode ? (
+                    <ItemIcon itemCode="steel" className="size-3.5" />
+                  ) : (
+                    <Coins className="size-3.5" aria-hidden />
+                  )
+                }
+                label={`Steel ${steelPrice != null ? `${formatGold(steelPrice, 2)} G` : "—"}`}
+              />
+              <MetaChip
+                icon={<ItemIcon itemCode="concrete" className="size-3.5" />}
+                label={`Concrete ${concretePrice != null ? `${formatGold(concretePrice, 2)} G` : "—"}`}
+              />
+              <MetaChip
+                icon={
+                  newItemCode ? (
+                    <ItemIcon itemCode={newItemCode} className="size-3.5" />
+                  ) : (
+                    <Factory className="size-3.5" aria-hidden />
+                  )
+                }
+                label={
+                  newFactoryDaily != null
+                    ? `New factory ${formatGold(newFactoryDaily, 2)} G/AE/day`
+                    : "New factory —"
+                }
+              />
+            </div>
+            <details className="group mt-4 rounded-lg border border-border/80 bg-secondary/30 px-3 py-2">
+              <summary className="flex cursor-pointer list-none items-center gap-2 text-sm font-medium text-muted-foreground [&::-webkit-details-marker]:hidden">
+                <Settings2 className="size-3.5" aria-hidden />
+                Advanced
+                <span className="ml-auto text-xs font-normal opacity-70 group-open:hidden">
+                  max steps {maxIterations.toLocaleString()}
+                </span>
+              </summary>
+              <div className="mt-3 grid max-w-sm grid-cols-1 gap-3">
+                <Field
+                  id="max-iterations"
+                  label="Max plan steps"
+                  icon={<Gauge className="size-3.5" aria-hidden />}
+                  type="number"
+                  min={100}
+                  step={500}
+                  value={maxIterations}
+                  onChange={(v) =>
+                    setMaxIterations(
+                      Math.max(100, Math.min(50_000, Math.round(v) || DEFAULT_MAX_ITERATIONS)),
+                    )
+                  }
+                />
+                <p className="m-0 text-xs text-muted-foreground">
+                  Safety cap on greedy steps. Raise if a path shows <em>incomplete</em>. Default{" "}
+                  {DEFAULT_MAX_ITERATIONS.toLocaleString()}.
+                </p>
+              </div>
+            </details>
           </section>
 
-          <section className="mt-6">
-            <h2 className="mt-0 mb-2 text-[1.05rem] font-semibold">Production curve</h2>
-            <GrowthPathChart optimal={optimalPlan} upgradesOnly={upgradesOnlyPlan} />
+          <section className="rounded-xl border border-border bg-card p-4">
+            <div className="mb-3 flex items-center gap-2">
+              <CalendarDays className="size-4 text-muted-foreground" aria-hidden />
+              <h2 className="m-0 text-base font-semibold">Production curve</h2>
+              <span className="text-xs text-muted-foreground">G/day over days</span>
+            </div>
+            <GrowthPathChart plans={plans} />
           </section>
 
-          <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
             <GrowthFactoryList
               factories={factories}
               onAeLevelChange={updateFactoryLevel}
@@ -373,51 +465,82 @@ export function GrowthPage() {
 }
 
 function PathCard({
-  title,
-  description,
+  path,
+  icon,
   result,
   active,
   onSelect,
 }: {
-  title: string;
-  description: string;
+  path: FocusedPath;
+  icon: ReactNode;
   result: GrowthPlanResult | null;
   active: boolean;
   onSelect: () => void;
 }) {
+  const theme = PATH_THEME[path];
+  const status = result ? formatPlanStatus(result) : { label: "—", tone: "muted" as const };
+
   return (
-    <button type="button" onClick={onSelect} className="text-left">
-      <Card
+    <button type="button" onClick={onSelect} className="group text-left">
+      <div
         className={cn(
-          "gap-0 border-border bg-secondary py-0 shadow-none transition-colors",
-          active && "ring-2 ring-primary/50",
+          "rounded-xl border px-4 py-3.5 transition-[box-shadow,transform] duration-200",
+          active ? `ring-2 ${theme.ring}` : "hover:-translate-y-0.5",
         )}
+        style={{
+          borderColor: theme.border,
+          background: `linear-gradient(145deg, ${theme.soft}, transparent 70%), var(--card)`,
+        }}
       >
-        <CardHeader className="px-3.5 pt-3 pb-1">
-          <CardTitle className="text-base font-semibold">{title}</CardTitle>
-        </CardHeader>
-        <CardContent className="px-3.5 pb-3">
-          <p className="m-0 text-2xl font-semibold tracking-tight">
-            {result ? formatTimeToGoal(result) : "—"}
+        <div className="flex items-center justify-between gap-2">
+          <div className={cn("flex items-center gap-2 font-semibold", theme.text)}>
+            {icon}
+            <span>{theme.label}</span>
+          </div>
+          <span className={cn("rounded-full border px-2 py-0.5 text-[11px]", theme.chip)}>
+            {theme.short}
+          </span>
+        </div>
+        <p
+          className={cn(
+            "mt-2 mb-0 text-3xl font-semibold tracking-tight tabular-nums",
+            status.tone === "ok" && theme.text,
+            status.tone === "bad" && "text-red-400",
+            status.tone === "warn" && "text-amber-200",
+            status.tone === "muted" && "text-muted-foreground",
+          )}
+        >
+          {status.label}
+        </p>
+        <p className="mt-1 mb-0 text-sm text-muted-foreground">{theme.description}</p>
+        {result ? (
+          <p className="mt-2 mb-0 flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
+            <span>{result.steps.length} steps</span>
+            {result.complete ? <span className={theme.text}>reaches goal</span> : null}
+            {result.stuck ? <span className="text-red-400">no affordable moves</span> : null}
+            {result.hitIterLimit && !result.complete ? (
+              <span className="text-amber-200">step limit</span>
+            ) : null}
           </p>
-          <p className="mt-1 mb-0 text-sm text-muted-foreground">{description}</p>
-          {result ? (
-            <p className="mt-1.5 mb-0 text-xs text-muted-foreground">
-              {result.steps.length} steps
-              {result.complete ? " · reaches goal" : null}
-              {result.stuck ? " · stuck" : null}
-              {result.hitIterLimit ? " · hit iter limit" : null}
-            </p>
-          ) : null}
-        </CardContent>
-      </Card>
+        ) : null}
+      </div>
     </button>
+  );
+}
+
+function MetaChip({ icon, label }: { icon: ReactNode; label: string }) {
+  return (
+    <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-secondary/50 px-2.5 py-1 font-mono text-muted-foreground">
+      {icon}
+      {label}
+    </span>
   );
 }
 
 function Field({
   id,
   label,
+  icon,
   type,
   value,
   onChange,
@@ -427,6 +550,7 @@ function Field({
 }: {
   id: string;
   label: string;
+  icon?: ReactNode;
   type: "number";
   value: number;
   onChange: (value: number) => void;
@@ -437,7 +561,10 @@ function Field({
   const safeValue = Number.isFinite(value) ? value : 0;
   return (
     <div className="flex flex-col gap-1.5">
-      <Label htmlFor={id}>{label}</Label>
+      <Label htmlFor={id} className="inline-flex items-center gap-1.5">
+        {icon}
+        {label}
+      </Label>
       <Input
         id={id}
         type={type}

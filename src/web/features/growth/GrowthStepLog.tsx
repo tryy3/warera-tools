@@ -1,3 +1,4 @@
+import { ArrowUpCircle, Building2, CalendarDays, Coins, ListOrdered } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -6,32 +7,17 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { cn } from "@/lib/utils";
+import { formatGold, formatPlanDuration, formatSignedGold } from "./format";
+import { PATH_THEME } from "./pathTheme";
 import type { EditableFactory, FocusedPath, GrowthPlanResult, GrowthPlanStep } from "./types";
 
-/** 3dcut-style duration: &lt;1h → minutes; &lt;24h → hours; else days. */
-function formatStepTime(hours: number): string {
-  if (!Number.isFinite(hours) || hours < 0) return "—";
-  if (hours < 1) {
-    const mins = Math.max(0, Math.round(hours * 60));
-    return `${mins}m`;
-  }
-  if (hours < 24) {
-    const rounded = hours < 10 ? Number(hours.toFixed(1)) : Math.round(hours);
-    return `${rounded}h`;
-  }
-  const days = hours / 24;
-  const rounded = days < 10 ? Number(days.toFixed(1)) : Math.round(days);
-  return `${rounded}d`;
-}
-
 function formatAction(step: GrowthPlanStep, factoryName?: string): string {
-  const label = factoryName ?? step.factoryId;
-  if (step.action === "buy") return `Buy ${label} (AE1)`;
-  return `Upgrade ${label} AE${step.fromLevel}→${step.toLevel}`;
-}
-
-function pathTitle(path: FocusedPath): string {
-  return path === "optimal" ? "Optimal" : "Upgrades-only";
+  const label =
+    factoryName ??
+    (step.factoryId.startsWith("new-") ? `Company #${step.factoryId.slice(4)}` : step.factoryId);
+  if (step.action === "buy") return `Buy ${label}`;
+  return `Upgrade ${label} · AE${step.fromLevel}→${step.toLevel}`;
 }
 
 export function GrowthStepLog({
@@ -43,31 +29,50 @@ export function GrowthStepLog({
   result: GrowthPlanResult | null;
   factories: EditableFactory[];
 }) {
+  const theme = PATH_THEME[path];
   const nameById = new Map(factories.map((f) => [f.id, f.name]));
   const steps = result?.steps ?? [];
 
+  let statusLine = "No plan for this path.";
+  if (result) {
+    if (result.stuck) statusLine = "Path stuck — last reachable steps below.";
+    else if (result.hitIterLimit && !result.complete)
+      statusLine = "Step limit reached — partial steps below.";
+    else if (steps.length === 0) statusLine = "Already at goal — nothing to do.";
+    else
+      statusLine = `${steps.length} steps · ${formatPlanDuration(result.timeToGoalHours)} to goal`;
+  }
+
   return (
-    <section>
-      <h2 className="mt-0 mb-1 text-[1.05rem] font-semibold">Step log · {pathTitle(path)}</h2>
-      <p className="mb-2 text-sm text-muted-foreground">
-        {result == null
-          ? "No plan for this path."
-          : result.stuck
-            ? "Path stuck — last reachable steps below."
-            : result.hitIterLimit && !result.complete
-              ? "Hit iteration limit — partial steps below."
-              : steps.length === 0
-                ? "Already at goal — no steps needed."
-                : `${steps.length} steps to goal.`}
-      </p>
+    <section
+      className="rounded-xl border p-3.5"
+      style={{ borderColor: theme.border, background: theme.soft }}
+    >
+      <div className="mb-2 flex items-center gap-2">
+        <ListOrdered className={cn("size-4", theme.text)} aria-hidden />
+        <h2 className={cn("m-0 text-[1.05rem] font-semibold", theme.text)}>
+          Build plan · {theme.label}
+        </h2>
+      </div>
+      <p className="mb-3 text-sm text-muted-foreground">{statusLine}</p>
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead className="w-14">#</TableHead>
+            <TableHead className="w-12">#</TableHead>
             <TableHead>Action</TableHead>
-            <TableHead className="w-20">Time</TableHead>
+            <TableHead className="w-20">
+              <span className="inline-flex items-center gap-1">
+                <CalendarDays className="size-3.5 opacity-70" aria-hidden />
+                When
+              </span>
+            </TableHead>
             <TableHead className="w-24 text-right">Δ G/day</TableHead>
-            <TableHead className="w-24 text-right">G spent</TableHead>
+            <TableHead className="w-24 text-right">
+              <span className="inline-flex items-center justify-end gap-1">
+                <Coins className="size-3.5 opacity-70" aria-hidden />
+                Cost
+              </span>
+            </TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -81,13 +86,23 @@ export function GrowthStepLog({
             steps.map((step, i) => (
               <TableRow key={`${step.tHours}-${step.factoryId}-${i}`}>
                 <TableCell className="font-mono text-muted-foreground">{i + 1}</TableCell>
-                <TableCell>{formatAction(step, nameById.get(step.factoryId))}</TableCell>
-                <TableCell className="font-mono">{formatStepTime(step.tHours)}</TableCell>
-                <TableCell className="text-right font-mono">
-                  {step.deltaDailyGold >= 0 ? "+" : ""}
-                  {step.deltaDailyGold.toFixed(2)}
+                <TableCell>
+                  <span className="inline-flex items-center gap-1.5">
+                    {step.action === "buy" ? (
+                      <Building2 className={cn("size-3.5 shrink-0", theme.text)} aria-hidden />
+                    ) : (
+                      <ArrowUpCircle className={cn("size-3.5 shrink-0", theme.text)} aria-hidden />
+                    )}
+                    {formatAction(step, nameById.get(step.factoryId))}
+                  </span>
                 </TableCell>
-                <TableCell className="text-right font-mono">{step.goldSpent.toFixed(1)}</TableCell>
+                <TableCell className="font-mono">{formatPlanDuration(step.tHours)}</TableCell>
+                <TableCell className="text-right font-mono">
+                  {formatSignedGold(step.deltaDailyGold, 2)}
+                </TableCell>
+                <TableCell className="text-right font-mono">
+                  {formatGold(step.goldSpent, 1)}
+                </TableCell>
               </TableRow>
             ))
           )}

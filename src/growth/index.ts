@@ -25,6 +25,7 @@ export {
   type GrowthFactory,
 } from "./income";
 export {
+  DEFAULT_MAX_ITERATIONS,
   planGrowthPath,
   type GrowthPathMode,
   type GrowthPlanInput,

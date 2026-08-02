@@ -1,3 +1,4 @@
+import { Factory, Minus, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Table,
@@ -9,6 +10,7 @@ import {
 } from "@/components/ui/table";
 import { ItemIcon } from "../../components/ItemIcon";
 import { formatItem } from "../market/formatItem";
+import { formatGold } from "./format";
 import type { EditableFactory } from "./types";
 
 const MAX_COMPANIES = 12;
@@ -23,12 +25,18 @@ export function GrowthFactoryList({
   onRemove: (id: string) => void;
 }) {
   return (
-    <section>
-      <h2 className="mt-0 mb-1 text-[1.05rem] font-semibold">
-        Your Factories ({factories.length}/{MAX_COMPANIES})
-      </h2>
-      <p className="mb-2 text-sm text-muted-foreground">
-        Adjust AE levels or remove factories for what-if planning.
+    <section className="rounded-xl border border-border bg-secondary/40 p-3.5">
+      <div className="mb-1 flex items-center gap-2">
+        <Factory className="size-4 text-sky-300" aria-hidden />
+        <h2 className="m-0 text-[1.05rem] font-semibold">
+          Your factories{" "}
+          <span className="font-mono text-muted-foreground">
+            ({factories.length}/{MAX_COMPANIES})
+          </span>
+        </h2>
+      </div>
+      <p className="mb-3 text-sm text-muted-foreground">
+        Tweak AE or remove companies for what-if planning.
       </p>
       <Table>
         <TableHeader>
@@ -36,14 +44,14 @@ export function GrowthFactoryList({
             <TableHead>Name</TableHead>
             <TableHead>Item</TableHead>
             <TableHead className="w-36">AE</TableHead>
-            <TableHead className="w-20" />
+            <TableHead className="w-16" />
           </TableRow>
         </TableHeader>
         <TableBody>
           {factories.length === 0 ? (
             <TableRow>
               <TableCell colSpan={4} className="text-muted-foreground">
-                No companies for this player.
+                No companies — planners will buy from scratch toward your goal.
               </TableCell>
             </TableRow>
           ) : (
@@ -52,7 +60,7 @@ export function GrowthFactoryList({
                 <TableCell>
                   <div className="font-medium">{f.name}</div>
                   <div className="font-mono text-xs text-muted-foreground">
-                    {f.goldPerAePerDay.toFixed(3)} G/AE/day
+                    {formatGold(f.goldPerAePerDay, 2)} G/AE/day
                   </div>
                 </TableCell>
                 <TableCell>
@@ -75,7 +83,7 @@ export function GrowthFactoryList({
                       disabled={f.aeLevel <= 1}
                       onClick={() => onAeLevelChange(f.id, f.aeLevel - 1)}
                     >
-                      −
+                      <Minus className="size-3.5" />
                     </Button>
                     <span className="w-6 text-center font-mono tabular-nums">{f.aeLevel}</span>
                     <Button
@@ -86,7 +94,7 @@ export function GrowthFactoryList({
                       disabled={f.aeLevel >= 7}
                       onClick={() => onAeLevelChange(f.id, f.aeLevel + 1)}
                     >
-                      +
+                      <Plus className="size-3.5" />
                     </Button>
                   </div>
                 </TableCell>
@@ -94,11 +102,12 @@ export function GrowthFactoryList({
                   <Button
                     type="button"
                     variant="ghost"
-                    size="xs"
+                    size="icon-xs"
                     className="text-destructive hover:text-destructive"
+                    aria-label={`Remove ${f.name}`}
                     onClick={() => onRemove(f.id)}
                   >
-                    Remove
+                    <Trash2 className="size-3.5" />
                   </Button>
                 </TableCell>
               </TableRow>

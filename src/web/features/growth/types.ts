@@ -9,4 +9,4 @@ export type EditableFactory = {
   goldPerAePerDay: number;
 };
 
-export type FocusedPath = "optimal" | "upgrades_only";
+export type FocusedPath = "cheapest" | "income_roi" | "upgrade_first";

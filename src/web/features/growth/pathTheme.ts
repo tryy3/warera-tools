@@ -1,0 +1,40 @@
+export const PATH_THEME = {
+  cheapest: {
+    key: "cheapest" as const,
+    label: "Cheapest-first",
+    short: "Low cost",
+    description: "Lowest gold-cost buy or upgrade toward N×AE7 (buys ≤ N).",
+    stroke: "#38bdf8",
+    soft: "rgba(56, 189, 248, 0.14)",
+    border: "rgba(56, 189, 248, 0.45)",
+    text: "text-sky-300",
+    ring: "ring-sky-400/50",
+    chip: "bg-sky-500/15 text-sky-200 border-sky-400/30",
+  },
+  income_roi: {
+    key: "income_roi" as const,
+    label: "Income ROI",
+    short: "Best bump",
+    description: "Best ΔG/day per gold toward N×AE7 (buys ≤ N).",
+    stroke: "#2dd4bf",
+    soft: "rgba(45, 212, 191, 0.14)",
+    border: "rgba(45, 212, 191, 0.45)",
+    text: "text-teal-300",
+    ring: "ring-teal-400/50",
+    chip: "bg-teal-500/15 text-teal-200 border-teal-400/30",
+  },
+  upgrade_first: {
+    key: "upgrade_first" as const,
+    label: "Upgrade-first",
+    short: "AE7 ASAP",
+    description: "Finishes AE7s before buying; buys only for more goal slots.",
+    stroke: "#fbbf24",
+    soft: "rgba(251, 191, 36, 0.14)",
+    border: "rgba(251, 191, 36, 0.45)",
+    text: "text-amber-300",
+    ring: "ring-amber-400/50",
+    chip: "bg-amber-500/15 text-amber-200 border-amber-400/30",
+  },
+} as const;
+
+export type PathThemeKey = keyof typeof PATH_THEME;

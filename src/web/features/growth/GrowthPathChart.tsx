@@ -3,110 +3,101 @@ import { tooltip } from "@tanstack/charts/tooltip";
 import { Chart } from "@tanstack/react-charts";
 import { scaleLinear } from "d3-scale";
 import { useMemo } from "react";
+import { PATH_THEME, type PathThemeKey } from "./pathTheme";
 import type { GrowthPlanResult } from "./types";
 
-type Row = { tHours: number; optimal?: number; upgradesOnly?: number };
+type Row = {
+  tDays: number;
+  cheapest?: number;
+  income_roi?: number;
+  upgrade_first?: number;
+};
 
-const OPTIMAL_STROKE = "#0f766e";
-const UPGRADES_STROKE = "#b45309";
+const SERIES = ["cheapest", "income_roi", "upgrade_first"] as const satisfies PathThemeKey[];
 
-function mergeSeries(
-  optimal: GrowthPlanResult | null,
-  upgradesOnly: GrowthPlanResult | null,
-): Row[] {
+function mergeSeries(plans: Record<PathThemeKey, GrowthPlanResult | null>): Row[] {
   const times = new Set<number>();
-  for (const p of optimal?.series ?? []) times.add(p.tHours);
-  for (const p of upgradesOnly?.series ?? []) times.add(p.tHours);
+  for (const key of SERIES) {
+    for (const p of plans[key]?.series ?? []) times.add(p.tHours);
+  }
   if (times.size === 0) times.add(0);
 
   const sorted = [...times].toSorted((a, b) => a - b);
-  const optAt = new Map((optimal?.series ?? []).map((p) => [p.tHours, p.dailyGold]));
-  const upAt = new Map((upgradesOnly?.series ?? []).map((p) => [p.tHours, p.dailyGold]));
+  const maps = Object.fromEntries(
+    SERIES.map((key) => [
+      key,
+      new Map((plans[key]?.series ?? []).map((p) => [p.tHours, p.dailyGold])),
+    ]),
+  ) as Record<PathThemeKey, Map<number, number>>;
 
-  let lastOpt: number | undefined;
-  let lastUp: number | undefined;
+  const last: Partial<Record<PathThemeKey, number>> = {};
   const rows: Row[] = [];
 
   for (const t of sorted) {
-    if (optAt.has(t)) lastOpt = optAt.get(t);
-    if (upAt.has(t)) lastUp = upAt.get(t);
-    rows.push({
-      tHours: t,
-      optimal: lastOpt,
-      upgradesOnly: lastUp,
-    });
+    const row: Row = { tDays: t / 24 };
+    for (const key of SERIES) {
+      if (maps[key].has(t)) last[key] = maps[key].get(t);
+      if (last[key] != null) row[key] = last[key];
+    }
+    rows.push(row);
   }
 
   return rows;
 }
 
 export function GrowthPathChart({
-  optimal,
-  upgradesOnly,
+  plans,
 }: {
-  optimal: GrowthPlanResult | null;
-  upgradesOnly: GrowthPlanResult | null;
+  plans: Record<PathThemeKey, GrowthPlanResult | null>;
 }) {
-  const rows = useMemo(() => mergeSeries(optimal, upgradesOnly), [optimal, upgradesOnly]);
+  const rows = useMemo(() => mergeSeries(plans), [plans]);
 
-  const optimalRows = useMemo(
-    () => rows.filter((r) => r.optimal != null && Number.isFinite(r.optimal)),
-    [rows],
-  );
-  const upgradesRows = useMemo(
-    () => rows.filter((r) => r.upgradesOnly != null && Number.isFinite(r.upgradesOnly)),
-    [rows],
-  );
+  const seriesRows = useMemo(() => {
+    const out = {} as Record<PathThemeKey, Row[]>;
+    for (const key of SERIES) {
+      out[key] = rows.filter((r) => r[key] != null && Number.isFinite(r[key]));
+    }
+    return out;
+  }, [rows]);
 
   const definition = useMemo(
     () =>
       defineChart({
-        marks: [
-          lineY(optimalRows, {
-            x: "tHours",
-            y: "optimal",
-            stroke: OPTIMAL_STROKE,
-            strokeWidth: 2,
+        marks: SERIES.map((key) =>
+          lineY(seriesRows[key], {
+            x: "tDays",
+            y: key,
+            stroke: PATH_THEME[key].stroke,
+            strokeWidth: 2.5,
           }),
-          lineY(upgradesRows, {
-            x: "tHours",
-            y: "upgradesOnly",
-            stroke: UPGRADES_STROKE,
-            strokeWidth: 2,
-          }),
-        ],
-        x: { scale: scaleLinear, nice: true, axis: { label: "Hours" } },
+        ),
+        x: { scale: scaleLinear, nice: true, axis: { label: "Days" } },
         y: { scale: scaleLinear, nice: true, grid: true, axis: { label: "G/day" } },
         tooltip,
       }),
-    [optimalRows, upgradesRows],
+    [seriesRows],
   );
 
-  if (optimalRows.length === 0 && upgradesRows.length === 0) {
+  const anyRows = SERIES.some((key) => seriesRows[key].length > 0);
+  if (!anyRows) {
     return <p className="text-sm text-muted-foreground">No production curve to plot yet.</p>;
   }
 
   return (
     <div>
-      <div className="mb-2 flex flex-wrap gap-4 text-sm text-muted-foreground">
-        <span className="inline-flex items-center gap-1.5">
-          <span
-            className="inline-block h-0.5 w-4 rounded-full"
-            style={{ backgroundColor: OPTIMAL_STROKE }}
-            aria-hidden
-          />
-          Optimal
-        </span>
-        <span className="inline-flex items-center gap-1.5">
-          <span
-            className="inline-block h-0.5 w-4 rounded-full"
-            style={{ backgroundColor: UPGRADES_STROKE }}
-            aria-hidden
-          />
-          Upgrades-only
-        </span>
+      <div className="mb-3 flex flex-wrap gap-4 text-sm">
+        {SERIES.map((key) => (
+          <span key={key} className={`inline-flex items-center gap-2 ${PATH_THEME[key].text}`}>
+            <span
+              className="inline-block h-0.5 w-5 rounded-full"
+              style={{ backgroundColor: PATH_THEME[key].stroke }}
+              aria-hidden
+            />
+            {PATH_THEME[key].label}
+          </span>
+        ))}
       </div>
-      <Chart definition={definition} height={360} ariaLabel="Growth path daily gold over time" />
+      <Chart definition={definition} height={360} ariaLabel="Growth path daily gold over days" />
     </div>
   );
 }
