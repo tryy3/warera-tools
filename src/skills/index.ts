@@ -16,3 +16,8 @@ export {
   type SkillsCompany,
   type SkillsLevels,
 } from "./income";
+export {
+  optimizeEcoSkills,
+  type OptimizeMode,
+  type OptimizeResult,
+} from "./optimize";
