@@ -26,3 +26,11 @@ export {
   resolveJobWage,
   type SkillsJob,
 } from "./job-wage";
+export {
+  buildSkillsBootstrap,
+  mapSkillsBootstrap,
+  type MapSkillsBootstrapInput,
+  type SkillsBootstrapCompany,
+  type SkillsBootstrapResponse,
+  type SkillsBootstrapSkill,
+} from "./bootstrap";
