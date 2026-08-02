@@ -8,12 +8,7 @@ import {
   type AeDailyBreakdown,
   type ProfitPpBreakdown,
 } from "../economy";
-import {
-  getCompanyPack,
-  isCompanyPackFresh,
-  upsertCompanyPack,
-  type CompanyPackEntry,
-} from "../db/company-packs";
+import type { CompanyPackEntry } from "../db/company-packs";
 import { getLatestPrices, marketPriceMap } from "../db/prices";
 import {
   getRecommendedRegionsByItemCodes,
@@ -25,8 +20,6 @@ import { runPricePoll } from "../jobs/price-poll/run";
 import type { Logger } from "../logging/logger";
 import {
   fetchBestRecommendedRegion,
-  fetchCompaniesByUserId,
-  fetchCompanyProductionBonus,
   fetchRegionInfo,
   type CompanySummary,
   type ProductionBonusDetails,
@@ -34,6 +27,7 @@ import {
   type RegionInfo,
 } from "../warera/companies";
 import type { WareraRequester } from "../warera/prices";
+import { loadCompanyPackForUser } from "./load-company-pack";
 
 export type SwitchRecommendation = {
   itemCode: string;
@@ -111,10 +105,10 @@ export async function buildAdvisor(options: {
   let phaseStarted = performance.now();
   const recipeCodes = listProducibleRecipes().map((r) => r.itemCode);
 
-  // Independent Turso reads in parallel (one RTT each, overlapped).
-  const [latestInitial, existingPack, recommendedByItem] = await Promise.all([
+  // Independent Turso / pack work in parallel (one RTT each, overlapped).
+  const [latestInitial, packResult, recommendedByItem] = await Promise.all([
     getLatestPrices(db),
-    getCompanyPack(db, userId),
+    loadCompanyPackForUser({ db, warera, userId, refresh }),
     getRecommendedRegionsByItemCodes(db, recipeCodes),
   ]);
 
@@ -130,58 +124,10 @@ export async function buildAdvisor(options: {
   cacheStats.recommendedHit = recommendedByItem.size;
   cacheStats.recommendedMiss = Math.max(0, recipeCodes.length - recommendedByItem.size);
 
-  let companiesRefreshed = false;
-  let companiesFetchedAt: number | null = null;
-  let packEntries: CompanyPackEntry[];
-
-  const packFresh =
-    existingPack != null && isCompanyPackFresh(existingPack.fetchedAt, existingPack.ttlSeconds);
-
-  if (!refresh && packFresh && existingPack) {
-    packEntries = existingPack.companies;
-    companiesFetchedAt = existingPack.fetchedAt.getTime();
-    cacheStats.companyPack = "hit";
-  } else {
-    cacheStats.companyPack = refresh ? "refresh" : "miss";
-    const live = await fetchCompaniesByUserId(warera, userId);
-    const enrichedLive = await Promise.all(
-      live.map(async (c) => {
-        const bonusDetails =
-          c.productionBonus != null ? null : await fetchCompanyProductionBonus(warera, c.id);
-        const productionBonus = bonusDetails?.total ?? c.productionBonus ?? null;
-        return {
-          id: c.id,
-          name: c.name,
-          itemCode: c.itemCode,
-          regionId: c.regionId,
-          aeLevel: c.aeLevel,
-          productionBonus,
-          bonusDetails:
-            bonusDetails ??
-            (productionBonus != null
-              ? {
-                  total: productionBonus,
-                  strategicBonus: 0,
-                  depositBonus: 0,
-                  ethicSpecializationBonus: 0,
-                  ethicDepositBonus: 0,
-                  formula: `total ${productionBonus * 100}%`,
-                }
-              : null),
-        } satisfies CompanyPackEntry;
-      }),
-    );
-    const fetchedAt = new Date();
-    await upsertCompanyPack(db, { userId, companies: enrichedLive, fetchedAt });
-    await enqueueRegions(
-      db,
-      enrichedLive.flatMap((e) => (e.regionId ? [e.regionId] : [])),
-      fetchedAt,
-    );
-    packEntries = enrichedLive;
-    companiesFetchedAt = fetchedAt.getTime();
-    companiesRefreshed = true;
-  }
+  const packEntries = packResult.companies;
+  const companiesFetchedAt = packResult.fetchedAt;
+  const companiesRefreshed = packResult.refreshed;
+  cacheStats.companyPack = packResult.refreshed ? (refresh ? "refresh" : "miss") : "hit";
 
   logger.info(
     {

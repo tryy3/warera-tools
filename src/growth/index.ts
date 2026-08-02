@@ -5,6 +5,13 @@ export {
   type Wallet,
 } from "./afford";
 export {
+  buildGrowthBootstrap,
+  mapGrowthBootstrap,
+  type GrowthBootstrapCompany,
+  type GrowthBootstrapResponse,
+  type MapGrowthBootstrapInput,
+} from "./bootstrap";
+export {
   CONCRETE_PER_COMPANY_INDEX,
   MAX_AE_LEVEL,
   MAX_COMPANIES,
