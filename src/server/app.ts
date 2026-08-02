@@ -11,6 +11,7 @@ import { authPlaceholder } from "./middleware/auth-placeholder";
 import { countriesRoutes } from "./routes/countries";
 import { economyRoutes } from "./routes/economy";
 import { growthRoutes } from "./routes/growth";
+import { skillsRoutes } from "./routes/skills";
 import { healthRoutes } from "./routes/health";
 import { jobsRoutes } from "./routes/jobs";
 import { pricesRoutes } from "./routes/prices";
@@ -55,6 +56,7 @@ export function createApp(deps: CreateAppDeps): Hono {
     economyRoutes({ db: deps.db, warera: deps.warera, logger: deps.logger }),
   );
   app.route("/api/growth", growthRoutes({ db: deps.db, warera: deps.warera, logger: deps.logger }));
+  app.route("/api/skills", skillsRoutes({ db: deps.db, warera: deps.warera, logger: deps.logger }));
 
   // Production: serve built SPA from dist/web. Dev uses Vite on :5173.
   if (deps.config.nodeEnv === "production") {
