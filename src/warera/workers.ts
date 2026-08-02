@@ -1,0 +1,84 @@
+import type { WareraRequester } from "./prices";
+import { unwrapTrpcData, wareraProcedurePath } from "./trpc";
+
+export type WorkerRow = {
+  userId: string;
+  wagePerPp: number;
+  companyId: string | null;
+};
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return value != null && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+}
+
+function pickString(obj: Record<string, unknown>, keys: string[]): string | null {
+  for (const key of keys) {
+    const v = obj[key];
+    if (typeof v === "string" && v.length > 0) return v;
+  }
+  return null;
+}
+
+function pickWage(obj: Record<string, unknown>): number | null {
+  for (const key of ["wagePerPp", "wagePerPP", "wage", "wagePerProductionPoint"]) {
+    const v = obj[key];
+    if (typeof v === "number" && Number.isFinite(v)) return v;
+  }
+  return null;
+}
+
+function extractWorkerList(data: unknown): unknown[] {
+  if (Array.isArray(data)) return data;
+  const obj = asRecord(data);
+  if (!obj) return [];
+  for (const key of ["workers", "items", "data", "results"]) {
+    if (Array.isArray(obj[key])) return obj[key] as unknown[];
+  }
+  return [];
+}
+
+export function parseWorkers(data: unknown): WorkerRow[] {
+  const out: WorkerRow[] = [];
+  for (const raw of extractWorkerList(data)) {
+    const obj = asRecord(raw);
+    if (!obj) continue;
+    const userId = pickString(obj, ["userId", "user", "_id", "id"]);
+    const wagePerPp = pickWage(obj);
+    if (!userId || wagePerPp == null) continue;
+    const companyNested = asRecord(obj.company);
+    const companyId =
+      pickString(obj, ["companyId", "company"]) ??
+      (companyNested ? pickString(companyNested, ["_id", "id", "companyId"]) : null);
+    out.push({ userId, wagePerPp, companyId });
+  }
+  return out;
+}
+
+export function parseWorkOfferWage(data: unknown): number | null {
+  const obj = asRecord(data);
+  if (!obj) return null;
+  return pickWage(obj);
+}
+
+export async function fetchWorkers(
+  warera: WareraRequester,
+  input: { companyId?: string; userId?: string },
+): Promise<WorkerRow[]> {
+  const body: Record<string, string> = {};
+  if (input.companyId) body.companyId = input.companyId;
+  if (input.userId) body.userId = input.userId;
+  const json = await warera.request<unknown>(wareraProcedurePath("worker.getWorkers", body));
+  return parseWorkers(unwrapTrpcData(json));
+}
+
+export async function fetchWorkOfferWage(
+  warera: WareraRequester,
+  companyId: string,
+): Promise<number | null> {
+  const json = await warera.request<unknown>(
+    wareraProcedurePath("workOffer.getWorkOfferByCompanyId", { companyId }),
+  );
+  return parseWorkOfferWage(unwrapTrpcData(json));
+}
