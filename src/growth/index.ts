@@ -17,3 +17,11 @@ export {
   hourlyGoldFromFactories,
   type GrowthFactory,
 } from "./income";
+export {
+  planGrowthPath,
+  type GrowthPathMode,
+  type GrowthPlanInput,
+  type GrowthPlanResult,
+  type GrowthPlanSeriesPoint,
+  type GrowthPlanStep,
+} from "./plan";
