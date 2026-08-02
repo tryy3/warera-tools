@@ -14,7 +14,14 @@ export function resolveCron(
     new Cron(dbCron);
     return dbCron;
   } catch (err) {
-    logger.warn({ err, dbCron, defaultCron }, "invalid job cron; using default");
+    logger.warn(
+      {
+        dbCron,
+        defaultCron,
+        error: err instanceof Error ? err.message : String(err),
+      },
+      "invalid job cron; using default",
+    );
     return defaultCron;
   }
 }

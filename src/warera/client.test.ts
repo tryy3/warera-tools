@@ -11,6 +11,7 @@ const baseConfig = {
 function testLogger() {
   return {
     info: vi.fn(),
+    debug: vi.fn(),
     warn: vi.fn(),
     error: vi.fn(),
     child: () => ({ info: vi.fn() }),
@@ -172,7 +173,7 @@ describe("createWareraClient", () => {
   });
 
   it("logs path, status, and durationMs", async () => {
-    const logger = testLogger() as { info: ReturnType<typeof vi.fn> };
+    const logger = testLogger() as { debug: ReturnType<typeof vi.fn> };
     const fetchMock = vi
       .fn()
       .mockImplementation(() => new Response(JSON.stringify({ ok: true }), { status: 200 }));
@@ -185,7 +186,7 @@ describe("createWareraClient", () => {
     });
 
     await client.request("/v1/ping");
-    expect(logger.info).toHaveBeenCalledWith(
+    expect(logger.debug).toHaveBeenCalledWith(
       expect.objectContaining({ path: "/v1/ping", status: 200, durationMs: expect.any(Number) }),
       expect.any(String),
     );

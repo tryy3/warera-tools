@@ -183,7 +183,7 @@ async function runJobLocked(
     const durationMs = finishedAt.getTime() - startedAt.getTime();
     const errorMessage = err instanceof Error ? err.message : String(err);
 
-    logger.error({ err, jobId: def.id }, "job failed");
+    logger.error({ jobId: def.id }, "job failed", err);
 
     await db
       .update(jobRuns)

@@ -132,7 +132,7 @@ export function createWareraClient(options: CreateWareraClientOptions) {
         const durationMs = now() - started;
 
         if (primary.ok) {
-          options.logger.info({ path, status: 200, durationMs }, "warera request");
+          options.logger.debug({ path, status: 200, durationMs }, "warera request");
           return primary.json as T;
         }
 
@@ -142,7 +142,7 @@ export function createWareraClient(options: CreateWareraClientOptions) {
           (primary.status === 404 ||
             (primary.status === 400 && isUnknownMethodBody(primary.bodyText)))
         ) {
-          options.logger.info(
+          options.logger.debug(
             { path, status: primary.status, durationMs },
             "warera request (gateway miss; trying api2)",
           );
@@ -153,7 +153,7 @@ export function createWareraClient(options: CreateWareraClientOptions) {
           const fallback = await requestOnce(API2_TRPC_BASE, path, fetchInit, method, authStyle);
           const fallbackMs = now() - fallbackStarted;
           if (fallback.ok) {
-            options.logger.info(
+            options.logger.debug(
               { path, status: 200, durationMs: fallbackMs, via: "api2" },
               "warera request",
             );
@@ -164,7 +164,7 @@ export function createWareraClient(options: CreateWareraClientOptions) {
           lastError = new Error(
             `WarEra request failed: ${fallback.status} ${lastBodySnippet}`.trim(),
           );
-          options.logger.info(
+          options.logger.debug(
             { path, status: fallback.status, durationMs: fallbackMs, via: "api2" },
             "warera request",
           );
@@ -174,7 +174,7 @@ export function createWareraClient(options: CreateWareraClientOptions) {
         lastStatus = primary.status;
         lastBodySnippet = primary.bodyText.slice(0, BODY_SNIPPET_LEN);
         lastError = new Error(`WarEra request failed: ${primary.status} ${lastBodySnippet}`.trim());
-        options.logger.info({ path, status: primary.status, durationMs }, "warera request");
+        options.logger.debug({ path, status: primary.status, durationMs }, "warera request");
 
         const canRetry =
           isRetryableMethod(method) &&
@@ -189,7 +189,7 @@ export function createWareraClient(options: CreateWareraClientOptions) {
           throw err;
         }
         const durationMs = now() - started;
-        options.logger.info({ path, status: undefined, durationMs }, "warera request");
+        options.logger.debug({ path, status: undefined, durationMs }, "warera request");
         lastError = err;
         const canRetry = isRetryableMethod(method) && attempt < MAX_RETRIES;
         if (!canRetry) {

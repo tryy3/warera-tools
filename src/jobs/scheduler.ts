@@ -47,7 +47,7 @@ export async function startScheduler(deps: {
     const cronExpr = resolveCron(row.cron, def.defaultCron, logger);
     const jobCron = new Cron(cronExpr, { protect: true, name: def.id }, () => {
       void runJob(db, logger, def, { keep: jobRunHistoryLimit, warera }).catch((err) => {
-        logger.error({ err, jobId: def.id }, "unhandled job error");
+        logger.error({ jobId: def.id }, "unhandled job error", err);
       });
     });
     crons.set(def.id, jobCron);
