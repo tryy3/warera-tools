@@ -5,25 +5,24 @@ import {
   Coins,
   Factory,
   Gauge,
-  RefreshCw,
   Settings2,
   Sparkles,
   Target,
   TrendingUp,
   Wallet,
 } from "lucide-react";
-import { useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { goldPerAePerDayFromProfit } from "@/growth/income";
 import { DEFAULT_MAX_ITERATIONS, planGrowthPath } from "@/growth/plan";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
-import { api } from "../../api";
 import { GoldIcon } from "../../components/GoldIcon";
 import { ItemIcon } from "../../components/ItemIcon";
 import { buildGrowthSearch } from "../../lib/growthSearch";
-import { CompaniesPlayerSearch } from "../companies/CompaniesPlayerSearch";
+import { usePlayerSelection } from "../../player/PlayerSelectionContext";
+import { useSyncPlayerSearch } from "../../player/useSyncPlayerSearch";
+import { useGrowthBootstrapQuery } from "../../query/useGrowthBootstrapQuery";
 import { formatItem } from "../market/formatItem";
 import { formatGold, formatPlanStatus } from "./format";
 import { GrowthFactoryList } from "./GrowthFactoryList";
@@ -76,13 +75,30 @@ function parseNumberInput(raw: string, fallback = 0): number {
 export function GrowthPage() {
   const search = growthRoute.useSearch();
   const navigate = growthRoute.useNavigate();
-  const selectedUserId = search.userId ?? null;
-  const selectedUsername = search.username ?? null;
+  const { player } = usePlayerSelection();
+
+  const syncNavigate = useCallback(
+    (opts: { search: { userId?: string; username?: string }; replace: boolean }) =>
+      navigate({
+        search: buildGrowthSearch({
+          userId: opts.search.userId ?? null,
+          username: opts.search.username ?? null,
+        }),
+        replace: opts.replace,
+      }),
+    [navigate],
+  );
+
+  useSyncPlayerSearch({
+    userId: search.userId,
+    username: search.username,
+    navigate: syncNavigate,
+  });
+
+  const bootstrapQuery = useGrowthBootstrapQuery(player?.userId ?? null);
 
   const [bootstrap, setBootstrap] = useState<GrowthBootstrapResponse | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const appliedKeyRef = useRef<string | null>(null);
 
   const [goalN, setGoalN] = useState(6);
   const [startBalance, setStartBalance] = useState(0);
@@ -95,7 +111,12 @@ export function GrowthPage() {
   const [factories, setFactories] = useState<EditableFactory[]>([]);
   const [focusedOverride, setFocusedOverride] = useState<FocusedPath | null>(null);
 
-  const displayName = selectedUsername ?? selectedUserId;
+  const queryError =
+    bootstrapQuery.error instanceof Error
+      ? bootstrapQuery.error.message
+      : bootstrapQuery.isError
+        ? String(bootstrapQuery.error)
+        : null;
 
   function applyBootstrap(data: GrowthBootstrapResponse) {
     setBootstrap(data);
@@ -111,42 +132,29 @@ export function GrowthPage() {
     setFactories(companiesToEditable(data));
   }
 
-  async function loadBootstrap(userId: string, refresh = false) {
-    if (refresh) setRefreshing(true);
-    else setLoading(true);
-    setError(null);
-    try {
-      const qs = new URLSearchParams({ userId });
-      if (refresh) qs.set("refresh", "1");
-      const data = await api<GrowthBootstrapResponse>(`/api/growth/bootstrap?${qs}`);
-      applyBootstrap(data);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-      setBootstrap(null);
-      setFactories([]);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }
-
   useEffect(() => {
-    if (!selectedUserId) {
-      setBootstrap(null);
-      setFactories([]);
-      setFocusedOverride(null);
+    const data = bootstrapQuery.data;
+    const userId = player?.userId;
+    if (!data || !userId) {
+      if (!userId) {
+        setBootstrap(null);
+        setFactories([]);
+        setFocusedOverride(null);
+        appliedKeyRef.current = null;
+      } else if (!data) {
+        setBootstrap(null);
+        setFactories([]);
+        appliedKeyRef.current = null;
+      }
       return;
     }
-    setFocusedOverride(null);
-    void loadBootstrap(selectedUserId);
-  }, [selectedUserId]);
+    const key = `${userId}:${bootstrapQuery.dataUpdatedAt}`;
+    if (appliedKeyRef.current === key) return;
+    appliedKeyRef.current = key;
+    applyBootstrap(data);
+  }, [bootstrapQuery.data, bootstrapQuery.dataUpdatedAt, player?.userId]);
 
-  function selectPlayer(userId: string, username: string) {
-    void navigate({
-      search: buildGrowthSearch({ userId, username }),
-      replace: true,
-    });
-  }
+  const loading = bootstrapQuery.isFetching && !bootstrap;
 
   const steelPrice = bootstrap?.prices.steel ?? null;
   const concretePrice = bootstrap?.prices.concrete ?? null;
@@ -226,41 +234,22 @@ export function GrowthPage() {
               Upgrade-first (AE7 ASAP).
             </p>
           </div>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="gap-1.5"
-            disabled={!selectedUserId || refreshing || loading}
-            onClick={() => {
-              if (selectedUserId) void loadBootstrap(selectedUserId, true);
-            }}
-          >
-            <RefreshCw className={cn("size-3.5", refreshing && "animate-spin")} aria-hidden />
-            {refreshing ? "Refreshing…" : "Refresh"}
-          </Button>
         </div>
       </header>
 
-      {error ? <p className="text-destructive">{error}</p> : null}
+      {queryError ? <p className="text-destructive">{queryError}</p> : null}
 
-      <section className="max-w-md space-y-1.5">
-        <Label htmlFor="growth-user-search" className="text-muted-foreground">
-          Find player
-        </Label>
-        <CompaniesPlayerSearch selectedUserId={selectedUserId} onSelect={selectPlayer} />
-        {displayName ? (
-          <p className="text-sm text-muted-foreground">
-            Planning for <strong className="text-foreground">{displayName}</strong>
-          </p>
-        ) : null}
-      </section>
+      {player ? (
+        <p className="text-sm text-muted-foreground">
+          Planning for <strong className="text-foreground">{player.username}</strong>
+        </p>
+      ) : null}
 
       {loading ? <p className="text-muted-foreground">Loading factories…</p> : null}
 
-      {!selectedUserId && !loading ? (
+      {!player && !loading ? (
         <p className="rounded-xl border border-dashed border-border px-4 py-8 text-center text-muted-foreground">
-          Search for a player to load factories and race the paths.
+          Load a player in the header.
         </p>
       ) : null}
 

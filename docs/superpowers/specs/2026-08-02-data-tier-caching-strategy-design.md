@@ -1,7 +1,7 @@
 # Data Tier Caching Strategy — Design
 
 **Date:** 2026-08-02  
-**Status:** Draft (pending user review)  
+**Status:** Approved  
 **Inspired by:** [WarEra Factory Optimizer](https://3dcut.github.io/warera-company-calc/?lang=en) “load data” pattern  
 **Depends on / extends:**
 
