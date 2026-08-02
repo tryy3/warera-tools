@@ -9,7 +9,7 @@ Players own **companies** (often called factories). Output is measured in **PP**
 | Action | Cost |
 | --- | --- |
 | Starter | Free Grain company on join |
-| Extra company | 100× Concrete |
+| Extra company | `k × 50` Concrete for company `#k` (1st=50, 2nd=100, …). Wiki “100 flat” is incorrect. |
 | **Change production type** | **5× Concrete** |
 | **Move location** (region) | **5× Concrete** |
 | Rename | Free (names need not be unique) |
