@@ -22,7 +22,7 @@ afterEach(() => {
 });
 
 describe("loadPlayerData", () => {
-  it("fetches advisor with refresh=1 and invalidates growth bootstrap", async () => {
+  it("fetches advisor with refresh=1 and invalidates bootstrap caches", async () => {
     const queryClient = new QueryClient();
     const fetchQuery = vi.spyOn(queryClient, "fetchQuery").mockImplementation(async (options) => {
       return options.queryFn();
@@ -42,6 +42,9 @@ describe("loadPlayerData", () => {
 
     expect(invalidateQueries).toHaveBeenCalledWith({
       queryKey: queryKeys.growthBootstrap("u1"),
+    });
+    expect(invalidateQueries).toHaveBeenCalledWith({
+      queryKey: queryKeys.skillsBootstrap("u1"),
     });
   });
 });
