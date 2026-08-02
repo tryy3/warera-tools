@@ -8,3 +8,11 @@ export {
   skillValueFromLevel,
   type EcoSkillId,
 } from "./values";
+export {
+  calculateDailyIncome,
+  dailyActionsFromBar,
+  pickBestSelfWorkCompany,
+  type DailyIncomeBreakdown,
+  type SkillsCompany,
+  type SkillsLevels,
+} from "./income";
