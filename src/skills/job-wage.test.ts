@@ -105,6 +105,43 @@ describe("resolveJobWage", () => {
     expect(job.incomeTaxRate).toBe(0);
   });
 
+  it("uses workOffer when matched worker has companyId but no wage", async () => {
+    const request = vi.fn(async (path: string) => {
+      if (path.includes("user.getUserById")) return trpc({});
+      if (path.includes("worker.getWorkers")) {
+        return trpc([{ userId: "u1", companyId: "co-7" }]);
+      }
+      if (path.includes("workOffer.getWorkOfferByCompanyId")) {
+        return trpc({ wagePerPp: 0.75 });
+      }
+      if (path.includes("company.getById")) {
+        return trpc({
+          _id: "co-7",
+          name: "Mill",
+          region: "reg-1",
+          itemCode: "wood",
+          activeUpgradeLevels: { automatedEngine: 1 },
+        });
+      }
+      if (path.includes("region.getById")) {
+        return trpc({ country: "country-1", countryCode: "xx" });
+      }
+      if (path.includes("country.getCountryById")) {
+        return trpc({ taxes: { income: 0 } });
+      }
+      throw new Error(`unexpected path ${path}`);
+    });
+
+    const job = await resolveJobWage({ request } as never, "u1");
+    expect(job).toEqual({
+      status: "resolved",
+      companyId: "co-7",
+      grossWage: 0.75,
+      incomeTaxRate: 0,
+      netWage: 0.75,
+    });
+  });
+
   it("soft-fails to lookupFailed on throw", async () => {
     const request = vi.fn(async () => {
       throw new Error("network down");

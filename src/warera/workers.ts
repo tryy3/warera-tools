@@ -3,7 +3,7 @@ import { unwrapTrpcData, wareraProcedurePath } from "./trpc";
 
 export type WorkerRow = {
   userId: string;
-  wagePerPp: number;
+  wagePerPp: number | null;
   companyId: string | null;
 };
 
@@ -45,8 +45,8 @@ export function parseWorkers(data: unknown): WorkerRow[] {
     const obj = asRecord(raw);
     if (!obj) continue;
     const userId = pickString(obj, ["userId", "user", "_id", "id"]);
+    if (!userId) continue;
     const wagePerPp = pickWage(obj);
-    if (!userId || wagePerPp == null) continue;
     const companyNested = asRecord(obj.company);
     const companyId =
       pickString(obj, ["companyId", "company"]) ??

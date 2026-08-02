@@ -27,8 +27,14 @@ describe("parseWorkers", () => {
     ).toEqual([{ userId: "u3", wagePerPp: 2, companyId: null }]);
   });
 
-  it("skips rows without user or wage", () => {
-    expect(parseWorkers([{ userId: "u1" }, { wagePerPp: 1 }, null])).toEqual([]);
+  it("keeps userId rows when wage is missing (wagePerPp null)", () => {
+    expect(parseWorkers([{ userId: "u1", companyId: "co-1" }])).toEqual([
+      { userId: "u1", wagePerPp: null, companyId: "co-1" },
+    ]);
+  });
+
+  it("skips rows without userId", () => {
+    expect(parseWorkers([{ wagePerPp: 1 }, null])).toEqual([]);
   });
 });
 
