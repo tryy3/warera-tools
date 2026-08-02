@@ -16,10 +16,13 @@ import { errorPayload } from "../errors";
 import { growthRoutes } from "./growth";
 
 const silentLogger = {
+  silly: () => {},
+  trace: () => {},
+  debug: () => {},
   info: () => {},
   warn: () => {},
   error: () => {},
-  debug: () => {},
+  fatal: () => {},
   child: () => silentLogger,
 } as unknown as Logger;
 
@@ -176,7 +179,15 @@ describe("GET /bootstrap", () => {
 
     const res = await appFor(db).request("http://localhost/bootstrap?userId=u1");
     expect(res.status).toBe(200);
-    const body = await res.json();
+    const body = (await res.json()) as {
+      startBalance: number;
+      steel: number;
+      concrete: number;
+      companies: Array<Record<string, unknown>>;
+      opportunitiesLite: unknown[];
+      bestItem: Record<string, unknown>;
+      prices: { steel: number; concrete: number };
+    };
     expect(body.startBalance).toBe(0);
     expect(body.steel).toBe(0);
     expect(body.concrete).toBe(0);
@@ -253,7 +264,10 @@ describe("GET /bootstrap", () => {
 
     const res = await app.request("http://localhost/bootstrap?userId=u1&refresh=1");
     expect(res.status).toBe(200);
-    const body = await res.json();
+    const body = (await res.json()) as {
+      companiesRefreshed: boolean;
+      companies: Array<{ id?: string }>;
+    };
     expect(body.companiesRefreshed).toBe(true);
     expect(body.companies[0]?.id).toBe("c-new");
   });

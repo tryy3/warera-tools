@@ -16,10 +16,7 @@ export type AppConfig = {
   jobRunHistoryLimit: number;
 };
 
-function parseBoolEnv(
-  value: string | undefined,
-  defaultValue: boolean,
-): boolean {
+function parseBoolEnv(value: string | undefined, defaultValue: boolean): boolean {
   if (value === undefined || value === "") return defaultValue;
   if (value === "true" || value === "1") return true;
   if (value === "false" || value === "0") return false;
@@ -45,10 +42,7 @@ export function parseConfig(
     wareraMaxRequestsPerMinute: Number(env.WARERA_MAX_REQUESTS_PER_MINUTE ?? 120),
     discordWebhookUrl: env.DISCORD_WEBHOOK_URL,
     logLevel: env.LOG_LEVEL ?? "info",
-    logMaskSecrets: parseBoolEnv(
-      env.LOG_MASK_SECRETS,
-      nodeEnv === "production",
-    ),
+    logMaskSecrets: parseBoolEnv(env.LOG_MASK_SECRETS, nodeEnv === "production"),
     logFile: env.LOG_FILE || undefined,
     jobRunHistoryLimit: Number(env.JOB_RUN_HISTORY_LIMIT ?? 50),
   };

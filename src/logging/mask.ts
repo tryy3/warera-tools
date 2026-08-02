@@ -11,8 +11,6 @@ export const MASK_KEYS = [
   "DISCORD_WEBHOOK_URL",
 ] as const;
 
-export function resolveMaskEnabled(
-  config: Pick<AppConfig, "logMaskSecrets">,
-): boolean {
+export function resolveMaskEnabled(config: Pick<AppConfig, "logMaskSecrets">): boolean {
   return config.logMaskSecrets;
 }

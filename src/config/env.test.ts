@@ -53,9 +53,7 @@ describe("parseConfig", () => {
   });
 
   it("parses optional LOG_FILE", () => {
-    expect(
-      parseConfig({ TURSO_DATABASE_URL: "file:test.db" }).logFile,
-    ).toBeUndefined();
+    expect(parseConfig({ TURSO_DATABASE_URL: "file:test.db" }).logFile).toBeUndefined();
     expect(
       parseConfig({
         TURSO_DATABASE_URL: "file:test.db",

@@ -112,10 +112,13 @@ async function seedPrices(db: Db): Promise<void> {
 }
 
 const logger = {
+  silly: vi.fn(),
+  trace: vi.fn(),
+  debug: vi.fn(),
   info: vi.fn(),
   warn: vi.fn(),
   error: vi.fn(),
-  debug: vi.fn(),
+  fatal: vi.fn(),
   child: vi.fn(),
 };
 

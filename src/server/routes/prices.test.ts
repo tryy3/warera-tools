@@ -11,10 +11,13 @@ import { errorPayload } from "../errors";
 import { pricesRoutes } from "./prices";
 
 const silentLogger = {
+  silly: () => {},
+  trace: () => {},
+  debug: () => {},
   info: () => {},
   warn: () => {},
   error: () => {},
-  debug: () => {},
+  fatal: () => {},
   child: () => silentLogger,
 } as unknown as Logger;
 
@@ -97,7 +100,12 @@ describe("GET /history", () => {
 
     const res = await appFor(db).request("http://localhost/history?itemCode=steel&range=7d");
     expect(res.status).toBe(200);
-    const body = await res.json();
+    const body = (await res.json()) as {
+      itemCode: string;
+      range: string;
+      latest: { marketPrice: number; topBuy: number; topSell: number };
+      points: unknown[];
+    };
     expect(body.itemCode).toBe("steel");
     expect(body.range).toBe("7d");
     expect(body.latest.marketPrice).toBe(1.6);
@@ -126,7 +134,7 @@ describe("GET /history", () => {
     ]);
     const res = await appFor(db).request("http://localhost/history?itemCode=steel&range=nope");
     expect(res.status).toBe(200);
-    expect((await res.json()).range).toBe("7d");
+    expect(((await res.json()) as { range: string }).range).toBe("7d");
   });
 
   it("404s for unknown item", async () => {

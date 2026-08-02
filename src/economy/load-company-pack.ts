@@ -6,10 +6,7 @@ import {
 } from "../db/company-packs";
 import type { Db } from "../db/client";
 import { enqueueRegions } from "../db/regions";
-import {
-  fetchCompaniesByUserId,
-  fetchCompanyProductionBonus,
-} from "../warera/companies";
+import { fetchCompaniesByUserId, fetchCompanyProductionBonus } from "../warera/companies";
 import type { WareraRequester } from "../warera/prices";
 
 export async function loadCompanyPackForUser(options: {

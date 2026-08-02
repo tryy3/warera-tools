@@ -2,35 +2,29 @@ import { Logger as TsLogger } from "tslog";
 import { fileTransport } from "tslog/transports/file";
 import type { AppConfig } from "../config/env";
 import { MASK_KEYS, resolveMaskEnabled } from "./mask";
-import type { Logger } from "./types";
+import type { LogFn, Logger } from "./types";
 
 function toMinLevel(level: string): string {
   return level.trim().toUpperCase();
 }
 
 function adapt(log: TsLogger<unknown>): Logger {
+  const level =
+    (
+      name: keyof Pick<Logger, "silly" | "trace" | "debug" | "info" | "warn" | "error" | "fatal">,
+    ): LogFn =>
+    (...args: unknown[]) => {
+      (log[name] as LogFn)(...args);
+    };
+
   return {
-    silly: (...args) => {
-      log.silly(...args);
-    },
-    trace: (...args) => {
-      log.trace(...args);
-    },
-    debug: (...args) => {
-      log.debug(...args);
-    },
-    info: (...args) => {
-      log.info(...args);
-    },
-    warn: (...args) => {
-      log.warn(...args);
-    },
-    error: (...args) => {
-      log.error(...args);
-    },
-    fatal: (...args) => {
-      log.fatal(...args);
-    },
+    silly: level("silly"),
+    trace: level("trace"),
+    debug: level("debug"),
+    info: level("info"),
+    warn: level("warn"),
+    error: level("error"),
+    fatal: level("fatal"),
     child: (opts) =>
       adapt(
         log.getSubLogger({
@@ -54,9 +48,7 @@ export function createServerLogger(config: AppConfig): Logger {
   });
 
   if (config.logFile) {
-    log.attachTransport(
-      fileTransport({ path: config.logFile, format: "json", append: true }),
-    );
+    log.attachTransport(fileTransport({ path: config.logFile, format: "json", append: true }));
   }
 
   return adapt(log);

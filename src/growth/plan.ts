@@ -1,15 +1,6 @@
 import { goldCostAfterInventory, waitHoursToAfford, type Wallet } from "./afford";
-import {
-  MAX_AE_LEVEL,
-  MAX_COMPANIES,
-  concreteForNewCompany,
-  steelForAeUpgrade,
-} from "./costs";
-import {
-  dailyGoldFromFactories,
-  hourlyGoldFromFactories,
-  type GrowthFactory,
-} from "./income";
+import { MAX_AE_LEVEL, MAX_COMPANIES, concreteForNewCompany, steelForAeUpgrade } from "./costs";
+import { dailyGoldFromFactories, hourlyGoldFromFactories, type GrowthFactory } from "./income";
 
 export type GrowthPathMode = "optimal" | "upgrades_only";
 
@@ -126,9 +117,7 @@ function cloneFactories(factories: GrowthFactory[]): GrowthFactory[] {
 
 export function planGrowthPath(input: GrowthPlanInput): GrowthPlanResult {
   const maxCompanies =
-    input.mode === "optimal"
-      ? MAX_COMPANIES
-      : Math.max(input.factories.length, input.goalAe7Count);
+    input.mode === "optimal" ? MAX_COMPANIES : Math.max(input.factories.length, input.goalAe7Count);
   const maxIterations = input.maxIterations ?? 200_000;
 
   const startDaily = dailyGoldFromFactories(input.factories, input.extraGoldPerDay);
@@ -201,11 +190,7 @@ export function planGrowthPath(input: GrowthPlanInput): GrowthPlanResult {
         toLevel: number;
       },
     ) => {
-      const { goldNeeded, nextWallet } = goldCostAfterInventory(
-        node.wallet,
-        spend,
-        input.prices,
-      );
+      const { goldNeeded, nextWallet } = goldCostAfterInventory(node.wallet, spend, input.prices);
       const wait = waitHoursToAfford(goldNeeded, nextWallet.gold, hourly);
       if (!Number.isFinite(wait)) return;
       anyNeighbor = true;

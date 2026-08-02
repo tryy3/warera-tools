@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vite-plus/test";
-import { dailyGoldFromFactories, goldPerAePerDayFromProfit, hourlyGoldFromFactories } from "./income";
+import {
+  dailyGoldFromFactories,
+  goldPerAePerDayFromProfit,
+  hourlyGoldFromFactories,
+} from "./income";
 
 describe("goldPerAePerDayFromProfit", () => {
   it("equals AE1 daily value", () => {
@@ -20,6 +24,8 @@ describe("dailyGoldFromFactories", () => {
 
 describe("hourlyGoldFromFactories", () => {
   it("divides daily by 24", () => {
-    expect(hourlyGoldFromFactories([{ id: "a", aeLevel: 1, goldPerAePerDay: 24 }], 0)).toBeCloseTo(1);
+    expect(hourlyGoldFromFactories([{ id: "a", aeLevel: 1, goldPerAePerDay: 24 }], 0)).toBeCloseTo(
+      1,
+    );
   });
 });

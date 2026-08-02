@@ -9,10 +9,13 @@ import { HttpError } from "../errors";
 import { resolveScrapPrice } from "./scraps";
 
 const silentLogger = {
+  silly: () => {},
+  trace: () => {},
+  debug: () => {},
   info: () => {},
   warn: () => {},
   error: () => {},
-  debug: () => {},
+  fatal: () => {},
   child: () => silentLogger,
 } as unknown as Logger;
 

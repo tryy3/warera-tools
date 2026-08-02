@@ -47,16 +47,6 @@ describe("createServerLogger", () => {
   });
 
   it("masks configured keys when logMaskSecrets is true", async () => {
-    const logger = createServerLogger(
-      baseConfig({
-        nodeEnv: "production",
-        logMaskSecrets: true,
-        logLevel: "info",
-        logFile: undefined,
-      }),
-    );
-    // Use a ring/spy via child + type hidden is hard; assert mask keys exist and
-    // logging a secret field does not throw. Stronger assert: write JSON file.
     const dir = mkdtempSync(join(tmpdir(), "warera-log-"));
     dirs.push(dir);
     const path = join(dir, "app.ndjson");

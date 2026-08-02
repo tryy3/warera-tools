@@ -23,10 +23,7 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
     const durationMs = Math.round(performance.now() - started);
     if (!res.ok) {
       const body = await res.json().catch(() => null);
-      webLogger.warn(
-        { path, status: res.status, durationMs },
-        "api request",
-      );
+      webLogger.warn({ path, status: res.status, durationMs }, "api request");
       throw new ApiError(
         res.status,
         body?.error?.message ?? res.statusText,

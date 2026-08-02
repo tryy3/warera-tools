@@ -54,10 +54,7 @@ export function createApp(deps: CreateAppDeps): Hono {
     "/api/economy",
     economyRoutes({ db: deps.db, warera: deps.warera, logger: deps.logger }),
   );
-  app.route(
-    "/api/growth",
-    growthRoutes({ db: deps.db, warera: deps.warera, logger: deps.logger }),
-  );
+  app.route("/api/growth", growthRoutes({ db: deps.db, warera: deps.warera, logger: deps.logger }));
 
   // Production: serve built SPA from dist/web. Dev uses Vite on :5173.
   if (deps.config.nodeEnv === "production") {

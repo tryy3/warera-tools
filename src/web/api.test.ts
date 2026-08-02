@@ -54,10 +54,7 @@ describe("api logging", () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(async () =>
-        Response.json(
-          { error: { code: "not_found", message: "missing" } },
-          { status: 404 },
-        ),
+        Response.json({ error: { code: "not_found", message: "missing" } }, { status: 404 }),
       ),
     );
 

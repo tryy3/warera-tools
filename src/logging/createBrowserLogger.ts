@@ -1,40 +1,34 @@
 import { createLiteLogger } from "tslog/lite";
-import type { Logger } from "./types";
+import type { LogFn, Logger } from "./types";
 
 type Lite = ReturnType<typeof createLiteLogger>;
 
 function adaptLite(log: Lite): Logger {
+  const level =
+    (
+      name: keyof Pick<Logger, "silly" | "trace" | "debug" | "info" | "warn" | "error" | "fatal">,
+    ): LogFn =>
+    (...args: unknown[]) => {
+      (log[name] as LogFn)(...args);
+    };
+
   return {
-    silly: (...args) => {
-      log.silly(...args);
-    },
-    trace: (...args) => {
-      log.trace(...args);
-    },
-    debug: (...args) => {
-      log.debug(...args);
-    },
-    info: (...args) => {
-      log.info(...args);
-    },
-    warn: (...args) => {
-      log.warn(...args);
-    },
-    error: (...args) => {
-      log.error(...args);
-    },
-    fatal: (...args) => {
-      log.fatal(...args);
-    },
+    silly: level("silly"),
+    trace: level("trace"),
+    debug: level("debug"),
+    info: level("info"),
+    warn: level("warn"),
+    error: level("error"),
+    fatal: level("fatal"),
     child: (opts) => adaptLite(log.getSubLogger({ name: opts?.name })),
   };
 }
 
-export function createBrowserLogger(): Logger {
+export function createBrowserLogger(minLevel: "DEBUG" | "WARN" = "WARN"): Logger {
   return adaptLite(
     createLiteLogger({
       name: "warera-web",
-      minLevel: import.meta.env.DEV ? "DEBUG" : "WARN",
+      minLevel,
     }),
   );
 }

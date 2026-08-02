@@ -38,11 +38,7 @@ export function goldCostAfterInventory(
   };
 }
 
-export function waitHoursToAfford(
-  goldNeeded: number,
-  gold: number,
-  goldPerHour: number,
-): number {
+export function waitHoursToAfford(goldNeeded: number, gold: number, goldPerHour: number): number {
   if (goldNeeded <= gold) return 0;
   if (goldPerHour <= 0) return Number.POSITIVE_INFINITY;
   return (goldNeeded - gold) / goldPerHour;

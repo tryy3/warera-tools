@@ -18,3 +18,39 @@ Docs are local at `node_modules/vite-plus/docs` or online at https://viteplus.de
 - [ ] If setup, runtime, or package-manager behavior looks wrong, run `vp env doctor` and include its output when asking for help.
 
 <!--VITE PLUS END-->
+
+## Logging
+
+This project uses [tslog v5](https://tslog.js.org/) for structured logging.
+
+### Factories
+
+- **Server:** dependency-injected via `createLogger` in `src/logging/` (full tslog).
+- **Browser:** `src/web/logger.ts` (tslog/lite).
+
+### Structured messages
+
+Prefer structured fields plus a short message:
+
+```ts
+logger.info({ jobId, pollId, itemCount }, "price poll complete");
+```
+
+Do not default everything to `info`. Pick the level that matches operational severity (see [SRE School — log levels](https://sreschool.com/blog/log-level/)).
+
+| Level | When to use |
+| --- | --- |
+| `silly` / `trace` | Rare; very verbose tracing only |
+| `debug` | Diagnostic detail: HTTP bodies, SQL, retries, heartbeats |
+| `info` | Normal lifecycle events (startup, job complete, user-facing actions) |
+| `warn` | Recoverable problems (retries succeeded, deprecated paths) |
+| `error` | Failures that need attention |
+| `fatal` | Process cannot continue |
+
+### Secrets
+
+Respect `LOG_MASK_SECRETS` (default **on** in production). Set `LOG_MASK_SECRETS=false` only for local secret debugging.
+
+### File sink
+
+Optional `LOG_FILE=logs/app.log` enables a JSON file transport. Leave unset in normal development.

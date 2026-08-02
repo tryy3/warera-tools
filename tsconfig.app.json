@@ -25,5 +25,12 @@
     "erasableSyntaxOnly": true,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["src/web", "src/calculator", "src/lib", "src/components"]
+  "include": [
+    "src/web",
+    "src/calculator",
+    "src/lib",
+    "src/components",
+    "src/logging/createBrowserLogger.ts",
+    "src/logging/types.ts"
+  ]
 }
