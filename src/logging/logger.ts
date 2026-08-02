@@ -1,14 +1,9 @@
-import pino from "pino";
 import type { AppConfig } from "../config/env";
+import { createServerLogger } from "./createServerLogger";
+import type { Logger } from "./types";
 
-export function createLogger(config: AppConfig) {
-  return pino({
-    level: config.logLevel,
-    transport:
-      config.nodeEnv === "development"
-        ? { target: "pino-pretty", options: { colorize: true } }
-        : undefined,
-  });
+export type { Logger } from "./types";
+
+export function createLogger(config: AppConfig): Logger {
+  return createServerLogger(config);
 }
-
-export type Logger = ReturnType<typeof createLogger>;
