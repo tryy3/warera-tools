@@ -8,6 +8,7 @@ export function createAppQueryClient(): QueryClient {
     defaultOptions: {
       queries: {
         staleTime: COMPANY_PACK_STALE_MS,
+        gcTime: COMPANY_PACK_STALE_MS,
         retry: 1,
         refetchOnWindowFocus: false,
       },
