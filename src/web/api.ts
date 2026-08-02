@@ -1,3 +1,5 @@
+import { webLogger } from "./logger";
+
 export class ApiError extends Error {
   status: number;
   code: string | undefined;
@@ -15,14 +17,28 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
   if (!headers.has("content-type")) {
     headers.set("content-type", "application/json");
   }
-  const res = await fetch(path, { ...init, headers });
-  if (!res.ok) {
-    const body = await res.json().catch(() => null);
-    throw new ApiError(
-      res.status,
-      body?.error?.message ?? res.statusText,
-      typeof body?.error?.code === "string" ? body.error.code : undefined,
-    );
+  const started = performance.now();
+  try {
+    const res = await fetch(path, { ...init, headers });
+    const durationMs = Math.round(performance.now() - started);
+    if (!res.ok) {
+      const body = await res.json().catch(() => null);
+      webLogger.warn(
+        { path, status: res.status, durationMs },
+        "api request",
+      );
+      throw new ApiError(
+        res.status,
+        body?.error?.message ?? res.statusText,
+        typeof body?.error?.code === "string" ? body.error.code : undefined,
+      );
+    }
+    webLogger.debug({ path, status: res.status, durationMs }, "api request");
+    return res.json() as Promise<T>;
+  } catch (err) {
+    if (err instanceof ApiError) throw err;
+    const durationMs = Math.round(performance.now() - started);
+    webLogger.error({ path, durationMs }, "api request", err);
+    throw err;
   }
-  return res.json() as Promise<T>;
 }
