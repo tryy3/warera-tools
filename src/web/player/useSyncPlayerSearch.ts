@@ -11,12 +11,13 @@ type SyncArgs = {
 export function useSyncPlayerSearch({ userId, username, navigate }: SyncArgs): void {
   const { player, setPlayer } = usePlayerSelection();
 
-  // Route → shell (deep links only when route carries a userId)
+  // Route → shell: hydrate when route params change only (not on every shell pick)
   useEffect(() => {
     const next = nextPlayerFromRoute(userId, username, player);
     if (next === undefined) return;
     setPlayer(next);
-  }, [userId, username, player, setPlayer]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- shell is SoT after hydration; re-running on `player` overwrites combobox picks with stale URL params
+  }, [userId, username, setPlayer]);
 
   // Shell → route (shareable URLs while on Companies/Growth only)
   useEffect(() => {

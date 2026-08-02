@@ -1,5 +1,6 @@
+import { useQueryClient } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import type { ReactNode } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -18,8 +19,11 @@ import { FlagIcon } from "../../components/FlagIcon";
 import { GoldIcon } from "../../components/GoldIcon";
 import { ItemIcon } from "../../components/ItemIcon";
 import { buildCompaniesSearch } from "../../lib/companiesSearch";
-import { CompaniesPlayerSearch } from "./CompaniesPlayerSearch";
-import type { AdvisorResponse, CompanyAdvisorRow } from "./types";
+import { usePlayerSelection } from "../../player/PlayerSelectionContext";
+import { useSyncPlayerSearch } from "../../player/useSyncPlayerSearch";
+import { queryKeys } from "../../query/keys";
+import { useCompaniesQuery } from "../../query/useCompaniesQuery";
+import type { CompanyAdvisorRow } from "./types";
 
 const companiesRoute = getRouteApi("/companies");
 
@@ -244,77 +248,54 @@ function CompanyCard({ row }: { row: CompanyAdvisorRow }) {
 export function CompaniesPage() {
   const search = companiesRoute.useSearch();
   const navigate = companiesRoute.useNavigate();
-  const selectedUserId = search.userId ?? null;
-  const selectedUsername = search.username ?? null;
+  const queryClient = useQueryClient();
+  const { player } = usePlayerSelection();
 
-  const [advisor, setAdvisor] = useState<AdvisorResponse | null>(null);
-  const [loadingAdvisor, setLoadingAdvisor] = useState(false);
+  const syncNavigate = useCallback(
+    (opts: { search: { userId?: string; username?: string }; replace: boolean }) =>
+      navigate({
+        search: buildCompaniesSearch({
+          userId: opts.search.userId ?? null,
+          username: opts.search.username ?? null,
+        }),
+        replace: opts.replace,
+      }),
+    [navigate],
+  );
+
+  useSyncPlayerSearch({
+    userId: search.userId,
+    username: search.username,
+    navigate: syncNavigate,
+  });
+
+  const companiesQuery = useCompaniesQuery(player?.userId ?? null);
+  const advisor = companiesQuery.data ?? null;
+
   const [polling, setPolling] = useState(false);
-  const [refreshingCompanies, setRefreshingCompanies] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [pollError, setPollError] = useState<string | null>(null);
 
-  const displayName = selectedUsername ?? selectedUserId;
-
-  async function loadAdvisor(userId: string) {
-    setLoadingAdvisor(true);
-    setError(null);
-    try {
-      const data = await api<AdvisorResponse>(
-        `/api/economy/advisor?userId=${encodeURIComponent(userId)}`,
-      );
-      setAdvisor(data);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-      setAdvisor(null);
-    } finally {
-      setLoadingAdvisor(false);
-    }
-  }
-
-  useEffect(() => {
-    if (!selectedUserId) {
-      setAdvisor(null);
-      return;
-    }
-    void loadAdvisor(selectedUserId);
-  }, [selectedUserId]);
+  const queryError =
+    companiesQuery.error instanceof Error
+      ? companiesQuery.error.message
+      : companiesQuery.isError
+        ? String(companiesQuery.error)
+        : null;
+  const error = pollError ?? queryError;
 
   async function refreshPrices() {
     setPolling(true);
-    setError(null);
+    setPollError(null);
     try {
       await api("/api/prices/poll", { method: "POST" });
-      if (selectedUserId) {
-        await loadAdvisor(selectedUserId);
+      if (player?.userId) {
+        await queryClient.invalidateQueries({ queryKey: queryKeys.companies(player.userId) });
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      setPollError(err instanceof Error ? err.message : String(err));
     } finally {
       setPolling(false);
     }
-  }
-
-  async function refreshCompanies() {
-    if (!selectedUserId) return;
-    setRefreshingCompanies(true);
-    setError(null);
-    try {
-      const data = await api<AdvisorResponse>(
-        `/api/economy/advisor?userId=${encodeURIComponent(selectedUserId)}&refresh=1`,
-      );
-      setAdvisor(data);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-    } finally {
-      setRefreshingCompanies(false);
-    }
-  }
-
-  function selectPlayer(userId: string, username: string) {
-    void navigate({
-      search: buildCompaniesSearch({ userId, username }),
-      replace: true,
-    });
   }
 
   return (
@@ -340,17 +321,10 @@ export function CompaniesPage() {
 
       {error ? <p className="my-2 text-destructive">{error}</p> : null}
 
-      <section className="my-4 flex max-w-md flex-col gap-1.5">
-        <label htmlFor="user-search" className="text-sm text-muted-foreground">
-          Find player
-        </label>
-        <CompaniesPlayerSearch selectedUserId={selectedUserId} onSelect={selectPlayer} />
-      </section>
-
-      {displayName ? (
-        <div className="mb-2 flex flex-wrap items-center gap-x-4 gap-y-3">
-          <p className="m-0 min-w-64 flex-1 text-muted-foreground">
-            Showing companies for <strong className="text-foreground">{displayName}</strong>
+      {player ? (
+        <div className="mb-2">
+          <p className="m-0 min-w-64 text-muted-foreground">
+            Showing companies for <strong className="text-foreground">{player.username}</strong>
             {advisor?.recordedAt
               ? ` · prices as of ${new Date(advisor.recordedAt).toLocaleString()}`
               : null}
@@ -358,25 +332,18 @@ export function CompaniesPage() {
               ? ` · companies as of ${new Date(advisor.companiesFetchedAt).toLocaleString()}`
               : null}
           </p>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            disabled={!selectedUserId || refreshingCompanies || loadingAdvisor}
-            onClick={() => void refreshCompanies()}
-          >
-            {refreshingCompanies ? "Refreshing…" : "Refresh companies"}
-          </Button>
         </div>
       ) : null}
 
-      {loadingAdvisor ? <p className="text-muted-foreground">Loading advisor…</p> : null}
+      {companiesQuery.isFetching ? <p className="text-muted-foreground">Loading advisor…</p> : null}
 
       <div className="mt-3 grid grid-cols-1 gap-5 lg:grid-cols-[1.2fr_0.8fr]">
         <section>
           <h2 className="mt-0 mb-2 text-[1.05rem] font-semibold">Companies</h2>
-          {!advisor && !loadingAdvisor ? (
-            <p className="text-muted-foreground">Search for a player to load companies.</p>
+          {!player ? (
+            <p className="text-muted-foreground">Load a player in the header.</p>
+          ) : !advisor && !companiesQuery.isFetching ? (
+            <p className="text-muted-foreground">{queryError ?? "Load a player in the header."}</p>
           ) : null}
           {advisor?.companies.length === 0 ? (
             <p className="text-muted-foreground">No companies found for this user.</p>
