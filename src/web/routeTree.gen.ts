@@ -14,6 +14,7 @@ import { Route as SplatRouteImport } from './routes/$'
 import { Route as CalculatorRouteImport } from './routes/calculator'
 import { Route as CompaniesRouteImport } from './routes/companies'
 import { Route as CountriesRouteImport } from './routes/countries'
+import { Route as GrowthRouteImport } from './routes/growth'
 import { Route as JobsRouteImport } from './routes/jobs'
 import { Route as MarketRouteImport } from './routes/market'
 import { Route as MarketItemCodeRouteImport } from './routes/market_.$itemCode'
@@ -43,6 +44,11 @@ const CountriesRoute = CountriesRouteImport.update({
   path: '/countries',
   getParentRoute: () => rootRouteImport,
 } as any)
+const GrowthRoute = GrowthRouteImport.update({
+  id: '/growth',
+  path: '/growth',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const JobsRoute = JobsRouteImport.update({
   id: '/jobs',
   path: '/jobs',
@@ -65,6 +71,7 @@ export interface FileRoutesByFullPath {
   '/calculator': typeof CalculatorRoute
   '/companies': typeof CompaniesRoute
   '/countries': typeof CountriesRoute
+  '/growth': typeof GrowthRoute
   '/jobs': typeof JobsRoute
   '/market': typeof MarketRoute
   '/market/$itemCode': typeof MarketItemCodeRoute
@@ -75,6 +82,7 @@ export interface FileRoutesByTo {
   '/calculator': typeof CalculatorRoute
   '/companies': typeof CompaniesRoute
   '/countries': typeof CountriesRoute
+  '/growth': typeof GrowthRoute
   '/jobs': typeof JobsRoute
   '/market': typeof MarketRoute
   '/market/$itemCode': typeof MarketItemCodeRoute
@@ -86,6 +94,7 @@ export interface FileRoutesById {
   '/calculator': typeof CalculatorRoute
   '/companies': typeof CompaniesRoute
   '/countries': typeof CountriesRoute
+  '/growth': typeof GrowthRoute
   '/jobs': typeof JobsRoute
   '/market': typeof MarketRoute
   '/market_/$itemCode': typeof MarketItemCodeRoute
@@ -98,6 +107,7 @@ export interface FileRouteTypes {
     | '/calculator'
     | '/companies'
     | '/countries'
+    | '/growth'
     | '/jobs'
     | '/market'
     | '/market/$itemCode'
@@ -108,6 +118,7 @@ export interface FileRouteTypes {
     | '/calculator'
     | '/companies'
     | '/countries'
+    | '/growth'
     | '/jobs'
     | '/market'
     | '/market/$itemCode'
@@ -118,6 +129,7 @@ export interface FileRouteTypes {
     | '/calculator'
     | '/companies'
     | '/countries'
+    | '/growth'
     | '/jobs'
     | '/market'
     | '/market_/$itemCode'
@@ -129,6 +141,7 @@ export interface RootRouteChildren {
   CalculatorRoute: typeof CalculatorRoute
   CompaniesRoute: typeof CompaniesRoute
   CountriesRoute: typeof CountriesRoute
+  GrowthRoute: typeof GrowthRoute
   JobsRoute: typeof JobsRoute
   MarketRoute: typeof MarketRoute
   MarketItemCodeRoute: typeof MarketItemCodeRoute
@@ -171,6 +184,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CountriesRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/growth': {
+      id: '/growth'
+      path: '/growth'
+      fullPath: '/growth'
+      preLoaderRoute: typeof GrowthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/jobs': {
       id: '/jobs'
       path: '/jobs'
@@ -201,6 +221,7 @@ const rootRouteChildren: RootRouteChildren = {
   CalculatorRoute: CalculatorRoute,
   CompaniesRoute: CompaniesRoute,
   CountriesRoute: CountriesRoute,
+  GrowthRoute: GrowthRoute,
   JobsRoute: JobsRoute,
   MarketRoute: MarketRoute,
   MarketItemCodeRoute: MarketItemCodeRoute,
