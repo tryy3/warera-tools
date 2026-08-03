@@ -16,6 +16,7 @@ import { healthRoutes } from "./routes/health";
 import { jobsRoutes } from "./routes/jobs";
 import { pricesRoutes } from "./routes/prices";
 import { scrapsRoutes } from "./routes/scraps";
+import { userRoutes } from "./routes/user";
 
 export type CreateAppDeps = {
   db: Db;
@@ -57,6 +58,7 @@ export function createApp(deps: CreateAppDeps): Hono {
   );
   app.route("/api/growth", growthRoutes({ db: deps.db, warera: deps.warera, logger: deps.logger }));
   app.route("/api/skills", skillsRoutes({ db: deps.db, warera: deps.warera, logger: deps.logger }));
+  app.route("/api/user", userRoutes({ db: deps.db, warera: deps.warera, logger: deps.logger }));
 
   // Production: serve built SPA from dist/web. Dev uses Vite on :5173.
   if (deps.config.nodeEnv === "production") {
