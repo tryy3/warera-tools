@@ -124,15 +124,7 @@ export function SkillsPage() {
     selfWorkCompanyId: selfWorkCompanyId || null,
   });
 
-  const loadedIncome =
-    user != null
-      ? calculateDailyIncome({
-          levels: ecoLevelsFromUser(user),
-          netWage: user.job.netWage ?? 0,
-          companies: user.companies,
-          selfWorkCompanyId: null,
-        })
-      : null;
+  const loadedIncome = user?.income ?? null;
 
   function setEcoLevel(skill: EcoSkillId, nextLevel: number) {
     const clamped = Math.max(0, Math.round(nextLevel));
@@ -209,7 +201,7 @@ export function SkillsPage() {
       ) : null}
 
       {user && !loading ? (
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(300px,360px)_1fr]">
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(260px,320px)_1fr]">
           <SkillRail
             levels={levels}
             loadedSkills={user.skills}
