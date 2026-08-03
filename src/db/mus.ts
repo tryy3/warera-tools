@@ -58,16 +58,18 @@ export async function replaceMuMembers(
   members: { userId: string; role: string }[],
   updatedAt: Date,
 ): Promise<void> {
-  await db.delete(muMembers).where(eq(muMembers.muId, muId));
-  if (members.length === 0) return;
-  await db.insert(muMembers).values(
-    members.map((m) => ({
-      muId,
-      userId: m.userId,
-      role: m.role,
-      updatedAt,
-    })),
-  );
+  await db.transaction(async (tx) => {
+    await tx.delete(muMembers).where(eq(muMembers.muId, muId));
+    if (members.length === 0) return;
+    await tx.insert(muMembers).values(
+      members.map((m) => ({
+        muId,
+        userId: m.userId,
+        role: m.role,
+        updatedAt,
+      })),
+    );
+  });
 }
 
 export async function listMuMembers(
