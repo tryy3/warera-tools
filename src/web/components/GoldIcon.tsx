@@ -1,3 +1,5 @@
+import { cn } from "@/lib/utils";
+
 type Props = {
   className?: string;
 };
@@ -5,7 +7,7 @@ type Props = {
 export function GoldIcon({ className }: Props) {
   return (
     <svg
-      className={className ?? "gold-icon"}
+      className={cn("gold-icon", className)}
       stroke="currentColor"
       fill="currentColor"
       strokeWidth="0"

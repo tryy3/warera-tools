@@ -152,6 +152,7 @@ button:disabled {
 }
 
 .gold-icon {
+  color: var(--color-gold, #ddd79e);
   filter: drop-shadow(black 1px 1px 0px);
   font-size: 120%;
 }
@@ -188,6 +189,7 @@ button:disabled {
   --color-muted-foreground: var(--muted-foreground);
   --color-muted: var(--muted);
   --color-success: var(--success);
+  --color-gold: #ddd79e;
   --color-secondary-foreground: var(--secondary-foreground);
   --color-secondary: var(--secondary);
   --color-primary-foreground: var(--primary-foreground);

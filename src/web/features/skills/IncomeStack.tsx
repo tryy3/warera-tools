@@ -1,4 +1,4 @@
-import { Briefcase, Building2, Factory, Wallet } from "lucide-react";
+import { Wallet } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -6,6 +6,8 @@ import { skillValueFromLevel } from "@/skills/values";
 import { GoldIcon } from "../../components/GoldIcon";
 import type { DailyIncomeBreakdown, SkillsJob, SkillsLevels, UserCompany } from "./types";
 import { formatGold, formatSignedGold } from "./format";
+import { SkillIcon } from "./SkillIcon";
+import { SKILL_VISUALS } from "./skillVisuals";
 
 function aeDaily(aeLevel: number, bonus: number, profitPerPp: number): number {
   return aeLevel * (1 + bonus) * 24 * profitPerPp;
@@ -78,24 +80,28 @@ export function IncomeStack({
           <p className="mb-1 text-xs font-medium tracking-[0.14em] text-muted-foreground uppercase">
             Daily eco income
           </p>
-          <p className="m-0 flex flex-wrap items-baseline gap-3">
-            <span className="inline-flex items-center gap-2 text-4xl font-semibold tracking-tight tabular-nums">
-              <GoldIcon className="size-7" />
-              {formatGold(income.totalGPerDay, 2)}
-              <span className="text-lg font-normal text-muted-foreground">G/day</span>
+          <p className="m-0 flex flex-wrap items-end gap-3">
+            <span className="inline-flex items-end gap-2 text-gold">
+              <span className="inline-flex items-center gap-2">
+                <GoldIcon className="size-7" />
+                <span className="text-4xl leading-none font-semibold tracking-tight tabular-nums">
+                  {formatGold(income.totalGPerDay, 2)}
+                </span>
+              </span>
+              <span className="text-lg font-normal leading-none">G/day</span>
             </span>
             {Math.abs(delta) > 1e-9 ? (
               <span
                 className={
                   delta > 0
-                    ? "text-sm font-medium text-teal-300"
-                    : "text-sm font-medium text-amber-200"
+                    ? "text-sm font-medium leading-none text-teal-300"
+                    : "text-sm font-medium leading-none text-amber-200"
                 }
               >
                 {formatSignedGold(delta, 2)} vs loaded
               </span>
             ) : (
-              <span className="text-sm text-muted-foreground">matches loaded</span>
+              <span className="text-sm leading-none text-muted-foreground">matches loaded</span>
             )}
           </p>
         </div>
@@ -105,14 +111,25 @@ export function IncomeStack({
         <Card size="sm">
           <CardHeader className="pb-1">
             <CardTitle className="flex items-center gap-2 text-sm font-medium">
-              <Briefcase className="size-4 text-sky-300" aria-hidden />
+              <span
+                className="grid size-7 shrink-0 place-items-center rounded-md"
+                style={{
+                  background: SKILL_VISUALS.energy.boxBackground,
+                  color: SKILL_VISUALS.energy.color,
+                }}
+              >
+                <SkillIcon skill="energy" className="size-4" />
+              </span>
               Work
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="m-0 text-2xl font-semibold tabular-nums">
-              {formatGold(income.workGPerDay, 2)}
-              <span className="ml-1 text-sm font-normal text-muted-foreground">G/day</span>
+            <p className="m-0 inline-flex items-end gap-1.5 text-gold">
+              <span className="inline-flex items-center gap-1.5 text-2xl leading-none font-semibold tabular-nums">
+                <GoldIcon className="size-5" />
+                {formatGold(income.workGPerDay, 2)}
+              </span>
+              <span className="text-sm font-normal leading-none">G/day</span>
             </p>
             <FormulaBox label="Formula">{workFormula}</FormulaBox>
             <p className="mt-1.5 mb-0 text-xs text-muted-foreground">
@@ -124,14 +141,25 @@ export function IncomeStack({
         <Card size="sm">
           <CardHeader className="pb-1">
             <CardTitle className="flex items-center gap-2 text-sm font-medium">
-              <Factory className="size-4 text-teal-300" aria-hidden />
+              <span
+                className="grid size-7 shrink-0 place-items-center rounded-md"
+                style={{
+                  background: SKILL_VISUALS.entrepreneurship.boxBackground,
+                  color: SKILL_VISUALS.entrepreneurship.color,
+                }}
+              >
+                <SkillIcon skill="entrepreneurship" className="size-4" />
+              </span>
               Self-work
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="m-0 text-2xl font-semibold tabular-nums">
-              {formatGold(income.selfWorkGPerDay, 2)}
-              <span className="ml-1 text-sm font-normal text-muted-foreground">G/day</span>
+            <p className="m-0 inline-flex items-end gap-1.5 text-gold">
+              <span className="inline-flex items-center gap-1.5 text-2xl leading-none font-semibold tabular-nums">
+                <GoldIcon className="size-5" />
+                {formatGold(income.selfWorkGPerDay, 2)}
+              </span>
+              <span className="text-sm font-normal leading-none">G/day</span>
             </p>
             <FormulaBox label="Formula">{selfFormula}</FormulaBox>
             <p className="mt-1.5 mb-0 text-xs text-muted-foreground">
@@ -143,14 +171,25 @@ export function IncomeStack({
         <Card size="sm">
           <CardHeader className="pb-1">
             <CardTitle className="flex items-center gap-2 text-sm font-medium">
-              <Building2 className="size-4 text-amber-200" aria-hidden />
-              AE
+              <span
+                className="grid size-7 shrink-0 place-items-center rounded-md"
+                style={{
+                  background: SKILL_VISUALS.companies.boxBackground,
+                  color: SKILL_VISUALS.companies.color,
+                }}
+              >
+                <SkillIcon skill="companies" className="size-4" />
+              </span>
+              Companies AE
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="m-0 text-2xl font-semibold tabular-nums">
-              {formatGold(income.aeGPerDay, 2)}
-              <span className="ml-1 text-sm font-normal text-muted-foreground">G/day</span>
+            <p className="m-0 inline-flex items-end gap-1.5 text-gold">
+              <span className="inline-flex items-center gap-1.5 text-2xl leading-none font-semibold tabular-nums">
+                <GoldIcon className="size-5" />
+                {formatGold(income.aeGPerDay, 2)}
+              </span>
+              <span className="text-sm font-normal leading-none">G/day</span>
             </p>
             <FormulaBox label="Formula">{`top ${income.activeSlots} of ${companies.length} slots (Companies Limit ${formatGold(companiesValue, 0)})`}</FormulaBox>
           </CardContent>

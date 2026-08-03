@@ -30,19 +30,19 @@ export function SkillLevelMeter({
 
   return (
     <div className="flex items-center gap-2" style={{ ["--skill-icon" as string]: visual.color }}>
-      <div className="flex min-w-0 flex-1 gap-[3px]">
+      <div className="flex min-w-0 flex-1 items-center gap-[3px]">
         {slots.map((slotLevel) => {
           const filled = slotLevel <= level;
           if (filled) {
             return (
               <div
                 key={slotLevel}
-                className="grid aspect-[0.72] max-h-7 flex-1 place-items-center rounded-[4px]"
+                className="grid h-[26px] w-[20px] shrink-0 place-items-center rounded-[3px]"
                 style={{ background: visual.boxBackground }}
                 aria-hidden
               >
                 <div style={{ color: visual.color }} className="grid place-items-center">
-                  <SkillIcon skill={skill} className="size-3.5" />
+                  <SkillIcon skill={skill} className="size-4" />
                 </div>
               </div>
             );
@@ -51,7 +51,7 @@ export function SkillLevelMeter({
           return (
             <div
               key={slotLevel}
-              className="aspect-[0.72] max-h-7 flex-1 rounded-[4px]"
+              className="h-[26px] w-[20px] shrink-0 rounded-[3px]"
               style={{
                 background: EMPTY_SKILL_BOX_BG,
                 opacity: affordable ? 1 : 0.2,

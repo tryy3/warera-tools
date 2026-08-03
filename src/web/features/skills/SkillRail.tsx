@@ -53,10 +53,10 @@ export function SkillRail({
     .toSorted(([a], [b]) => a.localeCompare(b));
 
   return (
-    <aside className="space-y-4 rounded-xl border border-border bg-card/80 p-4">
+    <aside className="space-y-5 rounded-xl border border-border bg-card/80 p-5">
       <div className="flex items-start justify-between gap-2">
         <div>
-          <h2 className="m-0 text-base font-semibold">Skills</h2>
+          <h2 className="m-0 text-lg font-semibold">Skills</h2>
           <p className="mt-1 mb-0 text-xs text-muted-foreground">
             Draft pool {formatGold(ecoPool, 0)} SP · spent {formatGold(spentEco, 0)} · free{" "}
             {formatGold(availableDraft, 0)}
@@ -66,12 +66,12 @@ export function SkillRail({
             total
           </p>
         </div>
-        <Button type="button" variant="outline" size="sm" onClick={onReset}>
+        <Button type="button" variant="outline" size="xs" onClick={onReset}>
           Reset
         </Button>
       </div>
 
-      <ul className="m-0 list-none space-y-2.5 p-0">
+      <ul className="m-0 list-none space-y-3 p-0">
         {SKILL_PANEL_ORDER.map((skillId) => {
           const visual = SKILL_VISUALS[skillId];
           const eco = isEcoSkill(skillId);
@@ -90,18 +90,18 @@ export function SkillRail({
           return (
             <li
               key={skillId}
-              className={`rounded-lg border border-border/80 bg-secondary/20 px-3 py-2.5 ${eco ? "" : "opacity-80"}`}
+              className={`rounded-xl border border-border/80 bg-secondary/20 px-4 py-3.5 ${eco ? "" : "opacity-80"}`}
             >
-              <div className="mb-2 flex items-center gap-2.5">
+              <div className="mb-2.5 flex items-center gap-3">
                 <div
-                  className="grid size-9 shrink-0 place-items-center rounded-lg"
+                  className="grid size-11 shrink-0 place-items-center rounded-lg"
                   style={{ background: visual.boxBackground, color: visual.color }}
                 >
-                  <SkillIcon skill={skillId} className="size-[18px]" />
+                  <SkillIcon skill={skillId} className="size-6" />
                 </div>
                 <div className="min-w-0">
-                  <div className="font-medium">{visual.label}</div>
-                  <div className="text-xs text-muted-foreground">
+                  <div className="text-[0.95rem] font-medium">{visual.label}</div>
+                  <div className="text-sm text-muted-foreground">
                     {eco ? (
                       <>
                         Lv {level} · value {formatGold(value, 0)}
@@ -130,20 +130,27 @@ export function SkillRail({
         })}
       </ul>
 
-      <div className="flex flex-col gap-2">
+      <div className="mt-2 flex flex-col gap-2 pt-1">
         <div className="grid grid-cols-2 gap-2">
-          <Button type="button" className="gap-1.5" onClick={onFullOptimize}>
+          <Button type="button" size="lg" className="h-10 gap-1.5" onClick={onFullOptimize}>
             <Sparkles className="size-3.5" aria-hidden />
             Full Optimize
           </Button>
-          <Button type="button" variant="secondary" className="gap-1.5" onClick={onOptimizeUnspent}>
+          <Button
+            type="button"
+            variant="secondary"
+            size="lg"
+            className="h-10 gap-1.5"
+            aria-label="Optimize unspent"
+            onClick={onOptimizeUnspent}
+          >
             <Coins className="size-3.5" aria-hidden />
-            Optimize unspent
+            Unspent
           </Button>
         </div>
         <button
           type="button"
-          className="text-center text-xs text-primary underline-offset-2 hover:underline"
+          className="text-center text-[0.65rem] text-primary underline-offset-2 hover:underline"
           onClick={onRestore}
         >
           Restore
