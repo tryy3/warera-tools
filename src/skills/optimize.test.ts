@@ -92,4 +92,31 @@ describe("optimizeEcoSkills", () => {
     expect(r.levels.companies).toBe(1);
     expect(r.levels.energy).toBe(0);
   });
+
+  it("never raises any eco skill above MAX_ECO_SKILL_LEVEL", () => {
+    const r = optimizeEcoSkills({
+      mode: "full_eco_reset",
+      currentLevels: { energy: 0, entrepreneurship: 0, production: 0, companies: 0 },
+      availableSkillPoints: 0,
+      totalSkillPoints: 10_000,
+      netWage: 1,
+      companies: [
+        { id: "a", name: "a", aeLevel: 20, productionBonus: 1, profitPerPp: 1 },
+        { id: "b", name: "b", aeLevel: 20, productionBonus: 1, profitPerPp: 1 },
+        { id: "c", name: "c", aeLevel: 20, productionBonus: 1, profitPerPp: 1 },
+        { id: "d", name: "d", aeLevel: 20, productionBonus: 1, profitPerPp: 1 },
+        { id: "e", name: "e", aeLevel: 20, productionBonus: 1, profitPerPp: 1 },
+        { id: "f", name: "f", aeLevel: 20, productionBonus: 1, profitPerPp: 1 },
+        { id: "g", name: "g", aeLevel: 20, productionBonus: 1, profitPerPp: 1 },
+        { id: "h", name: "h", aeLevel: 20, productionBonus: 1, profitPerPp: 1 },
+        { id: "i", name: "i", aeLevel: 20, productionBonus: 1, profitPerPp: 1 },
+        { id: "j", name: "j", aeLevel: 20, productionBonus: 1, profitPerPp: 1 },
+        { id: "k", name: "k", aeLevel: 20, productionBonus: 1, profitPerPp: 1 },
+        { id: "l", name: "l", aeLevel: 20, productionBonus: 1, profitPerPp: 1 },
+      ],
+    });
+    for (const k of ["energy", "entrepreneurship", "production", "companies"] as const) {
+      expect(r.levels[k]).toBeLessThanOrEqual(10);
+    }
+  });
 });

@@ -1,5 +1,5 @@
 import { calculateDailyIncome, type SkillsCompany, type SkillsLevels } from "./income";
-import { spCostForLevel } from "./sp";
+import { MAX_ECO_SKILL_LEVEL, spCostForLevel } from "./sp";
 import { ECO_SKILL_IDS, skillValueFromLevel } from "./values";
 
 export type OptimizeMode = "unspent" | "full_eco_reset";
@@ -55,6 +55,7 @@ export function optimizeEcoSkills(input: {
 
     for (const skill of ECO_SKILL_IDS) {
       const nextLevel = levels[skill] + 1;
+      if (nextLevel > MAX_ECO_SKILL_LEVEL) continue;
       const cost = spCostForLevel(nextLevel);
       if (cost <= 0 || cost > budget) continue;
       const trial = { ...levels, [skill]: nextLevel };

@@ -1,5 +1,23 @@
+export const MAX_ECO_SKILL_LEVEL = 10;
+
 export function spCostForLevel(level: number): number {
   return level >= 1 ? level : 0;
+}
+
+export function maxAffordableLevel(
+  currentLevel: number,
+  freeSp: number,
+  maxLevel: number = MAX_ECO_SKILL_LEVEL,
+): number {
+  let level = Math.max(0, Math.min(maxLevel, Math.floor(currentLevel)));
+  let remaining = Math.max(0, freeSp);
+  while (level < maxLevel) {
+    const cost = spCostForLevel(level + 1);
+    if (cost <= 0 || cost > remaining) break;
+    remaining -= cost;
+    level += 1;
+  }
+  return level;
 }
 
 export function totalSpToReachLevel(level: number): number {
