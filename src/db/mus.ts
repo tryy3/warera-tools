@@ -14,11 +14,7 @@ export async function listMusForSync(db: Db): Promise<{ id: string }[]> {
   return rows;
 }
 
-export async function upsertMuCurrent(
-  db: Db,
-  parsed: ParsedMu,
-  fetchedAt: Date,
-): Promise<void> {
+export async function upsertMuCurrent(db: Db, parsed: ParsedMu, fetchedAt: Date): Promise<void> {
   await db
     .insert(mus)
     .values({

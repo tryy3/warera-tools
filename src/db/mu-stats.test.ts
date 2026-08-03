@@ -7,11 +7,7 @@ import { join } from "node:path";
 import { beforeEach, describe, expect, it } from "vite-plus/test";
 import type { Db } from "./client";
 import * as schema from "./schema";
-import {
-  insertMuMemberStatSnapshots,
-  insertMuPoll,
-  insertMuStatSnapshots,
-} from "./mu-stats";
+import { insertMuMemberStatSnapshots, insertMuPoll, insertMuStatSnapshots } from "./mu-stats";
 
 async function createDb(): Promise<Db> {
   const dir = mkdtempSync(join(tmpdir(), "mu-stats-"));
