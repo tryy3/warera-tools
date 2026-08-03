@@ -7,7 +7,6 @@ export {
 export {
   buildGrowthBootstrap,
   mapGrowthBootstrap,
-  type GrowthBootstrapCompany,
   type GrowthBootstrapResponse,
   type MapGrowthBootstrapInput,
 } from "./bootstrap";

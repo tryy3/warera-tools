@@ -56,14 +56,9 @@ function pickFasterPath(plans: Record<FocusedPath, GrowthPlanResult | null>): Fo
   return found ? best : "cheapest";
 }
 
-function companiesToEditable(bootstrap: GrowthBootstrapResponse): EditableFactory[] {
-  return bootstrap.companies.map((c) => ({
-    id: c.id,
-    name: c.name,
-    itemCode: c.itemCode,
-    aeLevel: c.aeLevel,
-    goldPerAePerDay: c.goldPerAePerDay,
-  }));
+// Task 7: wire factories from User query instead of bootstrap.
+function companiesToEditable(_bootstrap: GrowthBootstrapResponse): EditableFactory[] {
+  return [];
 }
 
 function parseNumberInput(raw: string, fallback = 0): number {

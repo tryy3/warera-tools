@@ -7,7 +7,6 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vite-plus/test";
 import type { Db } from "../../db/client";
-import { upsertCompanyPack } from "../../db/company-packs";
 import { insertPricePoll, insertPriceSnapshots } from "../../db/prices";
 import * as schema from "../../db/schema";
 import { listProducibleRecipes } from "../../economy/recipes";
@@ -60,14 +59,6 @@ async function createMemoryDb(): Promise<Db> {
       payload TEXT,
       fetched_at INTEGER,
       enqueued_at INTEGER NOT NULL
-    )
-  `);
-  await client.execute(`
-    CREATE TABLE company_packs (
-      user_id TEXT PRIMARY KEY NOT NULL,
-      payload TEXT NOT NULL,
-      fetched_at INTEGER NOT NULL,
-      ttl_seconds INTEGER NOT NULL DEFAULT 600
     )
   `);
   return drizzle(client, { schema });
@@ -159,31 +150,13 @@ describe("GET /bootstrap", () => {
     expect(res.status).toBe(400);
   });
 
-  it("returns lean bootstrap shape for a fixture user", async () => {
-    const fetchedAt = new Date();
-    await upsertCompanyPack(db, {
-      userId: "u1",
-      companies: [
-        {
-          id: "c1",
-          name: "Mine",
-          itemCode: "iron",
-          regionId: "reg-home",
-          aeLevel: 3,
-          productionBonus: 0.1,
-          bonusDetails: null,
-        },
-      ],
-      fetchedAt,
-    });
-
+  it("returns thin bootstrap shape without companies", async () => {
     const res = await appFor(db).request("http://localhost/bootstrap?userId=u1");
     expect(res.status).toBe(200);
     const body = (await res.json()) as {
       startBalance: number;
       steel: number;
       concrete: number;
-      companies: Array<Record<string, unknown>>;
       opportunitiesLite: unknown[];
       bestItem: Record<string, unknown>;
       prices: { steel: number; concrete: number };
@@ -191,61 +164,20 @@ describe("GET /bootstrap", () => {
     expect(body.startBalance).toBe(0);
     expect(body.steel).toBe(0);
     expect(body.concrete).toBe(0);
-    expect(body.companies).toHaveLength(1);
-    expect(body.companies[0]).toMatchObject({
-      id: "c1",
-      name: "Mine",
-      aeLevel: 3,
-      itemCode: "iron",
-      productionBonus: 0.1,
-    });
-    expect(body.companies[0]).not.toHaveProperty("bestSwitch");
+    expect(body).not.toHaveProperty("companies");
+    expect(body).not.toHaveProperty("companiesFetchedAt");
+    expect(body).not.toHaveProperty("companiesRefreshed");
     expect(body.opportunitiesLite.length).toBeGreaterThan(0);
     expect(body.bestItem).toHaveProperty("itemCode");
-    expect(body.bestItem).toHaveProperty("suggestedBonus");
+    expect(body.bestItem.suggestedBonus).toBe(0);
     expect(body.prices.steel).toBe(20);
     expect(body.prices.concrete).toBe(5);
     expect(body).not.toHaveProperty("opportunities");
   });
 
-  it("accepts refresh=1", async () => {
-    await upsertCompanyPack(db, {
-      userId: "u1",
-      companies: [
-        {
-          id: "old",
-          name: "Old",
-          itemCode: "iron",
-          regionId: null,
-          aeLevel: 1,
-          productionBonus: 0,
-          bonusDetails: null,
-        },
-      ],
-      fetchedAt: new Date(),
-    });
-
-    const request = vi.fn(async (path: string) => {
-      if (String(path).includes("company.getCompanies")) {
-        return { result: { data: { items: ["c-new"] } } };
-      }
-      if (String(path).includes("company.getById")) {
-        return {
-          result: {
-            data: {
-              _id: "c-new",
-              name: "Fresh Co",
-              itemCode: "iron",
-              region: null,
-              activeUpgradeLevels: { automatedEngine: 2 },
-            },
-          },
-        };
-      }
-      if (String(path).includes("company.getProductionBonus")) {
-        return { result: { data: { total: 10 } } };
-      }
-      throw new Error(`unexpected path ${path}`);
+  it("accepts refresh=1 without loading company pack", async () => {
+    const request = vi.fn(async () => {
+      throw new Error("warera should not be called for company pack");
     });
 
     const app = new Hono();
@@ -264,11 +196,9 @@ describe("GET /bootstrap", () => {
 
     const res = await app.request("http://localhost/bootstrap?userId=u1&refresh=1");
     expect(res.status).toBe(200);
-    const body = (await res.json()) as {
-      companiesRefreshed: boolean;
-      companies: Array<{ id?: string }>;
-    };
-    expect(body.companiesRefreshed).toBe(true);
-    expect(body.companies[0]?.id).toBe("c-new");
+    const body = (await res.json()) as Record<string, unknown>;
+    expect(body).not.toHaveProperty("companies");
+    expect(body).not.toHaveProperty("companiesRefreshed");
+    expect(request).not.toHaveBeenCalled();
   });
 });

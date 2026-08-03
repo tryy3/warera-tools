@@ -5,12 +5,10 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vite-plus/test";
 import type { Db } from "../db/client";
-import { upsertCompanyPack } from "../db/company-packs";
 import { insertPricePoll, insertPriceSnapshots } from "../db/prices";
 import * as schema from "../db/schema";
 import { listProducibleRecipes } from "../economy/recipes";
 import { buildGrowthBootstrap, mapGrowthBootstrap } from "./bootstrap";
-import { goldPerAePerDayFromProfit } from "./income";
 
 async function createDb(): Promise<Db> {
   const dir = mkdtempSync(join(tmpdir(), "growth-bootstrap-"));
@@ -46,14 +44,6 @@ async function createDb(): Promise<Db> {
       payload TEXT,
       fetched_at INTEGER,
       enqueued_at INTEGER NOT NULL
-    )
-  `);
-  await client.execute(`
-    CREATE TABLE company_packs (
-      user_id TEXT PRIMARY KEY NOT NULL,
-      payload TEXT NOT NULL,
-      fetched_at INTEGER NOT NULL,
-      ttl_seconds INTEGER NOT NULL DEFAULT 600
     )
   `);
   return drizzle(client, { schema });
@@ -123,31 +113,9 @@ const logger = {
 };
 
 describe("mapGrowthBootstrap", () => {
-  it("maps lean companies and defaults inventory to 0", () => {
+  it("maps prices, opportunities, and defaults inventory to 0", () => {
     const result = mapGrowthBootstrap({
       recordedAt: "2026-08-01T12:00:00.000Z",
-      companiesFetchedAt: 1,
-      companiesRefreshed: false,
-      packEntries: [
-        {
-          id: "c1",
-          name: "Mine",
-          itemCode: "iron",
-          regionId: "r1",
-          aeLevel: 3,
-          productionBonus: 0.1,
-          bonusDetails: null,
-        },
-        {
-          id: "c2",
-          name: "Idle",
-          itemCode: null,
-          regionId: null,
-          aeLevel: 1,
-          productionBonus: null,
-          bonusDetails: null,
-        },
-      ],
       prices: { iron: 1, steel: 20, concrete: 5 },
       opportunities: [
         { itemCode: "steel", profitPerPp: 0.5 },
@@ -166,28 +134,17 @@ describe("mapGrowthBootstrap", () => {
     expect(result.bestItem).toEqual({
       itemCode: "steel",
       profitPerPp: 0.5,
-      suggestedBonus: 0.1,
+      suggestedBonus: 0,
     });
-    expect(result.companies).toHaveLength(2);
-    expect(result.companies[0]).toEqual({
-      id: "c1",
-      name: "Mine",
-      aeLevel: 3,
-      itemCode: "iron",
-      productionBonus: 0.1,
-      goldPerAePerDay: goldPerAePerDayFromProfit(0.2, 0.1),
-    });
-    expect(result.companies[1]?.goldPerAePerDay).toBe(0);
-    expect(result.companies[0]).not.toHaveProperty("bestSwitch");
+    expect(result).not.toHaveProperty("companies");
+    expect(result).not.toHaveProperty("companiesFetchedAt");
+    expect(result).not.toHaveProperty("companiesRefreshed");
     expect(result).not.toHaveProperty("opportunities");
   });
 
   it("uses suggestedBonus 0 when no company bonuses", () => {
     const result = mapGrowthBootstrap({
       recordedAt: null,
-      companiesFetchedAt: null,
-      companiesRefreshed: false,
-      packEntries: [],
       prices: {},
       opportunities: [{ itemCode: "iron", profitPerPp: 0.1 }],
     });
@@ -204,24 +161,7 @@ describe("buildGrowthBootstrap", () => {
     await seedPrices(db);
   });
 
-  it("returns lean fields without switch recommendations", async () => {
-    const fetchedAt = new Date();
-    await upsertCompanyPack(db, {
-      userId: "u1",
-      companies: [
-        {
-          id: "c1",
-          name: "Mine",
-          itemCode: "iron",
-          regionId: "reg-home",
-          aeLevel: 3,
-          productionBonus: 0.1,
-          bonusDetails: null,
-        },
-      ],
-      fetchedAt,
-    });
-
+  it("returns prices and opportunities without loading company pack", async () => {
     const request = vi.fn(async () => {
       throw new Error("warera should not be called");
     });
@@ -233,18 +173,18 @@ describe("buildGrowthBootstrap", () => {
       userId: "u1",
     });
 
-    expect(result).toHaveProperty("companies");
+    expect(result).not.toHaveProperty("companies");
+    expect(result).not.toHaveProperty("companiesFetchedAt");
+    expect(result).not.toHaveProperty("companiesRefreshed");
     expect(result).toHaveProperty("opportunitiesLite");
     expect(result).toHaveProperty("bestItem");
     expect(result.startBalance).toBe(0);
     expect(result.steel).toBe(0);
     expect(result.concrete).toBe(0);
-    expect(result.companiesRefreshed).toBe(false);
-    expect(result.companiesFetchedAt).toBe(fetchedAt.getTime());
     expect(result.recordedAt).toBe("2026-08-01T12:00:00.000Z");
     expect(result.prices.steel).toBe(20);
     expect(result.prices.concrete).toBe(5);
-    expect(result.companies[0]).not.toHaveProperty("bestSwitch");
+    expect(result.bestItem?.suggestedBonus).toBe(0);
     expect(result).not.toHaveProperty("opportunities");
     expect(request).not.toHaveBeenCalled();
   });

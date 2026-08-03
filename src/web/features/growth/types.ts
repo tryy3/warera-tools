@@ -1,4 +1,4 @@
-export type { GrowthBootstrapCompany, GrowthBootstrapResponse } from "@/growth/bootstrap";
+export type { GrowthBootstrapResponse } from "@/growth/bootstrap";
 export type { GrowthPathMode, GrowthPlanResult, GrowthPlanStep } from "@/growth/plan";
 
 export type EditableFactory = {
