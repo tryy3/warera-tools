@@ -1,3 +1,15 @@
+## IMPORTANT — Working on `master`
+
+**Before starting any task on the `master` branch**, check for uncommitted changes (`git status`).
+
+1. **If there are uncommitted changes, commit them first** before doing anything else on `master`.
+2. **If the changes feel weird, unexpected, or unclear** (wrong files, secrets, half-finished work, unknown origin) — **ask the user for confirmation** before committing.
+3. **Never discard, delete, or restore** uncommitted work (`git restore`, `git checkout --`, `git reset --hard`, `git clean`, etc.) **without explicit user confirmation**.
+
+This rule overrides the usual “only commit when asked” preference while on `master`: protecting existing work comes first.
+
+---
+
 <!--VITE PLUS START-->
 
 # Using Vite+, the Unified Toolchain for the Web
