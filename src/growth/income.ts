@@ -20,10 +20,7 @@ export function goldPerAePerDayFromProfit(profitPerPp: number, bonus: number): n
   return aeDailyValue(1, bonus, profitPerPp);
 }
 
-export function dailyGoldFromFactories(
-  factories: GrowthFactory[],
-  side: GrowthSideIncome,
-): number {
+export function dailyGoldFromFactories(factories: GrowthFactory[], side: GrowthSideIncome): number {
   let sum = sideIncomeTotal(side);
   for (const f of factories) {
     sum += f.aeLevel * f.goldPerAePerDay;

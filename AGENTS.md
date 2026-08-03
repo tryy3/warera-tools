@@ -45,7 +45,7 @@ Classify new persisted / fetched data before inventing a one-off cache. Full mod
 | --- | --- | --- |
 | **Global** | Croner jobs (+ rare manual poll) | Market prices / history, recommended regions by item |
 | **Geo** | Jobs over watchlist; cold miss live-fills | Regions, countries; **MU** later (same pattern) |
-| **User** | Shell Load/Refresh → server TTL | Selected player, `company_packs` |
+| **User** | Shell Load/Refresh → server TTL | Selected player, `GET /api/user` (skills/job/companies/income), `company_packs` |
 
 Rules:
 

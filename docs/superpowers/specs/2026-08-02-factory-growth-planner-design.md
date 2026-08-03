@@ -21,7 +21,7 @@ This tool answers **upgrade/buy sequencing**. It does **not** replace Companies 
 | Optimal | May buy companies beyond N (income accelerators); hard cap **12** |
 | Upgrades-only | May buy only up to N (`maxCompanies = max(currentCount, N)`); never beyond N |
 | Active skills / slots | **Ignored in v1** — every owned company earns AE income (player may temporarily put skills into companies) |
-| Side income | Single editable **extra G/day** (no named mission/case/worker toggles) |
+| Side income | Work + self-work from shared [User](./2026-08-03-user-data-income-design.md) income (read-only) + editable **Extra G/day** residual; no Eco/Sustain toggle |
 | Player data | Same player picker pattern as Companies; override most parameters |
 | New company income | Default **best Profit/PP** item; user may pick another item + bonus override |
 | Existing company income | Keep each company’s bootstrapped G/AE/day from current item + bonus |

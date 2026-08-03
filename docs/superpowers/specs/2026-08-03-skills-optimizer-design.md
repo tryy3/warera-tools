@@ -19,7 +19,7 @@ This tool does **not** replace Companies (what to produce / switch) or Growth (b
 | --- | --- |
 | Nav / route | **Skills** → `/skills` |
 | Code layout | Pure math `src/skills/*`; UI `src/web/features/skills/*` |
-| Computation | Client-side pure module; API only boots a lean snapshot |
+| Computation | Client-side pure module; page boots from shared [User](./2026-08-03-user-data-income-design.md) (`GET /api/user`) |
 | v1 objective | Economy daily gold (`totalG/day`) |
 | Income sources | Work + self-work + AE; **not** workers/Management |
 | Full eco reset | Treat as character reset into eco: all `totalSkillPoints` available; non-eco skills at 0 |

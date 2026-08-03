@@ -1,5 +1,6 @@
 export type { GrowthBootstrapResponse } from "@/growth/bootstrap";
 export type { GrowthPathMode, GrowthPlanResult, GrowthPlanStep } from "@/growth/plan";
+export type { UserCompany, UserResponse } from "@/user";
 
 export type EditableFactory = {
   id: string;

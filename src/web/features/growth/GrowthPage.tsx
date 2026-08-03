@@ -14,6 +14,7 @@ import {
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { goldPerAePerDayFromProfit } from "@/growth/income";
 import { DEFAULT_MAX_ITERATIONS, planGrowthPath } from "@/growth/plan";
+import type { UserCompany, UserResponse } from "@/user";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
@@ -23,6 +24,7 @@ import { buildGrowthSearch } from "../../lib/growthSearch";
 import { usePlayerSelection } from "../../player/PlayerSelectionContext";
 import { useSyncPlayerSearch } from "../../player/useSyncPlayerSearch";
 import { useGrowthBootstrapQuery } from "../../query/useGrowthBootstrapQuery";
+import { useUserQuery } from "../../query/useUserQuery";
 import { formatItem } from "../market/formatItem";
 import { formatGold, formatPlanStatus } from "./format";
 import { GrowthFactoryList } from "./GrowthFactoryList";
@@ -56,15 +58,33 @@ function pickFasterPath(plans: Record<FocusedPath, GrowthPlanResult | null>): Fo
   return found ? best : "cheapest";
 }
 
-// Task 7: wire factories from User query instead of bootstrap.
-function companiesToEditable(_bootstrap: GrowthBootstrapResponse): EditableFactory[] {
-  return [];
+function companiesToEditable(companies: UserCompany[]): EditableFactory[] {
+  return companies.map((c) => ({
+    id: c.id,
+    name: c.name,
+    itemCode: c.itemCode,
+    aeLevel: c.aeLevel,
+    goldPerAePerDay: c.goldPerAePerDay,
+  }));
+}
+
+function averageProductionBonus(companies: UserCompany[]): number {
+  if (companies.length === 0) return 0;
+  let sum = 0;
+  for (const c of companies) sum += c.productionBonus;
+  return sum / companies.length;
 }
 
 function parseNumberInput(raw: string, fallback = 0): number {
   if (raw === "" || raw === "-" || raw === "." || raw === "-.") return fallback;
   const n = Number(raw);
   return Number.isFinite(n) ? n : fallback;
+}
+
+function queryErrorMessage(error: unknown, isError: boolean): string | null {
+  if (error instanceof Error) return error.message;
+  if (isError) return String(error);
+  return null;
 }
 
 export function GrowthPage() {
@@ -90,10 +110,13 @@ export function GrowthPage() {
     navigate: syncNavigate,
   });
 
+  const userQuery = useUserQuery(player?.userId ?? null);
   const bootstrapQuery = useGrowthBootstrapQuery(player?.userId ?? null);
 
+  const [user, setUser] = useState<UserResponse | null>(null);
   const [bootstrap, setBootstrap] = useState<GrowthBootstrapResponse | null>(null);
-  const appliedKeyRef = useRef<string | null>(null);
+  const appliedUserKeyRef = useRef<string | null>(null);
+  const appliedBootstrapKeyRef = useRef<string | null>(null);
 
   const [goalN, setGoalN] = useState(6);
   const [startBalance, setStartBalance] = useState(0);
@@ -107,11 +130,15 @@ export function GrowthPage() {
   const [focusedOverride, setFocusedOverride] = useState<FocusedPath | null>(null);
 
   const queryError =
-    bootstrapQuery.error instanceof Error
-      ? bootstrapQuery.error.message
-      : bootstrapQuery.isError
-        ? String(bootstrapQuery.error)
-        : null;
+    queryErrorMessage(userQuery.error, userQuery.isError) ??
+    queryErrorMessage(bootstrapQuery.error, bootstrapQuery.isError);
+
+  function applyUser(data: UserResponse) {
+    setUser(data);
+    setFactories(companiesToEditable(data.companies));
+    setBonus(averageProductionBonus(data.companies));
+    setFocusedOverride(null);
+  }
 
   function applyBootstrap(data: GrowthBootstrapResponse) {
     setBootstrap(data);
@@ -122,10 +149,30 @@ export function GrowthPage() {
     setConcrete(data.concrete);
     setExtraGoldPerDay(0);
     setNewItemCode(data.bestItem?.itemCode ?? data.opportunitiesLite[0]?.itemCode ?? "");
-    setBonus(data.bestItem?.suggestedBonus ?? 0);
     setMaxIterations(DEFAULT_MAX_ITERATIONS);
-    setFactories(companiesToEditable(data));
   }
+
+  useEffect(() => {
+    const data = userQuery.data;
+    const userId = player?.userId;
+    if (!data || !userId) {
+      if (!userId) {
+        setUser(null);
+        setFactories([]);
+        setFocusedOverride(null);
+        appliedUserKeyRef.current = null;
+      } else if (!data) {
+        setUser(null);
+        setFactories([]);
+        appliedUserKeyRef.current = null;
+      }
+      return;
+    }
+    const key = `${userId}:${userQuery.dataUpdatedAt}`;
+    if (appliedUserKeyRef.current === key) return;
+    appliedUserKeyRef.current = key;
+    applyUser(data);
+  }, [userQuery.data, userQuery.dataUpdatedAt, player?.userId]);
 
   useEffect(() => {
     const data = bootstrapQuery.data;
@@ -133,23 +180,21 @@ export function GrowthPage() {
     if (!data || !userId) {
       if (!userId) {
         setBootstrap(null);
-        setFactories([]);
         setFocusedOverride(null);
-        appliedKeyRef.current = null;
+        appliedBootstrapKeyRef.current = null;
       } else if (!data) {
         setBootstrap(null);
-        setFactories([]);
-        appliedKeyRef.current = null;
+        appliedBootstrapKeyRef.current = null;
       }
       return;
     }
     const key = `${userId}:${bootstrapQuery.dataUpdatedAt}`;
-    if (appliedKeyRef.current === key) return;
-    appliedKeyRef.current = key;
+    if (appliedBootstrapKeyRef.current === key) return;
+    appliedBootstrapKeyRef.current = key;
     applyBootstrap(data);
   }, [bootstrapQuery.data, bootstrapQuery.dataUpdatedAt, player?.userId]);
 
-  const loading = bootstrapQuery.isFetching && !bootstrap;
+  const loading = (userQuery.isFetching && !user) || (bootstrapQuery.isFetching && !bootstrap);
 
   const steelPrice = bootstrap?.prices.steel ?? null;
   const concretePrice = bootstrap?.prices.concrete ?? null;
@@ -168,7 +213,7 @@ export function GrowthPage() {
     upgrade_first: null,
   };
 
-  if (bootstrap && !pricesMissing && selectedProfitPerPp != null) {
+  if (user && bootstrap && !pricesMissing && selectedProfitPerPp != null) {
     const newFactoryGoldPerAePerDay = goldPerAePerDayFromProfit(selectedProfitPerPp, bonus);
     const shared = {
       factories: factories.map((f) => ({
@@ -182,7 +227,11 @@ export function GrowthPage() {
         steel: steelPrice ?? 0,
         concrete: concretePrice ?? 0,
       },
-      sideIncome: { workGPerDay: 0, selfWorkGPerDay: 0, extraGoldPerDay },
+      sideIncome: {
+        workGPerDay: user.income.workGPerDay,
+        selfWorkGPerDay: user.income.selfWorkGPerDay,
+        extraGoldPerDay,
+      },
       newFactoryGoldPerAePerDay,
       maxIterations,
     };
@@ -195,6 +244,9 @@ export function GrowthPage() {
   const focusedPlan = plans[focusedPath];
   const newFactoryDaily =
     selectedProfitPerPp != null ? goldPerAePerDayFromProfit(selectedProfitPerPp, bonus) : null;
+
+  const workGPerDay = user?.income.workGPerDay ?? 0;
+  const selfWorkGPerDay = user?.income.selfWorkGPerDay ?? 0;
 
   function updateFactoryLevel(id: string, aeLevel: number) {
     setFactories((prev) =>
@@ -248,7 +300,7 @@ export function GrowthPage() {
         </p>
       ) : null}
 
-      {bootstrap && !loading ? (
+      {user && bootstrap && !loading ? (
         <>
           {pricesMissing ? (
             <p className="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
@@ -325,9 +377,21 @@ export function GrowthPage() {
                 value={concrete}
                 onChange={setConcrete}
               />
+              <ReadOnlyGoldField
+                id="work-g"
+                label="Work G/day"
+                icon={<Coins className="size-3.5" aria-hidden />}
+                value={workGPerDay}
+              />
+              <ReadOnlyGoldField
+                id="self-work-g"
+                label="Self-work G/day"
+                icon={<Coins className="size-3.5" aria-hidden />}
+                value={selfWorkGPerDay}
+              />
               <Field
                 id="extra-gold"
-                label="Extra gold / day"
+                label="Extra G/day"
                 icon={<Coins className="size-3.5" aria-hidden />}
                 type="number"
                 min={0}
@@ -519,6 +583,36 @@ function MetaChip({ icon, label }: { icon: ReactNode; label: string }) {
       {icon}
       {label}
     </span>
+  );
+}
+
+function ReadOnlyGoldField({
+  id,
+  label,
+  icon,
+  value,
+}: {
+  id: string;
+  label: string;
+  icon?: ReactNode;
+  value: number;
+}) {
+  const safeValue = Number.isFinite(value) ? value : 0;
+  return (
+    <div className="flex flex-col gap-1.5">
+      <Label htmlFor={id} className="inline-flex items-center gap-1.5">
+        {icon}
+        {label}
+      </Label>
+      <Input
+        id={id}
+        type="text"
+        readOnly
+        tabIndex={-1}
+        value={formatGold(safeValue, 2)}
+        className="bg-secondary/40 text-muted-foreground"
+      />
+    </div>
   );
 }
 

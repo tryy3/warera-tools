@@ -26,7 +26,7 @@ Define how WarEra Toolkit fetches, stores, and refreshes data across tools so we
 | User identity | Selected WarEra player (`userId` + `username`); not site auth |
 | User client cache | `@tanstack/react-query`, **memory only** (no pack persistence across reload) |
 | Load UX | Always-visible shell control: player search + Load/Refresh (do not hide on Global tools) |
-| User resources in v1 | Existing payloads only — company pack + selected player identity; **no new WarEra endpoints** |
+| User resources in v1 | Selected player identity, `company_packs`, and shared `GET /api/user` (skills/job/companies/income) — see [User Data + Growth Income](./2026-08-03-user-data-income-design.md) |
 | First implementation slice | Client foundation: QueryClient + shell + migrate Companies & Growth |
 | Event-driven Geo | Planned (`enqueueGeoRefresh`); not implemented yet |
 | Storage style | Case by case: dedicated tables when history/watchlist/query shape needs it; generic `cache` KV OK for simple TTL until a domain outgrows it |
@@ -37,7 +37,7 @@ Define how WarEra Toolkit fetches, stores, and refreshes data across tools so we
 | --- | --- | --- | --- |
 | **Global** | Market prices / order tops, recommended regions by item | Croner jobs (+ rare admin/manual poll) | Minutes–hours; shared by all clients |
 | **Geo** | `regions` watchlist, `countries`; **MU** when added | Jobs over a list/watchlist; cold miss live-fills | Hours–day; events may enqueue sooner later |
-| **User** | Selected player id/username, `company_packs` | Client Load/Refresh → server TTL; `refresh=1` busts pack only | Short (~10m server); memory on client |
+| **User** | Selected player id/username, `company_packs`, `GET /api/user` | Client Load/Refresh → server TTL; `refresh=1` busts pack / user cache | Short (~10m server); memory on client |
 
 ### Rules
 
