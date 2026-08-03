@@ -7,7 +7,7 @@ const { fetchAdvisorMock, fetchUserMock } = vi.hoisted(() => ({
   fetchAdvisorMock: vi.fn(async (_userId: string, _refresh: boolean) => ({
     recordedAt: null,
     companiesFetchedAt: 1,
-    companiesRefreshed: true,
+    companiesRefreshed: false,
     opportunities: [],
     companies: [],
   })),
@@ -38,7 +38,7 @@ afterEach(() => {
 });
 
 describe("loadPlayerData", () => {
-  it("fetches advisor and user with refresh=1 and invalidates growth bootstrap", async () => {
+  it("busts pack once via user refresh, warms companies without refresh, invalidates growth", async () => {
     const queryClient = new QueryClient();
     const fetchQuery = vi.spyOn(queryClient, "fetchQuery").mockImplementation(async (options) => {
       const queryFn = options.queryFn as (() => Promise<unknown>) | undefined;
@@ -53,19 +53,19 @@ describe("loadPlayerData", () => {
 
     expect(fetchQuery).toHaveBeenCalledTimes(2);
 
-    const companiesCall = fetchQuery.mock.calls[0]![0] as {
-      queryKey: readonly unknown[];
-      queryFn: () => Promise<unknown>;
-    };
-    expect(companiesCall.queryKey).toEqual(queryKeys.companies("u1"));
-    expect(fetchAdvisorMock).toHaveBeenCalledWith("u1", true);
-
-    const userCall = fetchQuery.mock.calls[1]![0] as {
+    const userCall = fetchQuery.mock.calls[0]![0] as {
       queryKey: readonly unknown[];
       queryFn: () => Promise<unknown>;
     };
     expect(userCall.queryKey).toEqual(queryKeys.user("u1"));
     expect(fetchUserMock).toHaveBeenCalledWith("u1", true);
+
+    const companiesCall = fetchQuery.mock.calls[1]![0] as {
+      queryKey: readonly unknown[];
+      queryFn: () => Promise<unknown>;
+    };
+    expect(companiesCall.queryKey).toEqual(queryKeys.companies("u1"));
+    expect(fetchAdvisorMock).toHaveBeenCalledWith("u1", false);
 
     expect(invalidateQueries).toHaveBeenCalledTimes(1);
     expect(invalidateQueries).toHaveBeenCalledWith({

@@ -237,4 +237,129 @@ describe("GET /api/user", () => {
     expect(typeof body.income.workGPerDay).toBe("number");
     expect(typeof body.income.aeGPerDay).toBe("number");
   });
+
+  it("accepts refresh=1 and refreshes company pack", async () => {
+    await upsertCompanyPack(db, {
+      userId: "u1",
+      companies: [
+        {
+          id: "old",
+          name: "Old",
+          itemCode: "iron",
+          regionId: null,
+          aeLevel: 1,
+          productionBonus: 0,
+          bonusDetails: null,
+        },
+      ],
+      fetchedAt: new Date(),
+    });
+
+    const request = vi.fn(async (path: string) => {
+      if (path.includes("user.getUserLite")) {
+        return {
+          result: {
+            data: {
+              _id: "u1",
+              username: "Alice",
+              leveling: liteFixture,
+              skills: { energy: { level: 2, total: 50 } },
+            },
+          },
+        };
+      }
+      if (path.includes("user.getUserById")) {
+        return { result: { data: { _id: "u1", company: null } } };
+      }
+      if (path.includes("worker.getWorkers")) {
+        return { result: { data: [] } };
+      }
+      if (String(path).includes("company.getCompanies")) {
+        return { result: { data: { items: ["c-new"] } } };
+      }
+      if (String(path).includes("company.getById")) {
+        return {
+          result: {
+            data: {
+              _id: "c-new",
+              name: "Fresh Co",
+              itemCode: "iron",
+              region: null,
+              activeUpgradeLevels: { automatedEngine: 2 },
+            },
+          },
+        };
+      }
+      if (String(path).includes("company.getProductionBonus")) {
+        return { result: { data: { total: 10 } } };
+      }
+      throw new Error(`unexpected warera call: ${path}`);
+    });
+
+    const res = await appFor(db, request).request("http://localhost/?userId=u1&refresh=1");
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      companiesRefreshed: boolean;
+      companies: Array<{ id?: string }>;
+    };
+    expect(body.companiesRefreshed).toBe(true);
+    expect(body.companies[0]?.id).toBe("c-new");
+  });
+
+  it("soft-fails wage lookup while still returning skills and companies", async () => {
+    await upsertCompanyPack(db, {
+      userId: "u1",
+      companies: [
+        {
+          id: "c1",
+          name: "Mine",
+          itemCode: "iron",
+          regionId: "reg-home",
+          aeLevel: 3,
+          productionBonus: 0.1,
+          bonusDetails: null,
+        },
+      ],
+      fetchedAt: new Date(),
+    });
+
+    const request = vi.fn(async (path: string) => {
+      if (path.includes("user.getUserLite")) {
+        return {
+          result: {
+            data: {
+              _id: "u1",
+              username: "Alice",
+              leveling: liteFixture,
+              skills: {
+                energy: { level: 2, total: 50 },
+                production: { level: 3, total: 19 },
+              },
+            },
+          },
+        };
+      }
+      if (path.includes("user.getUserById")) {
+        return { result: { data: { _id: "u1", company: "job-co" } } };
+      }
+      if (path.includes("worker.getWorkers")) {
+        throw new Error("wage lookup failed");
+      }
+      throw new Error(`unexpected warera call: ${path}`);
+    });
+
+    const res = await appFor(db, request).request("http://localhost/?userId=u1");
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      skills: Record<string, { level: number; value: number }>;
+      companies: Array<{ id?: string }>;
+      job: { status: string };
+      income: { workGPerDay: number };
+    };
+    expect(body.skills.energy).toEqual({ level: 2, value: 50 });
+    expect(body.companies).toHaveLength(1);
+    expect(body.companies[0]?.id).toBe("c1");
+    expect(body.job.status).toBe("lookupFailed");
+    expect(body.income.workGPerDay).toBe(0);
+  });
 });
