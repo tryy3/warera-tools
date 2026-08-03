@@ -1,4 +1,4 @@
-import { index, integer, real, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import { index, integer, primaryKey, real, sqliteTable, text } from "drizzle-orm/sqlite-core";
 
 export const jobStatuses = ["success", "error", "running"] as const;
 export type JobStatus = (typeof jobStatuses)[number];
@@ -108,3 +108,105 @@ export const companyPacks = sqliteTable("company_packs", {
   fetchedAt: integer("fetched_at", { mode: "timestamp_ms" }).notNull(),
   ttlSeconds: integer("ttl_seconds").notNull().default(600),
 });
+
+export const muPollStatuses = ["success", "partial", "error"] as const;
+export type MuPollStatus = (typeof muPollStatuses)[number];
+
+export const mus = sqliteTable("mus", {
+  id: text("id").primaryKey(),
+  name: text("name"),
+  avatarUrl: text("avatar_url"),
+  countryId: text("country_id"),
+  regionId: text("region_id"),
+  ownerUserId: text("owner_user_id"),
+  mercenaryReputation: real("mercenary_reputation"),
+  level: integer("level"),
+  createdAtGame: integer("created_at_game", { mode: "timestamp_ms" }),
+  roles: text("roles", { mode: "json" }).$type<Record<string, unknown> | null>(),
+  activeUpgradeLevels: text("active_upgrade_levels", {
+    mode: "json",
+  }).$type<Record<string, unknown> | null>(),
+  payload: text("payload", { mode: "json" }).$type<Record<string, unknown> | null>(),
+  enqueuedAt: integer("enqueued_at", { mode: "timestamp_ms" }).notNull(),
+  fetchedAt: integer("fetched_at", { mode: "timestamp_ms" }),
+});
+
+export const muMembers = sqliteTable(
+  "mu_members",
+  {
+    muId: text("mu_id")
+      .notNull()
+      .references(() => mus.id),
+    userId: text("user_id").notNull(),
+    role: text("role"),
+    updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.muId, t.userId] })],
+);
+
+export const muPolls = sqliteTable(
+  "mu_polls",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    recordedAt: integer("recorded_at", { mode: "timestamp_ms" }).notNull(),
+    status: text("status").notNull(),
+    error: text("error"),
+    muCount: integer("mu_count").notNull().default(0),
+    memberCount: integer("member_count").notNull().default(0),
+  },
+  (t) => [index("mu_polls_status_recorded_at_idx").on(t.status, t.recordedAt)],
+);
+
+export const muStatSnapshots = sqliteTable(
+  "mu_stat_snapshots",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    pollId: integer("poll_id")
+      .notNull()
+      .references(() => muPolls.id),
+    muId: text("mu_id").notNull(),
+    weeklyDamages: real("weekly_damages"),
+    weeklyDamagesRank: integer("weekly_damages_rank"),
+    weeklyDamagesTier: text("weekly_damages_tier"),
+    bounty: real("bounty"),
+    bountyRank: integer("bounty_rank"),
+    bountyTier: text("bounty_tier"),
+    reputation: real("reputation"),
+    reputationRank: integer("reputation_rank"),
+    reputationTier: text("reputation_tier"),
+    damages: real("damages"),
+    damagesRank: integer("damages_rank"),
+    damagesTier: text("damages_tier"),
+    terrain: real("terrain"),
+    terrainRank: integer("terrain_rank"),
+    terrainTier: text("terrain_tier"),
+    wealth: real("wealth"),
+    wealthRank: integer("wealth_rank"),
+    wealthTier: text("wealth_tier"),
+    levelingLevel: integer("leveling_level"),
+    levelingMonthlyDamages: real("leveling_monthly_damages"),
+    payload: text("payload", { mode: "json" }).$type<Record<string, unknown> | null>(),
+  },
+  (t) => [index("mu_stat_snapshots_mu_poll_idx").on(t.muId, t.pollId)],
+);
+
+export const muMemberStatSnapshots = sqliteTable(
+  "mu_member_stat_snapshots",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    pollId: integer("poll_id")
+      .notNull()
+      .references(() => muPolls.id),
+    muId: text("mu_id").notNull(),
+    userId: text("user_id").notNull(),
+    memberRowId: text("member_row_id"),
+    totalDamagesCount: integer("total_damages_count"),
+    monthlyDamagesCount: integer("monthly_damages_count"),
+    weeklyDamagesCount: integer("weekly_damages_count"),
+    totalHelpCount: integer("total_help_count"),
+    monthlyHelpCount: integer("monthly_help_count"),
+    weeklyHelpCount: integer("weekly_help_count"),
+    payload: text("payload", { mode: "json" }).$type<Record<string, unknown> | null>(),
+  },
+  (t) => [index("mu_member_stat_snapshots_mu_user_poll_idx").on(t.muId, t.userId, t.pollId)],
+);
