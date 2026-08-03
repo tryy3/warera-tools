@@ -10,11 +10,3 @@ export {
 } from "./income";
 export { optimizeEcoSkills, type OptimizeMode, type OptimizeResult } from "./optimize";
 export { parseIncomeTaxRate, resolveJobWage, type SkillsJob } from "./job-wage";
-export {
-  buildSkillsBootstrap,
-  mapSkillsBootstrap,
-  type MapSkillsBootstrapInput,
-  type SkillsBootstrapCompany,
-  type SkillsBootstrapResponse,
-  type SkillsBootstrapSkill,
-} from "./bootstrap";

@@ -2,12 +2,12 @@ import { Minus, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { spCostForLevel, totalSpForLevels, totalSpToReachLevel } from "@/skills/sp";
 import { ECO_SKILL_IDS, skillValueFromLevel, type EcoSkillId } from "@/skills/values";
-import type { SkillsBootstrapSkill, SkillsLevels } from "./types";
+import type { SkillsLevels, UserSkill } from "./types";
 import { formatGold, skillLabel } from "./format";
 
 type SkillRailProps = {
   levels: SkillsLevels;
-  loadedSkills: Record<string, SkillsBootstrapSkill>;
+  loadedSkills: Record<string, UserSkill>;
   ecoPool: number;
   availableDraft: number;
   spentEco: number;

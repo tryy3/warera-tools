@@ -3,7 +3,7 @@ import { fetchAdvisor } from "./fetchAdvisor";
 import { fetchUser } from "./fetchUser";
 import { queryKeys } from "./keys";
 
-/** Explicit shell Load/Refresh: bust server company pack, then drop bootstrap caches. */
+/** Explicit shell Load/Refresh: bust server company pack + user, then drop growth cache. */
 export async function loadPlayerData(queryClient: QueryClient, userId: string): Promise<void> {
   await queryClient.fetchQuery({
     queryKey: queryKeys.companies(userId),
@@ -14,5 +14,4 @@ export async function loadPlayerData(queryClient: QueryClient, userId: string): 
     queryFn: () => fetchUser(userId, true),
   });
   await queryClient.invalidateQueries({ queryKey: queryKeys.growthBootstrap(userId) });
-  await queryClient.invalidateQueries({ queryKey: queryKeys.skillsBootstrap(userId) });
 }

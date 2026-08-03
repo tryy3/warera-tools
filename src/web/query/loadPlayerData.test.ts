@@ -38,7 +38,7 @@ afterEach(() => {
 });
 
 describe("loadPlayerData", () => {
-  it("fetches advisor and user with refresh=1 and invalidates bootstrap caches", async () => {
+  it("fetches advisor and user with refresh=1 and invalidates growth bootstrap", async () => {
     const queryClient = new QueryClient();
     const fetchQuery = vi.spyOn(queryClient, "fetchQuery").mockImplementation(async (options) => {
       const queryFn = options.queryFn as (() => Promise<unknown>) | undefined;
@@ -67,11 +67,9 @@ describe("loadPlayerData", () => {
     expect(userCall.queryKey).toEqual(queryKeys.user("u1"));
     expect(fetchUserMock).toHaveBeenCalledWith("u1", true);
 
+    expect(invalidateQueries).toHaveBeenCalledTimes(1);
     expect(invalidateQueries).toHaveBeenCalledWith({
       queryKey: queryKeys.growthBootstrap("u1"),
-    });
-    expect(invalidateQueries).toHaveBeenCalledWith({
-      queryKey: queryKeys.skillsBootstrap("u1"),
     });
   });
 });

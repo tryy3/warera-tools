@@ -1,11 +1,7 @@
 import type { CompanyPackEntry } from "../db/company-packs";
 import { calculateProfitPerPp } from "../economy/profit";
 import { goldPerAePerDayFromProfit } from "../growth/income";
-import {
-  calculateDailyIncome,
-  type SkillsCompany,
-  type SkillsLevels,
-} from "../skills/income";
+import { calculateDailyIncome, type SkillsCompany, type SkillsLevels } from "../skills/income";
 import type { SkillsJob } from "../skills/job-wage";
 import { ECO_SKILL_IDS } from "../skills/values";
 import type { UserLiteSkills } from "../warera/users";

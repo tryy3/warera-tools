@@ -8,14 +8,14 @@ import { ECO_SKILL_IDS, type EcoSkillId } from "@/skills/values";
 import { buildSkillsSearch } from "../../lib/skillsSearch";
 import { usePlayerSelection } from "../../player/PlayerSelectionContext";
 import { useSyncPlayerSearch } from "../../player/useSyncPlayerSearch";
-import { useSkillsBootstrapQuery } from "../../query/useSkillsBootstrapQuery";
+import { useUserQuery } from "../../query/useUserQuery";
 import { IncomeStack } from "./IncomeStack";
 import { SkillRail } from "./SkillRail";
-import type { SkillsBootstrapResponse } from "./types";
+import type { UserResponse } from "./types";
 
 const skillsRoute = getRouteApi("/skills");
 
-function ecoLevelsFromBootstrap(data: SkillsBootstrapResponse): SkillsLevels {
+function ecoLevelsFromUser(data: UserResponse): SkillsLevels {
   return {
     energy: data.skills.energy?.level ?? 0,
     entrepreneurship: data.skills.entrepreneurship?.level ?? 0,
@@ -24,7 +24,7 @@ function ecoLevelsFromBootstrap(data: SkillsBootstrapResponse): SkillsLevels {
   };
 }
 
-function spentNonEcoSp(skills: SkillsBootstrapResponse["skills"]): number {
+function spentNonEcoSp(skills: UserResponse["skills"]): number {
   let sum = 0;
   for (const [id, skill] of Object.entries(skills)) {
     if ((ECO_SKILL_IDS as string[]).includes(id)) continue;
@@ -56,9 +56,9 @@ export function SkillsPage() {
     navigate: syncNavigate,
   });
 
-  const bootstrapQuery = useSkillsBootstrapQuery(player?.userId ?? null);
+  const userQuery = useUserQuery(player?.userId ?? null);
 
-  const [bootstrap, setBootstrap] = useState<SkillsBootstrapResponse | null>(null);
+  const [user, setUser] = useState<UserResponse | null>(null);
   const appliedKeyRef = useRef<string | null>(null);
 
   const [levels, setLevels] = useState<SkillsLevels>({
@@ -73,49 +73,49 @@ export function SkillsPage() {
   const [fullResetDraft, setFullResetDraft] = useState(false);
 
   const queryError =
-    bootstrapQuery.error instanceof Error
-      ? bootstrapQuery.error.message
-      : bootstrapQuery.isError
-        ? String(bootstrapQuery.error)
+    userQuery.error instanceof Error
+      ? userQuery.error.message
+      : userQuery.isError
+        ? String(userQuery.error)
         : null;
 
-  function applyBootstrap(data: SkillsBootstrapResponse) {
-    setBootstrap(data);
-    setLevels(ecoLevelsFromBootstrap(data));
+  function applyUser(data: UserResponse) {
+    setUser(data);
+    setLevels(ecoLevelsFromUser(data));
     setNetWage(data.job.netWage ?? 0);
     setSelfWorkCompanyId("");
     setFullResetDraft(false);
   }
 
   useEffect(() => {
-    const data = bootstrapQuery.data;
+    const data = userQuery.data;
     const userId = player?.userId;
     if (!data || !userId) {
       if (!userId) {
-        setBootstrap(null);
+        setUser(null);
         appliedKeyRef.current = null;
         setFullResetDraft(false);
       } else if (!data) {
-        setBootstrap(null);
+        setUser(null);
         appliedKeyRef.current = null;
       }
       return;
     }
-    const key = `${userId}:${bootstrapQuery.dataUpdatedAt}`;
+    const key = `${userId}:${userQuery.dataUpdatedAt}`;
     if (appliedKeyRef.current === key) return;
     appliedKeyRef.current = key;
-    applyBootstrap(data);
-  }, [bootstrapQuery.data, bootstrapQuery.dataUpdatedAt, player?.userId]);
+    applyUser(data);
+  }, [userQuery.data, userQuery.dataUpdatedAt, player?.userId]);
 
-  const loading = bootstrapQuery.isFetching && !bootstrap;
+  const loading = userQuery.isFetching && !user;
 
-  const nonEcoSpend = bootstrap ? spentNonEcoSp(bootstrap.skills) : 0;
-  const totalSkillPoints = bootstrap?.leveling.totalSkillPoints ?? 0;
+  const nonEcoSpend = user ? spentNonEcoSp(user.skills) : 0;
+  const totalSkillPoints = user?.leveling.totalSkillPoints ?? 0;
   const ecoPool = fullResetDraft ? totalSkillPoints : Math.max(0, totalSkillPoints - nonEcoSpend);
   const spentEco = totalSpForLevels(levels);
   const availableDraft = Math.max(0, ecoPool - spentEco);
 
-  const companies = bootstrap?.companies ?? [];
+  const companies = user?.companies ?? [];
 
   const income = calculateDailyIncome({
     levels,
@@ -125,11 +125,11 @@ export function SkillsPage() {
   });
 
   const loadedIncome =
-    bootstrap != null
+    user != null
       ? calculateDailyIncome({
-          levels: ecoLevelsFromBootstrap(bootstrap),
-          netWage: bootstrap.job.netWage ?? 0,
-          companies: bootstrap.companies,
+          levels: ecoLevelsFromUser(user),
+          netWage: user.job.netWage ?? 0,
+          companies: user.companies,
           selfWorkCompanyId: null,
         })
       : null;
@@ -144,21 +144,21 @@ export function SkillsPage() {
   }
 
   function handleReset() {
-    if (!bootstrap) return;
-    setLevels(ecoLevelsFromBootstrap(bootstrap));
-    setNetWage(bootstrap.job.netWage ?? 0);
+    if (!user) return;
+    setLevels(ecoLevelsFromUser(user));
+    setNetWage(user.job.netWage ?? 0);
     setSelfWorkCompanyId("");
     setFullResetDraft(false);
   }
 
   function handleOptimize(mode: "unspent" | "full_eco_reset") {
-    if (!bootstrap) return;
-    const currentLevels = ecoLevelsFromBootstrap(bootstrap);
+    if (!user) return;
+    const currentLevels = ecoLevelsFromUser(user);
     const result = optimizeEcoSkills({
       mode,
       currentLevels,
-      availableSkillPoints: bootstrap.leveling.availableSkillPoints,
-      totalSkillPoints: bootstrap.leveling.totalSkillPoints,
+      availableSkillPoints: user.leveling.availableSkillPoints,
+      totalSkillPoints: user.leveling.totalSkillPoints,
       netWage,
       companies,
       selfWorkCompanyId: selfWorkCompanyId || null,
@@ -196,7 +196,7 @@ export function SkillsPage() {
       {player ? (
         <p className="text-sm text-muted-foreground">
           Planning for <strong className="text-foreground">{player.username}</strong>
-          {bootstrap ? <span> · character level {bootstrap.leveling.level}</span> : null}
+          {user ? <span> · character level {user.leveling.level}</span> : null}
         </p>
       ) : null}
 
@@ -208,17 +208,17 @@ export function SkillsPage() {
         </p>
       ) : null}
 
-      {bootstrap && !loading ? (
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(260px,320px)_1fr]">
+      {user && !loading ? (
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(300px,360px)_1fr]">
           <SkillRail
             levels={levels}
-            loadedSkills={bootstrap.skills}
+            loadedSkills={user.skills}
             ecoPool={ecoPool}
             availableDraft={availableDraft}
             spentEco={spentEco}
-            totalSkillPoints={bootstrap.leveling.totalSkillPoints}
-            availableSkillPoints={bootstrap.leveling.availableSkillPoints}
-            spentSkillPoints={bootstrap.leveling.spentSkillPoints}
+            totalSkillPoints={user.leveling.totalSkillPoints}
+            availableSkillPoints={user.leveling.availableSkillPoints}
+            spentSkillPoints={user.leveling.spentSkillPoints}
             onLevelChange={setEcoLevel}
             onReset={handleReset}
             onOptimizeUnspent={() => handleOptimize("unspent")}
@@ -230,7 +230,7 @@ export function SkillsPage() {
             levels={levels}
             netWage={netWage}
             onNetWageChange={setNetWage}
-            job={bootstrap.job}
+            job={user.job}
             companies={companies}
             selfWorkCompanyId={selfWorkCompanyId}
             onSelfWorkCompanyChange={setSelfWorkCompanyId}

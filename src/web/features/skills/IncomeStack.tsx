@@ -4,12 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { skillValueFromLevel } from "@/skills/values";
 import { GoldIcon } from "../../components/GoldIcon";
-import type {
-  DailyIncomeBreakdown,
-  SkillsBootstrapCompany,
-  SkillsJob,
-  SkillsLevels,
-} from "./types";
+import type { DailyIncomeBreakdown, SkillsJob, SkillsLevels, UserCompany } from "./types";
 import { formatGold, formatSignedGold } from "./format";
 
 function aeDaily(aeLevel: number, bonus: number, profitPerPp: number): number {
@@ -34,7 +29,7 @@ type IncomeStackProps = {
   netWage: number;
   onNetWageChange: (value: number) => void;
   job: SkillsJob;
-  companies: SkillsBootstrapCompany[];
+  companies: UserCompany[];
   selfWorkCompanyId: string;
   onSelfWorkCompanyChange: (id: string) => void;
 };
