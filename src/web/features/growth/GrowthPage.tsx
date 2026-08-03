@@ -187,7 +187,7 @@ export function GrowthPage() {
         steel: steelPrice ?? 0,
         concrete: concretePrice ?? 0,
       },
-      extraGoldPerDay,
+      sideIncome: { workGPerDay: 0, selfWorkGPerDay: 0, extraGoldPerDay },
       newFactoryGoldPerAePerDay,
       maxIterations,
     };

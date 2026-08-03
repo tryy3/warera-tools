@@ -22,7 +22,9 @@ export {
   dailyGoldFromFactories,
   goldPerAePerDayFromProfit,
   hourlyGoldFromFactories,
+  sideIncomeTotal,
   type GrowthFactory,
+  type GrowthSideIncome,
 } from "./income";
 export {
   DEFAULT_MAX_ITERATIONS,

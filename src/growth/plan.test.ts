@@ -3,6 +3,7 @@ import type { GrowthFactory } from "./income";
 import { planGrowthPath } from "./plan";
 
 const prices = { steel: 1, concrete: 1 };
+const zeroSideIncome = { workGPerDay: 0, selfWorkGPerDay: 0, extraGoldPerDay: 0 };
 
 function fac(id: string, aeLevel: number, goldPerAePerDay = 1): GrowthFactory {
   return { id, aeLevel, goldPerAePerDay };
@@ -16,7 +17,7 @@ describe("planGrowthPath heuristics", () => {
       mode: "cheapest",
       wallet: { gold: 0, steel: 0, concrete: 0 },
       prices,
-      extraGoldPerDay: 0,
+      sideIncome: zeroSideIncome,
       newFactoryGoldPerAePerDay: 1,
     });
     expect(result.complete).toBe(true);
@@ -31,7 +32,7 @@ describe("planGrowthPath heuristics", () => {
       mode: "upgrade_first",
       wallet: { gold: 10_000, steel: 0, concrete: 0 },
       prices,
-      extraGoldPerDay: 0,
+      sideIncome: zeroSideIncome,
       newFactoryGoldPerAePerDay: 1,
     });
     expect(result.complete).toBe(true);
@@ -46,7 +47,7 @@ describe("planGrowthPath heuristics", () => {
       mode: "upgrade_first",
       wallet: { gold: 50_000, steel: 0, concrete: 0 },
       prices,
-      extraGoldPerDay: 0,
+      sideIncome: zeroSideIncome,
       newFactoryGoldPerAePerDay: 2,
     });
     expect(result.complete).toBe(true);
@@ -63,7 +64,7 @@ describe("planGrowthPath heuristics", () => {
       mode: "cheapest",
       wallet: { gold: 10_000, steel: 0, concrete: 0 },
       prices,
-      extraGoldPerDay: 0,
+      sideIncome: zeroSideIncome,
       newFactoryGoldPerAePerDay: 1,
     });
     expect(result.complete).toBe(true);
@@ -78,7 +79,7 @@ describe("planGrowthPath heuristics", () => {
       mode: "income_roi",
       wallet: { gold: 50_000, steel: 0, concrete: 0 },
       prices: { steel: 100, concrete: 1 },
-      extraGoldPerDay: 0,
+      sideIncome: zeroSideIncome,
       newFactoryGoldPerAePerDay: 50,
     });
     expect(result.complete).toBe(true);
@@ -95,7 +96,7 @@ describe("planGrowthPath heuristics", () => {
         mode,
         wallet: { gold: 100_000, steel: 0, concrete: 0 },
         prices,
-        extraGoldPerDay: 0,
+        sideIncome: zeroSideIncome,
         newFactoryGoldPerAePerDay: 2,
       });
       expect(result.complete).toBe(true);
@@ -111,10 +112,29 @@ describe("planGrowthPath heuristics", () => {
       mode: "cheapest",
       wallet: { gold: 0, steel: 0, concrete: 0 },
       prices,
-      extraGoldPerDay: 0,
+      sideIncome: zeroSideIncome,
       newFactoryGoldPerAePerDay: 1,
     });
     expect(result.complete).toBe(false);
     expect(result.stuck).toBe(true);
+  });
+
+  it("work income reduces time-to-goal vs zero side income", () => {
+    const shared = {
+      factories: [fac("a", 1, 1)],
+      goalAe7Count: 1,
+      mode: "cheapest" as const,
+      wallet: { gold: 0, steel: 0, concrete: 0 },
+      prices,
+      newFactoryGoldPerAePerDay: 1,
+    };
+    const withoutWork = planGrowthPath({ ...shared, sideIncome: zeroSideIncome });
+    const withWork = planGrowthPath({
+      ...shared,
+      sideIncome: { workGPerDay: 100, selfWorkGPerDay: 0, extraGoldPerDay: 0 },
+    });
+    expect(withWork.complete).toBe(true);
+    expect(withoutWork.complete).toBe(true);
+    expect(withWork.timeToGoalHours).toBeLessThan(withoutWork.timeToGoalHours!);
   });
 });

@@ -1,6 +1,11 @@
 import { goldCostAfterInventory, waitHoursToAfford, type Wallet } from "./afford";
 import { MAX_AE_LEVEL, MAX_COMPANIES, concreteForNewCompany, steelForAeUpgrade } from "./costs";
-import { dailyGoldFromFactories, hourlyGoldFromFactories, type GrowthFactory } from "./income";
+import {
+  dailyGoldFromFactories,
+  hourlyGoldFromFactories,
+  type GrowthFactory,
+  type GrowthSideIncome,
+} from "./income";
 
 export type GrowthPathMode = "cheapest" | "income_roi" | "upgrade_first";
 
@@ -13,7 +18,7 @@ export type GrowthPlanInput = {
   mode: GrowthPathMode;
   wallet: Wallet;
   prices: { steel: number; concrete: number };
-  extraGoldPerDay: number;
+  sideIncome: GrowthSideIncome;
   newFactoryGoldPerAePerDay: number;
   /** Max greedy steps before marking incomplete (default {@link DEFAULT_MAX_ITERATIONS}). */
   maxIterations?: number;
@@ -74,12 +79,12 @@ function listCandidates(
   factories: GrowthFactory[],
   wallet: Wallet,
   prices: { steel: number; concrete: number },
-  extraGoldPerDay: number,
+  sideIncome: GrowthSideIncome,
   newFactoryGoldPerAePerDay: number,
   mode: GrowthPathMode,
   goalAe7Count: number,
 ): Candidate[] {
-  const dailyBefore = dailyGoldFromFactories(factories, extraGoldPerDay);
+  const dailyBefore = dailyGoldFromFactories(factories, sideIncome);
   const out: Candidate[] = [];
   const allMaxed = factories.every((f) => f.aeLevel >= MAX_AE_LEVEL);
 
@@ -91,7 +96,7 @@ function listCandidates(
     const nextFactories = cloneFactories(factories);
     const fromLevel = nextFactories[index]!.aeLevel;
     nextFactories[index] = { ...nextFactories[index]!, aeLevel: fromLevel + 1 };
-    const dailyAfter = dailyGoldFromFactories(nextFactories, extraGoldPerDay);
+    const dailyAfter = dailyGoldFromFactories(nextFactories, sideIncome);
     out.push({
       action: "upgrade",
       factoryId: nextFactories[index]!.id,
@@ -117,7 +122,7 @@ function listCandidates(
       aeLevel: 1,
       goldPerAePerDay: newFactoryGoldPerAePerDay,
     });
-    const dailyAfter = dailyGoldFromFactories(nextFactories, extraGoldPerDay);
+    const dailyAfter = dailyGoldFromFactories(nextFactories, sideIncome);
     out.push({
       action: "buy",
       factoryId,
@@ -181,7 +186,7 @@ function pickCandidate(candidates: Candidate[], mode: GrowthPathMode): Candidate
 
 export function planGrowthPath(input: GrowthPlanInput): GrowthPlanResult {
   const maxSteps = input.maxIterations ?? DEFAULT_MAX_ITERATIONS;
-  const startDaily = dailyGoldFromFactories(input.factories, input.extraGoldPerDay);
+  const startDaily = dailyGoldFromFactories(input.factories, input.sideIncome);
 
   let factories = cloneFactories(input.factories);
   let wallet: Wallet = { ...input.wallet };
@@ -221,13 +226,13 @@ export function planGrowthPath(input: GrowthPlanInput): GrowthPlanResult {
       factories,
       wallet,
       input.prices,
-      input.extraGoldPerDay,
+      input.sideIncome,
       input.newFactoryGoldPerAePerDay,
       input.mode,
       input.goalAe7Count,
     );
     const chosen = pickCandidate(candidates, input.mode);
-    const hourly = hourlyGoldFromFactories(factories, input.extraGoldPerDay);
+    const hourly = hourlyGoldFromFactories(factories, input.sideIncome);
 
     if (!chosen) {
       stuck = true;
@@ -248,7 +253,7 @@ export function planGrowthPath(input: GrowthPlanInput): GrowthPlanResult {
       concrete: chosen.nextWalletAfterInventory.concrete,
     };
     factories = chosen.nextFactories;
-    const dailyGoldAfter = dailyGoldFromFactories(factories, input.extraGoldPerDay);
+    const dailyGoldAfter = dailyGoldFromFactories(factories, input.sideIncome);
     steps.push({
       tHours: time,
       action: chosen.action,
