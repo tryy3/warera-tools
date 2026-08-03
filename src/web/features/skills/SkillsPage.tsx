@@ -3,7 +3,7 @@ import { Sparkles } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { calculateDailyIncome, type SkillsLevels } from "@/skills/income";
 import { optimizeEcoSkills } from "@/skills/optimize";
-import { totalSpForLevels, totalSpToReachLevel } from "@/skills/sp";
+import { MAX_ECO_SKILL_LEVEL, totalSpForLevels, totalSpToReachLevel } from "@/skills/sp";
 import { ECO_SKILL_IDS, type EcoSkillId } from "@/skills/values";
 import { buildSkillsSearch } from "../../lib/skillsSearch";
 import { usePlayerSelection } from "../../player/PlayerSelectionContext";
@@ -127,7 +127,7 @@ export function SkillsPage() {
   const loadedIncome = user?.income ?? null;
 
   function setEcoLevel(skill: EcoSkillId, nextLevel: number) {
-    const clamped = Math.max(0, Math.round(nextLevel));
+    const clamped = Math.max(0, Math.min(MAX_ECO_SKILL_LEVEL, Math.round(nextLevel)));
     setLevels((prev) => {
       const next = { ...prev, [skill]: clamped };
       if (totalSpForLevels(next) > ecoPool) return prev;
@@ -136,6 +136,15 @@ export function SkillsPage() {
   }
 
   function handleReset() {
+    setLevels({
+      energy: 0,
+      entrepreneurship: 0,
+      production: 0,
+      companies: 0,
+    });
+  }
+
+  function handleRestore() {
     if (!user) return;
     setLevels(ecoLevelsFromUser(user));
     setNetWage(user.job.netWage ?? 0);
@@ -213,8 +222,9 @@ export function SkillsPage() {
             spentSkillPoints={user.leveling.spentSkillPoints}
             onLevelChange={setEcoLevel}
             onReset={handleReset}
+            onRestore={handleRestore}
             onOptimizeUnspent={() => handleOptimize("unspent")}
-            onFullEcoReset={() => handleOptimize("full_eco_reset")}
+            onFullOptimize={() => handleOptimize("full_eco_reset")}
           />
           <IncomeStack
             income={income}
