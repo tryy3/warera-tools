@@ -51,6 +51,8 @@ GET {base}/{namespace}.{method}?input=<url-encoded JSON>
 
 Gateway does not currently expose that procedure — call api2 directly.
 
+Same pattern for `muMember.getByMu` (MU member stats poll): not on official OpenAPI; force api2 GET via `baseUrl: "https://api2.warera.io/trpc"`.
+
 Examples:
 
 ```bash
@@ -126,6 +128,7 @@ Official OpenAPI is **incomplete** relative to live api2. Community explorers su
 | itemTrading | `getPrices` |
 | mercenaryContractAuction | `getPaginatedAuctions` |
 | mu | `getById`, `getManyPaginated` |
+| muMember | `getByMu`†† |
 | ranking | `getRanking` |
 | region | `getById`, `getRegionsObject` |
 | round | `getById`, `getLastHits` |
@@ -138,6 +141,8 @@ Official OpenAPI is **incomplete** relative to live api2. Community explorers su
 | worker | `getTotalWorkersCount`, `getWorkers` |
 
 † Auth-required; present on live api2 / explorers but not always on official OpenAPI. Used for Economy advisor (recommended regions / production bonus).
+
+†† Not on official OpenAPI; live api2 read used by MU stats poll — call api2 directly.
 
 For parameters and schemas: official OpenAPI. For observed response shapes: community `spec.md` / `spec.json` under majimawrks/warera-api-docs.
 
