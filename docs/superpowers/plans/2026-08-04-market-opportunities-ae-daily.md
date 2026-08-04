@@ -249,15 +249,36 @@ const opportunitiesBase = listMarketOpportunities(prices);
 
 - [ ] **Step 2: Enrich after the company switch-scan loop**
 
-After the `for (const entry of packEntries)` loop finishes (so `bestRegion` live-fills have run), build a region hint map from `bestRegionCache` and enrich:
+**Important:** Today the DB→cache seed uses `bonus: row.bonus ?? 0`. That is fine for switch math (treat missing as 0), but **must not** feed opportunity enrichment — a coerced `0` would show `+0%` and a real ~G/day, violating the spec. Build `regionHints` as follows:
+
+1. Start from `recommendedByItem` (DB rows) and preserve `bonus: row.bonus` (`number | null`).
+2. After ensuring cache fills, overlay live-fetched entries from `bestRegionCache` only for item codes that were not in `recommendedByItem` (or that live-fetched refreshed). Live `RecommendedRegion.bonus` is always a `number`.
+
+After the `for (const entry of packEntries)` loop finishes (so `bestRegion` live-fills have run), ensure every opportunity item has been resolved, then enrich:
 
 ```ts
+for (const o of opportunitiesBase) {
+  if (!bestRegionCache.has(o.itemCode)) {
+    await bestRegion(o.itemCode);
+  }
+}
+
 const regionHints = new Map<
   string,
   { regionId: string; regionName: string | null; bonus: number | null }
 >();
+for (const [itemCode, row] of recommendedByItem) {
+  regionHints.set(itemCode, {
+    regionId: row.regionId,
+    regionName: row.regionName,
+    bonus: row.bonus,
+  });
+}
 for (const [itemCode, region] of bestRegionCache) {
   if (region == null) continue;
+  const existing = regionHints.get(itemCode);
+  // Prefer DB row (preserves null bonus). Only add live-fetched items absent from DB.
+  if (existing) continue;
   regionHints.set(itemCode, {
     regionId: region.regionId,
     regionName: region.regionName,
@@ -267,17 +288,9 @@ for (const [itemCode, region] of bestRegionCache) {
 const opportunities = enrichMarketOpportunities(opportunitiesBase, regionHints);
 ```
 
-If some recipes never entered `bestRegionCache` (e.g. empty pack and no switch loop calls), still enrich from whatever is in the cache; missing keys stay null. To cover the empty-companies case, after building `bestRegionCache` from DB (the loop that sets cache from `recommendedByItem`), that data is already present — enrichment will work even when `packEntries` is empty. Live-fetch for cache misses only happens inside the switch loop; that is acceptable (same as today for switches). Optionally, before enrichment, for any opportunity `itemCode` missing from `bestRegionCache`, `await bestRegion(itemCode)` so the opportunities table fills regions even with zero companies — **do this**:
+Do **not** change the switch-scan `bonus: row.bonus ?? 0` seed unless needed — that coercion stays local to switch math. Opportunity enrichment must read `recommendedByItem.bonus` directly so null stays null.
 
-```ts
-for (const o of opportunitiesBase) {
-  if (!bestRegionCache.has(o.itemCode)) {
-    await bestRegion(o.itemCode);
-  }
-}
-```
-
-Then build `regionHints` and enrich. Place this block after the switch-scan loop (or replace duplicate fetches — if the switch loop already called `bestRegion` for every recipe, the extra loop is a no-op via cache).
+If the switch loop already called `bestRegion` for every recipe, the ensure-loop is a cache hit no-op. With zero companies it still live-fills misses so the opportunities table can show bonuses.
 
 - [ ] **Step 3: Return enriched `opportunities`**
 
