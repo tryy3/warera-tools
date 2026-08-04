@@ -1,8 +1,5 @@
 import { describe, expect, it, vi } from "vite-plus/test";
-import {
-  fetchItemMarketTransactionsPage,
-  parseItemMarketTransactionsPage,
-} from "./transactions";
+import { fetchItemMarketTransactionsPage, parseItemMarketTransactionsPage } from "./transactions";
 
 const equipmentTx = {
   _id: "6a720c0d8fe5b64f93cb3851",

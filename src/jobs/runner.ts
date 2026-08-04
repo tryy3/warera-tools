@@ -57,11 +57,7 @@ async function markOpenRunsInterrupted(
 }
 
 /** Records a blocked overlap attempt without changing jobs.last_status. */
-export async function recordJobOverrun(
-  db: Db,
-  logger: Logger,
-  jobId: string,
-): Promise<void> {
+export async function recordJobOverrun(db: Db, logger: Logger, jobId: string): Promise<void> {
   const now = new Date();
   await db.insert(jobRuns).values({
     jobId,

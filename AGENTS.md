@@ -66,7 +66,7 @@ Classify new persisted / fetched data before inventing a one-off cache. Full mod
 
 | Tier | Who refreshes | Examples |
 | --- | --- | --- |
-| **Global** | Croner jobs (+ rare manual poll) | Market prices / history, recommended regions by item |
+| **Global** | Croner jobs (+ rare manual poll) | Market prices / history, recommended regions by item; item-market sales history via `item-market-tx-backfill` + `item-market-tx-poll` (`transaction.getPaginatedTransactions`) |
 | **Geo** | Jobs over watchlist; cold miss live-fills | Regions, countries; **MU** via `mu-stats-poll` (30m) |
 | **User** | Shell Load/Refresh → server TTL | Selected player, `GET /api/user` (skills/job/companies/income), `company_packs` |
 
