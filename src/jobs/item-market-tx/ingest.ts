@@ -51,14 +51,14 @@ export async function walkItemMarketTransactions(opts: {
     const page = await fetchPage({ cursor, perPage });
     pages += 1;
 
-    // Handoff only after a successful backfill page fetch (never on failure).
-    if (mode === "backfill") {
-      enableItemMarketTxPoll();
-    }
-
     const { inserted: pageInserted, existingIds } =
       await insertItemMarketTransactionsIgnoreConflicts(db, page.items);
     inserted += pageInserted;
+
+    // Handoff only after a successful backfill page is handled (fetch + insert).
+    if (mode === "backfill") {
+      enableItemMarketTxPoll();
+    }
 
     logger.debug(
       {

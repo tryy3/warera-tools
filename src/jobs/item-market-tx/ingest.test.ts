@@ -6,6 +6,7 @@ import { join } from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vite-plus/test";
 import type { Db } from "../../db/client";
 import { insertItemMarketTransactionsIgnoreConflicts } from "../../db/item-market-transactions";
+import * as itemMarketTransactions from "../../db/item-market-transactions";
 import * as schema from "../../db/schema";
 import type { Logger } from "../../logging/logger";
 import type { ItemMarketTransaction, ItemMarketTransactionsPage } from "../../warera/transactions";
@@ -177,6 +178,34 @@ describe("walkItemMarketTransactions", () => {
     expect(result.pages).toBe(1);
     expect(fetchPage).toHaveBeenCalledTimes(1);
     expect(isItemMarketTxPollEnabled()).toBe(true);
+  });
+
+  it("backfill does not enable handoff when insert fails", async () => {
+    const fetchPage = vi.fn(async (): Promise<ItemMarketTransactionsPage> => ({
+      items: [makeTx({ id: "fresh" })],
+      nextCursor: null,
+    }));
+
+    vi.spyOn(
+      itemMarketTransactions,
+      "insertItemMarketTransactionsIgnoreConflicts",
+    ).mockRejectedValueOnce(new Error("insert failed"));
+
+    expect(isItemMarketTxPollEnabled()).toBe(false);
+
+    await expect(
+      walkItemMarketTransactions({
+        db,
+        logger: silentLogger,
+        mode: "backfill",
+        fetchPage,
+        pageDelayMs: 0,
+        now: new Date("2026-08-04T18:00:00.000Z"),
+      }),
+    ).rejects.toThrow("insert failed");
+
+    expect(isItemMarketTxPollEnabled()).toBe(false);
+    expect(fetchPage).toHaveBeenCalledTimes(1);
   });
 
   it("poll does not enable handoff", async () => {
