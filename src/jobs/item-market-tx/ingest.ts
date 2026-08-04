@@ -6,7 +6,7 @@ import { enableItemMarketTxPoll } from "./handoff";
 
 export type FetchItemMarketPage = (opts: {
   cursor?: string;
-  perPage?: number;
+  limit?: number;
 }) => Promise<ItemMarketTransactionsPage>;
 
 export type WalkItemMarketTransactionsResult = {
@@ -30,7 +30,7 @@ export async function walkItemMarketTransactions(opts: {
   pageDelayMs?: number;
   lookbackMs?: number;
   now?: Date;
-  perPage?: number;
+  limit?: number;
 }): Promise<WalkItemMarketTransactionsResult> {
   const {
     db,
@@ -40,7 +40,7 @@ export async function walkItemMarketTransactions(opts: {
     pageDelayMs = DEFAULT_PAGE_DELAY_MS,
     lookbackMs = DEFAULT_LOOKBACK_MS,
     now = new Date(),
-    perPage,
+    limit,
   } = opts;
 
   let pages = 0;
@@ -48,7 +48,7 @@ export async function walkItemMarketTransactions(opts: {
   let cursor: string | undefined;
 
   for (;;) {
-    const page = await fetchPage({ cursor, perPage });
+    const page = await fetchPage({ cursor, limit });
     pages += 1;
 
     const { inserted: pageInserted, existingIds } =

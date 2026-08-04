@@ -270,7 +270,8 @@ describe("deriveCompanyCard", () => {
 
     expect(card.offerWage).toEqual(wagePair(0.11, 0.2));
     expect(card.maxWage).toEqual(wagePair(card.day.maxGrossWagePerPp, 0.2));
-    expect(card.maxWage.gross).toBeCloseTo(0.15, 6);
+    // Break-even @0% fid includes production bonus (default 0.5 on fixture).
+    expect(card.maxWage.gross).toBeCloseTo(0.15 * 1.5, 6);
     expect(card.workersStatus).toBe("ok");
     expect(card.incomeTaxRate).toBe(0.2);
     expect(card.incomeTaxAssumed).toBe(false);

@@ -22,14 +22,20 @@ export type WorkerDayResult = {
   contributionPerDay: number;
 };
 
+/**
+ * Worker day economics (official factory guide):
+ * - Owner pays wage on unboosted (skill) PP.
+ * - Region production bonus + fidelity add, then apply to output PP only.
+ * - Extra bonus PP stays with the owner — higher fidelity never raises wage cost.
+ */
 export function workerDay(input: WorkerDayInput): WorkerDayResult {
   const actionsPerDay = dailyActionsFromBar(skillValueFromLevel("energy", input.energyLevel));
   const ppPerAction = skillValueFromLevel("production", input.productionLevel);
   const basePpPerDay = actionsPerDay * ppPerAction;
   const effectivePpPerDay =
-    basePpPerDay * (1 + input.productionBonus) * (1 + input.fidelityPct / 100);
+    basePpPerDay * (1 + input.productionBonus + input.fidelityPct / 100);
   const revenuePerDay = effectivePpPerDay * input.profitPerPp;
-  const ownerCostPerDay = effectivePpPerDay * input.grossWagePerPp;
+  const ownerCostPerDay = basePpPerDay * input.grossWagePerPp;
   const contributionPerDay = revenuePerDay - ownerCostPerDay;
 
   return {

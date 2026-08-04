@@ -35,7 +35,7 @@ describe("companyDay", () => {
     expect(r.totalPpPerDay).toBeCloseTo(ae.dailyPp, 6);
     expect(r.netPerDay).toBeCloseTo(ae.dailyValue, 6);
     expect(r.netPerDayAtMaxWorkerFidelity).toBeCloseTo(ae.dailyValue, 6);
-    expect(r.maxGrossWagePerPp).toBe(profitPerPp);
+    expect(r.maxGrossWagePerPp).toBeCloseTo(profitPerPp * (1 + productionBonus), 6);
   });
 
   it("self-work PP and value match entrepreneurship/production skills and add to netPerDay", () => {
@@ -85,9 +85,9 @@ describe("companyDay", () => {
     expect(withSelfWork.netPerDay - withoutSelfWork.netPerDay).toBeCloseTo(expectedSelfValue, 6);
   });
 
-  it("worker contribution is negative when wage exceeds profit/PP and positive when wage is below profit/PP", () => {
-    // With wage above profit/PP, contribution is negative at any fidelity (scales both sides).
-    // Cover the brief's loss-making case, then a wage-below-profit case where 10% is more profitable.
+  it("charges wage on base PP; fidelity improves contribution when bonuses stay with owner", () => {
+    // Break-even @0% fid is profitPerPp × (1 + bonus). Wage above that is a loss;
+    // higher fidelity still improves (extra PP is free relative to wage).
     const loss = companyDay({
       aeLevel: 0,
       productionBonus: 0.5,
@@ -103,13 +103,20 @@ describe("companyDay", () => {
           energyLevel: 5,
           productionLevel: 5,
           fidelityPct: 0,
-          grossWagePerPp: 0.15,
+          grossWagePerPp: 0.2,
         },
       ],
     });
     expect(loss.workers).toHaveLength(1);
     expect(loss.workers[0]!.current.contributionPerDay).toBeLessThan(0);
     expect(loss.netPerDay).toBeLessThan(0);
+    expect(loss.workers[0]!.atMaxFidelity.contributionPerDay).toBeGreaterThan(
+      loss.workers[0]!.current.contributionPerDay,
+    );
+    expect(loss.workers[0]!.atMaxFidelity.ownerCostPerDay).toBeCloseTo(
+      loss.workers[0]!.current.ownerCostPerDay,
+      6,
+    );
 
     const win = companyDay({
       aeLevel: 0,
@@ -135,10 +142,13 @@ describe("companyDay", () => {
       win.workers[0]!.current.contributionPerDay,
     );
     expect(win.workers[0]!.atMaxFidelity.effectivePpPerDay).toBeCloseTo(
-      win.workers[0]!.current.effectivePpPerDay * (1 + MAX_FIDELITY_PCT / 100),
+      win.workers[0]!.current.effectivePpPerDay *
+        (1 + 0.5 + MAX_FIDELITY_PCT / 100) /
+        (1 + 0.5),
       6,
     );
     expect(win.netPerDayAtMaxWorkerFidelity).toBeGreaterThan(win.netPerDay);
+    expect(win.maxGrossWagePerPp).toBeCloseTo(0.2 * 1.5, 6);
   });
 
   it("unitsProduced is null when itemCode has no recipe", () => {

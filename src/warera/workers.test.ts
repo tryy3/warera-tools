@@ -30,6 +30,35 @@ describe("parseWorkers", () => {
     ).toEqual([{ userId: "u3", wagePerPp: 2, companyId: null, ...nullSkillFields }]);
   });
 
+  it("parses live gateway shape { type, workers } with string user/company ids", () => {
+    expect(
+      parseWorkers({
+        type: "company",
+        workers: [
+          {
+            _id: "worker-doc-1",
+            user: "u-live",
+            company: "co-live",
+            employer: "boss",
+            wage: 0.134,
+            fidelity: 1,
+          },
+        ],
+      }),
+    ).toEqual([
+      {
+        userId: "u-live",
+        wagePerPp: 0.134,
+        companyId: "co-live",
+        username: null,
+        energyLevel: null,
+        productionLevel: null,
+        fidelityPct: 1,
+        assumedFields: [],
+      },
+    ]);
+  });
+
   it("keeps userId rows when wage is missing (wagePerPp null)", () => {
     expect(parseWorkers([{ userId: "u1", companyId: "co-1" }])).toEqual([
       { userId: "u1", wagePerPp: null, companyId: "co-1", ...nullSkillFields },
@@ -128,5 +157,26 @@ describe("fetchWorkers / fetchWorkOfferWage", () => {
       expect.stringContaining("workOffer.getWorkOfferByCompanyId"),
     );
     expect(wage).toBe(0.33);
+  });
+
+  it("returns null when work offer request fails (e.g. NOT_FOUND)", async () => {
+    const request = vi.fn(async () => {
+      throw new Error("WarEra request failed: 404 Workoffers not found.");
+    });
+    await expect(fetchWorkOfferWage({ request } as never, "co-1")).resolves.toBeNull();
+  });
+
+  it("returns null when tRPC envelope has error / missing result.data", async () => {
+    const request = vi.fn(async () => ({
+      error: { message: "Workoffers not found.", data: { code: "NOT_FOUND" } },
+    }));
+    await expect(fetchWorkOfferWage({ request } as never, "co-1")).resolves.toBeNull();
+  });
+
+  it("reads wage from first item when offer payload is an array", async () => {
+    const request = vi.fn(async () => ({
+      result: { data: [{ wage: 0.21 }, { wage: 0.99 }] },
+    }));
+    await expect(fetchWorkOfferWage({ request } as never, "co-1")).resolves.toBe(0.21);
   });
 });

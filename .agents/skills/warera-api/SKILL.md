@@ -134,7 +134,7 @@ Official OpenAPI is **incomplete** relative to live api2. Community explorers su
 | round | `getById`, `getLastHits` |
 | search | `searchAnything` |
 | tradingOrder | `getTopOrders` |
-| transaction | `getPaginatedTransactions` |
+| transaction | `getPaginatedTransactions`††† |
 | upgrade | `getUpgradeByTypeAndEntity` |
 | user | `getUserById`, `getUserLite`, `getUsersByCountry` |
 | workOffer | `getById`, `getWorkOfferByCompanyId`, `getWorkOffersPaginated` |
@@ -143,6 +143,8 @@ Official OpenAPI is **incomplete** relative to live api2. Community explorers su
 † Auth-required; present on live api2 / explorers but not always on official OpenAPI. Used for Economy advisor (recommended regions / production bonus).
 
 †† Not on official OpenAPI; live api2 read used by MU stats poll — call api2 directly.
+
+††† On official OpenAPI; force **api2** + `authStyle: "api-key"` for item-market ingest — gateway has had DB failures on this procedure. Requires `WARERA_API_KEY`.
 
 For parameters and schemas: official OpenAPI. For observed response shapes: community `spec.md` / `spec.json` under majimawrks/warera-api-docs.
 

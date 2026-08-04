@@ -117,7 +117,7 @@ describe("walkItemMarketTransactions", () => {
       makeTx({ id: "known", createdAt: new Date("2026-08-04T16:00:00.000Z") }),
     ]);
 
-    const fetchPage = vi.fn(async (opts: { cursor?: string; perPage?: number }) => {
+    const fetchPage = vi.fn(async (opts: { cursor?: string; limit?: number }) => {
       if (opts.cursor) {
         throw new Error("should not request next cursor");
       }

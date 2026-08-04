@@ -75,6 +75,13 @@ export function parseWorkers(data: unknown): WorkerRow[] {
 }
 
 export function parseWorkOfferWage(data: unknown): number | null {
+  if (Array.isArray(data)) {
+    for (const item of data) {
+      const wage = parseWorkOfferWage(item);
+      if (wage != null) return wage;
+    }
+    return null;
+  }
   const obj = asRecord(data);
   if (!obj) return null;
   return pickWage(obj);
@@ -101,8 +108,13 @@ export async function fetchWorkOfferWage(
   warera: WareraRequester,
   companyId: string,
 ): Promise<number | null> {
-  const json = await warera.request<unknown>(
-    wareraProcedurePath("workOffer.getWorkOfferByCompanyId", { companyId }),
-  );
-  return parseWorkOfferWage(unwrapTrpcData(json));
+  try {
+    const json = await warera.request<unknown>(
+      wareraProcedurePath("workOffer.getWorkOfferByCompanyId", { companyId }),
+    );
+    return parseWorkOfferWage(unwrapTrpcData(json));
+  } catch {
+    // Missing offer is common (NOT_FOUND / empty envelope) — wage comes from worker rows.
+    return null;
+  }
 }

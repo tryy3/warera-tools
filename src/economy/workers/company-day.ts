@@ -143,6 +143,6 @@ export function companyDay(input: CompanyDayInput): CompanyDayResult {
     inputCostPerDay,
     netPerDay,
     netPerDayAtMaxWorkerFidelity,
-    maxGrossWagePerPp: maxGrossWagePerPpFromProfit(input.profitPerPp),
+    maxGrossWagePerPp: maxGrossWagePerPpFromProfit(input.profitPerPp, input.productionBonus),
   };
 }

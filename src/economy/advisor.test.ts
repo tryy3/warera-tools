@@ -336,6 +336,56 @@ describe("buildAdvisor caching", () => {
     expect(row.offerWagePerPp).toBeNull();
   });
 
+  it("keeps workers when work offer is missing but worker.getWorkers succeeds", async () => {
+    await seedWarmAdvisorCaches(db);
+
+    const request = vi.fn(async (path: string) => {
+      if (path.includes("worker.getWorkers")) {
+        return trpc({
+          type: "company",
+          workers: [
+            {
+              _id: "wd1",
+              user: "w1",
+              company: "c1",
+              wage: 1.2,
+              fidelity: 4,
+            },
+          ],
+        });
+      }
+      if (path.includes("workOffer.getWorkOfferByCompanyId")) {
+        throw new Error("WarEra request failed: 404 Workoffers not found.");
+      }
+      const enrichment = mockLiveCompanyEnrichment(path);
+      if (enrichment) return enrichment;
+      throw new Error(`unexpected ${path}`);
+    });
+
+    const result = await buildAdvisor({
+      db,
+      warera: { request } as never,
+      logger: logger as never,
+      userId: "u1",
+    });
+
+    const row = result.companies[0]!;
+    expect(row.workersStatus).toBe("ok");
+    expect(row.workers).toEqual([
+      {
+        userId: "w1",
+        username: null,
+        wagePerPp: 1.2,
+        energyLevel: null,
+        productionLevel: null,
+        fidelityPct: 4,
+      },
+    ]);
+    expect(row.offerWagePerPp).toBeNull();
+    expect(row.incomeTaxRate).toBe(0.1);
+    expect(row.incomeTaxAssumed).toBe(false);
+  });
+
   it("refresh=true refetches company pack even when fresh", async () => {
     const fetchedAt = new Date();
     await upsertCompanyPack(db, {

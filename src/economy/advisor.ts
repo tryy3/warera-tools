@@ -101,39 +101,64 @@ async function enrichCompanyLive(
   companyId: string,
   probeFirstWorkerKeys: { done: boolean },
 ): Promise<CompanyLiveEnrichment> {
-  try {
-    const [workerRows, offerWagePerPp, incomeTax] = await Promise.all([
-      fetchWorkers(
-        warera,
-        { companyId },
-        {
-          onFirstRawKeys: (keys) => {
-            if (probeFirstWorkerKeys.done) return;
-            probeFirstWorkerKeys.done = true;
-            logger.debug({ keys }, "worker.getWorkers first object keys");
-          },
-        },
-      ),
-      fetchWorkOfferWage(warera, companyId),
-      fetchIncomeTaxRateForCompany(warera, companyId),
-    ]);
+  const workersPromise = fetchWorkers(
+    warera,
+    { companyId },
+    {
+      onFirstRawKeys: (keys) => {
+        if (probeFirstWorkerKeys.done) return;
+        probeFirstWorkerKeys.done = true;
+        logger.debug({ keys }, "worker.getWorkers first object keys");
+      },
+    },
+  ).then(
+    (workerRows) =>
+      ({
+        ok: true as const,
+        workers: workerRows.map((w) => ({
+          userId: w.userId,
+          username: w.username,
+          wagePerPp: w.wagePerPp,
+          energyLevel: w.energyLevel,
+          productionLevel: w.productionLevel,
+          fidelityPct: w.fidelityPct,
+        })),
+      }) as const,
+    () => ({ ok: false as const }),
+  );
+
+  const offerPromise = fetchWorkOfferWage(warera, companyId).then(
+    (offerWagePerPp) => offerWagePerPp,
+    () => null,
+  );
+
+  const taxPromise = fetchIncomeTaxRateForCompany(warera, companyId).then(
+    (incomeTax) => incomeTax,
+    () => ({ rate: 0, assumed: true }),
+  );
+
+  const [workersResult, offerWagePerPp, incomeTax] = await Promise.all([
+    workersPromise,
+    offerPromise,
+    taxPromise,
+  ]);
+
+  if (!workersResult.ok) {
     return {
-      workers: workerRows.map((w) => ({
-        userId: w.userId,
-        username: w.username,
-        wagePerPp: w.wagePerPp,
-        energyLevel: w.energyLevel,
-        productionLevel: w.productionLevel,
-        fidelityPct: w.fidelityPct,
-      })),
-      workersStatus: "ok",
+      ...UNAVAILABLE_ENRICHMENT,
+      offerWagePerPp,
       incomeTaxRate: incomeTax.rate,
       incomeTaxAssumed: incomeTax.assumed,
-      offerWagePerPp,
     };
-  } catch {
-    return UNAVAILABLE_ENRICHMENT;
   }
+
+  return {
+    workers: workersResult.workers,
+    workersStatus: "ok",
+    incomeTaxRate: incomeTax.rate,
+    incomeTaxAssumed: incomeTax.assumed,
+    offerWagePerPp,
+  };
 }
 
 async function mapInChunks<T, R>(

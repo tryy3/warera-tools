@@ -86,9 +86,20 @@ Storage caps mean AE cannot accumulate past capacity without Produce.
 
 Net owner cost per PP ≈ wage (tax is taken from the wage, not paid on top — employee receives less). Owner still pays full `totalWage` before tax split.
 
+**Fidelity + production bonus (confirmed):** Wage is charged on the worker’s **unboosted** PP. Region production bonus and fidelity (up to +10%) **add** onto output PP only — the extras stay with the owner. Higher fidelity therefore never increases wage cost.
+
+```
+basePp          = skill PP from the work session
+ownerWageCost   = basePp × Wage/PP
+effectivePp     = basePp × (1 + productionBonus + fidelityPct/100)
+ownerRevenue    ≈ effectivePp × Profit/PP
+```
+
+Break-even gross wage at 0% fidelity ≈ `Profit/PP × (1 + productionBonus)`.
+
 Tax rates and who controls the region **change with war / laws** — do not hardcode; use live country/region data (or this app’s country tax table when modeling market VAT separately).
 
-Employee **value** math is roughly: item value from their PP × (1+bonus) minus wage cost — not the AE formula.
+Employee **value** math is roughly: item value from their boosted PP minus wage on base PP — not the AE formula.
 
 ## Production bonus (“region boost”)
 

@@ -4,8 +4,13 @@ export function netWageFromGross(grossWagePerPp: number, incomeTaxRate: number):
   return grossWagePerPp * (1 - incomeTaxRate);
 }
 
-export function maxGrossWagePerPp(profitPerPp: number): number {
-  return profitPerPp;
+/**
+ * Owner break-even gross wage at 0% fidelity.
+ * Wage is charged on base PP while output includes production bonus, so:
+ * maxGross = profitPerPp × (1 + productionBonus).
+ */
+export function maxGrossWagePerPp(profitPerPp: number, productionBonus = 0): number {
+  return profitPerPp * (1 + productionBonus);
 }
 
 export function wagePair(gross: number, incomeTaxRate: number): WagePair {

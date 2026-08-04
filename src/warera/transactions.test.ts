@@ -78,16 +78,21 @@ describe("parseItemMarketTransactionsPage", () => {
 });
 
 describe("fetchItemMarketTransactionsPage", () => {
-  it("calls getPaginatedTransactions with itemMarket", async () => {
+  it("calls getPaginatedTransactions on api2 with itemMarket", async () => {
     const request = vi.fn().mockResolvedValue({
       result: { data: { items: [equipmentTx], cursor: null } },
     });
-    const page = await fetchItemMarketTransactionsPage({ request }, { perPage: 50 });
+    const page = await fetchItemMarketTransactionsPage({ request }, { limit: 100 });
     expect(request).toHaveBeenCalledWith(
       expect.stringContaining("transaction.getPaginatedTransactions"),
+      expect.objectContaining({
+        baseUrl: "https://api2.warera.io/trpc",
+        authStyle: "api-key",
+      }),
     );
     const called = String(request.mock.calls[0][0]);
     expect(called).toContain("itemMarket");
+    expect(decodeURIComponent(called)).toContain('"limit":100');
     expect(page.items[0].id).toBe(equipmentTx._id);
   });
 });

@@ -12,8 +12,9 @@ describe("netWageFromGross", () => {
 });
 
 describe("maxGrossWagePerPp", () => {
-  it("equals profit per PP at 0% fidelity break-even", () => {
-    expect(maxGrossWagePerPp(0.134)).toBe(0.134);
+  it("is profit/PP times (1 + production bonus) at 0% fidelity", () => {
+    expect(maxGrossWagePerPp(0.083, 0.605)).toBeCloseTo(0.083 * 1.605, 6);
+    expect(maxGrossWagePerPp(0.134, 0)).toBe(0.134);
   });
 });
 
