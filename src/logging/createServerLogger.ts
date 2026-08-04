@@ -55,6 +55,11 @@ export function createServerLogger(config: AppConfig): Logger {
   if (config.sentryDsn) {
     if (initSentry(config)) {
       attachSentryTransports(log, config);
+      // Visible confirmation that DSN was loaded (also becomes a Sentry Log).
+      log.info(
+        { enableLogs: true, environment: config.nodeEnv },
+        "sentry transports attached",
+      );
     }
   }
 

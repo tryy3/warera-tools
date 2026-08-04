@@ -30,6 +30,7 @@ export function initSentry(config: Pick<AppConfig, "sentryDsn" | "nodeEnv">): bo
       dsn: config.sentryDsn,
       enableLogs: true,
       environment: config.nodeEnv,
+      debug: process.env.SENTRY_DEBUG === "true" || process.env.SENTRY_DEBUG === "1",
     });
     initialized = true;
     return true;

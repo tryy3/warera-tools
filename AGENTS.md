@@ -130,6 +130,8 @@ Optional `LOG_FILE=logs/app.log` enables a JSON file transport. Leave unset in n
 
 Optional. Set `SENTRY_DSN` to forward server logs via tslog transports: **Issues** for `error`/`fatal`, and **Sentry Logs** at the same min level as `LOG_LEVEL`. Unset disables Sentry (default for local/CI). Browser Sentry is not wired yet.
 
+Restart the server after changing `.env` (`tsx watch` does not reload env). On successful attach you should see `sentry transports attached` in the console. Issues only appear for `error`/`fatal` — look under **Explore → Logs** for `info`/`debug` (filter `environment:development`). Set `SENTRY_DEBUG=true` to print SDK transport traffic.
+
 ## Commands
 
 | Task | Command |
