@@ -17,11 +17,13 @@ import { queryKeys } from "../../query/keys";
 import { useCompaniesQuery } from "../../query/useCompaniesQuery";
 import { useUserQuery } from "../../query/useUserQuery";
 import { CompanyCardSummary } from "./CompanyCardSummary";
+import { CompanyDailyBreakdown } from "./CompanyDailyBreakdown";
+import { CompanyParametersForm } from "./CompanyParametersForm";
 import { MarketOpportunitiesTable } from "./MarketOpportunitiesTable";
 import { MoveWorkerModal } from "./MoveWorkerModal";
 import { SimWorkerModal, type SimWorkerDraft } from "./SimWorkerModal";
 import type { DerivedCompanyCard } from "./sim/derive";
-import { CompanySimProvider, useCompanySim } from "./sim/CompanySimProvider";
+import { CompanySimProvider, useCompanySim, type OwnerDefaults } from "./sim/CompanySimProvider";
 import type { SimWorker } from "./sim/types";
 import type { CompanyAdvisorRow } from "./types";
 import { WorkerRowActions } from "./WorkerRowActions";
@@ -380,14 +382,32 @@ function CompanyWorkersSection({
 
 function CompanyCard({
   row,
+  companies,
   companyOptions,
+  ownerDefaults,
 }: {
   row: CompanyAdvisorRow;
+  companies: CompanyAdvisorRow[];
   companyOptions: { id: string; name: string }[];
+  ownerDefaults: OwnerDefaults;
 }) {
-  const { cards } = useCompanySim();
+  const { cards, state } = useCompanySim();
   const summary = cards.find((c) => c.companyId === row.company.id);
   if (!summary) return null;
+
+  const companyId = row.company.id;
+  const overrides = state.overrides[companyId];
+  const aeLevel = overrides?.aeLevel ?? row.company.aeLevel;
+  const productionBonus = overrides?.productionBonus ?? row.company.productionBonus ?? 0;
+  const entrepreneurshipLevel =
+    overrides?.entrepreneurshipLevel ?? ownerDefaults.entrepreneurshipLevel;
+  const productionSkillLevel =
+    overrides?.productionSkillLevel ?? ownerDefaults.productionSkillLevel;
+  const includeSelfWork = overrides?.includeSelfWork ?? false;
+
+  const assumedWorkerFields = state.workers
+    .filter((w) => w.assignment === companyId)
+    .flatMap((w) => w.assumedFields);
 
   return (
     <Card className="gap-0 border-border bg-secondary py-0 shadow-none">
@@ -396,9 +416,25 @@ function CompanyCard({
       </CardHeader>
 
       <CardContent className="px-3.5 pb-3">
-        <SectionPlaceholder label="Parameters" />
+        <SectionPlaceholder label="Parameters">
+          <CompanyParametersForm
+            companyId={companyId}
+            companies={companies}
+            aeLevel={aeLevel}
+            productionBonus={productionBonus}
+            entrepreneurshipLevel={entrepreneurshipLevel}
+            productionSkillLevel={productionSkillLevel}
+            includeSelfWork={includeSelfWork}
+          />
+        </SectionPlaceholder>
         <CompanyWorkersSection row={row} summary={summary} companyOptions={companyOptions} />
-        <SectionPlaceholder label="Daily breakdown" />
+        <SectionPlaceholder label="Daily breakdown">
+          <CompanyDailyBreakdown
+            day={summary.day}
+            incomeTaxAssumed={summary.incomeTaxAssumed}
+            assumedWorkerFields={assumedWorkerFields}
+          />
+        </SectionPlaceholder>
 
         {row.bonusDetails || row.profitBreakdown || row.aeBreakdown ? (
           <FormulaDetails label="How calculated">
@@ -490,7 +526,13 @@ function CompanyCard({
   );
 }
 
-function CompaniesList({ companies }: { companies: CompanyAdvisorRow[] }) {
+function CompaniesList({
+  companies,
+  ownerDefaults,
+}: {
+  companies: CompanyAdvisorRow[];
+  ownerDefaults: OwnerDefaults;
+}) {
   const companyOptions = companies.map((row) => ({
     id: row.company.id,
     name: row.company.name,
@@ -500,7 +542,13 @@ function CompaniesList({ companies }: { companies: CompanyAdvisorRow[] }) {
       <PortfolioNetBanner />
       <div className="flex flex-col gap-3">
         {companies.map((row) => (
-          <CompanyCard key={row.company.id} row={row} companyOptions={companyOptions} />
+          <CompanyCard
+            key={row.company.id}
+            row={row}
+            companies={companies}
+            companyOptions={companyOptions}
+            ownerDefaults={ownerDefaults}
+          />
         ))}
       </div>
     </>
@@ -623,7 +671,7 @@ export function CompaniesPage() {
               ownerDefaults={ownerDefaults}
               liveRevision={companiesQuery.dataUpdatedAt}
             >
-              <CompaniesList companies={advisor.companies} />
+              <CompaniesList companies={advisor.companies} ownerDefaults={ownerDefaults} />
             </CompanySimProvider>
           ) : null}
         </section>

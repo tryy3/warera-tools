@@ -9,8 +9,9 @@ import {
 } from "react";
 import type { CompanyAdvisorRow } from "../types";
 import { deriveCompanyCard, derivePortfolioNet, type DerivedCompanyCard } from "./derive";
+import { toHydratePayload } from "./hydrate";
 import { companySimReducer, initialCompanySimState } from "./reducer";
-import type { CompanySimAction, CompanySimState, HydratePayload } from "./types";
+import type { CompanySimAction, CompanySimState } from "./types";
 
 export type OwnerDefaults = {
   entrepreneurshipLevel: number;
@@ -25,16 +26,6 @@ export type CompanySimContextValue = {
 };
 
 const CompanySimContext = createContext<CompanySimContextValue | null>(null);
-
-function toHydratePayload(companies: CompanyAdvisorRow[]): HydratePayload {
-  return {
-    companies: companies.map((row) => ({
-      companyId: row.company.id,
-      offerWagePerPp: row.offerWagePerPp,
-      workers: row.workers,
-    })),
-  };
-}
 
 function hydrateState(companies: CompanyAdvisorRow[], keepOverrides: boolean): CompanySimState {
   return companySimReducer(initialCompanySimState, {
