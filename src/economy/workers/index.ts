@@ -1,4 +1,10 @@
 export {
+  companyDay,
+  type CompanyDayInput,
+  type CompanyDayResult,
+  type CompanyDayWorker,
+} from "./company-day";
+export {
   maxGrossWagePerPp,
   netWageFromGross,
   wagePair,
