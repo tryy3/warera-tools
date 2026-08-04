@@ -102,7 +102,7 @@ async function enrichCompanyLive(
   probeFirstWorkerKeys: { done: boolean },
 ): Promise<CompanyLiveEnrichment> {
   try {
-    const [workerRows, offerWagePerPp, incomeTaxRate] = await Promise.all([
+    const [workerRows, offerWagePerPp, incomeTax] = await Promise.all([
       fetchWorkers(
         warera,
         { companyId },
@@ -127,8 +127,8 @@ async function enrichCompanyLive(
         fidelityPct: w.fidelityPct,
       })),
       workersStatus: "ok",
-      incomeTaxRate,
-      incomeTaxAssumed: false,
+      incomeTaxRate: incomeTax.rate,
+      incomeTaxAssumed: incomeTax.assumed,
       offerWagePerPp,
     };
   } catch {

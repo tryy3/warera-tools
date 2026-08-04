@@ -30,27 +30,40 @@ function percentToFraction(value: number): number {
   return value > 1 ? value / 100 : value;
 }
 
-/** Probe taxes.income / taxes.incomeTax / incomeTax; percent→fraction if >1; default 0. */
-export function parseIncomeTaxRate(countryPayload: unknown): number {
+export type IncomeTaxRateResult = {
+  rate: number;
+  /** True when no income-tax field was found (defaulted to 0). Explicit 0 is not assumed. */
+  assumed: boolean;
+};
+
+const ASSUMED_ZERO_TAX: IncomeTaxRateResult = { rate: 0, assumed: true };
+
+/** Probe taxes.income / taxes.incomeTax / incomeTax; percent→fraction if >1; assumed when absent. */
+export function parseIncomeTaxRateResult(countryPayload: unknown): IncomeTaxRateResult {
   const obj = asRecord(countryPayload);
-  if (!obj) return 0;
+  if (!obj) return ASSUMED_ZERO_TAX;
   const taxes = asRecord(obj.taxes);
   const candidates = [taxes?.income, taxes?.incomeTax, obj.incomeTax, obj.income];
   for (const raw of candidates) {
     if (typeof raw === "number" && Number.isFinite(raw)) {
-      return percentToFraction(raw);
+      return { rate: percentToFraction(raw), assumed: false };
     }
   }
-  return 0;
+  return ASSUMED_ZERO_TAX;
 }
 
-/** Resolve company region → country income tax (fraction). Returns 0 when missing. */
+/** Probe taxes.income / taxes.incomeTax / incomeTax; percent→fraction if >1; default 0. */
+export function parseIncomeTaxRate(countryPayload: unknown): number {
+  return parseIncomeTaxRateResult(countryPayload).rate;
+}
+
+/** Resolve company region → country income tax (fraction). Assumed 0 when missing. */
 export async function fetchIncomeTaxRateForCompany(
   warera: WareraRequester,
   companyId: string,
-): Promise<number> {
+): Promise<IncomeTaxRateResult> {
   const company = await fetchCompanyById(warera, companyId);
-  if (!company?.regionId) return 0;
+  if (!company?.regionId) return ASSUMED_ZERO_TAX;
 
   const regionJson = await warera.request<unknown>(
     wareraProcedurePath("region.getById", { regionId: company.regionId }),
@@ -62,22 +75,22 @@ export async function fetchIncomeTaxRateForCompany(
     const countryJson = await warera.request<unknown>(
       wareraProcedurePath("country.getCountryById", { countryId }),
     );
-    return parseIncomeTaxRate(unwrapTrpcData(countryJson));
+    return parseIncomeTaxRateResult(unwrapTrpcData(countryJson));
   }
 
   const countryCode = pickString(region, ["countryCode", "code"]);
-  if (!countryCode) return 0;
+  if (!countryCode) return ASSUMED_ZERO_TAX;
 
   const allJson = await warera.request<unknown>(wareraProcedurePath("country.getAllCountries"));
   const all = unwrapTrpcData(allJson);
-  if (!Array.isArray(all)) return 0;
+  if (!Array.isArray(all)) return ASSUMED_ZERO_TAX;
   const match = all.find((row) => {
     const rec = asRecord(row);
     if (!rec) return false;
     const code = pickString(rec, ["code", "isoCode", "countryCode"]);
     return code != null && code.toLowerCase() === countryCode.toLowerCase();
   });
-  return parseIncomeTaxRate(match);
+  return parseIncomeTaxRateResult(match);
 }
 
 function workerForUser(workers: WorkerRow[], userId: string): WorkerRow | undefined {
@@ -117,7 +130,7 @@ export async function resolveJobWage(warera: WareraRequester, userId: string): P
       grossWage = offerWage;
     }
 
-    const incomeTaxRate = await fetchIncomeTaxRateForCompany(warera, companyId);
+    const { rate: incomeTaxRate } = await fetchIncomeTaxRateForCompany(warera, companyId);
     const netWage = grossWage * (1 - incomeTaxRate);
 
     return {

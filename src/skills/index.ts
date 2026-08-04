@@ -18,6 +18,8 @@ export { optimizeEcoSkills, type OptimizeMode, type OptimizeResult } from "./opt
 export {
   fetchIncomeTaxRateForCompany,
   parseIncomeTaxRate,
+  parseIncomeTaxRateResult,
   resolveJobWage,
+  type IncomeTaxRateResult,
   type SkillsJob,
 } from "./job-wage";

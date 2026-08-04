@@ -1,5 +1,10 @@
 import { describe, expect, it, vi } from "vite-plus/test";
-import { fetchIncomeTaxRateForCompany, parseIncomeTaxRate, resolveJobWage } from "./job-wage";
+import {
+  fetchIncomeTaxRateForCompany,
+  parseIncomeTaxRate,
+  parseIncomeTaxRateResult,
+  resolveJobWage,
+} from "./job-wage";
 
 describe("parseIncomeTaxRate", () => {
   it("reads taxes.income percent as fraction when > 1", () => {
@@ -18,6 +23,21 @@ describe("parseIncomeTaxRate", () => {
   it("defaults to 0", () => {
     expect(parseIncomeTaxRate(null)).toBe(0);
     expect(parseIncomeTaxRate({})).toBe(0);
+  });
+});
+
+describe("parseIncomeTaxRateResult", () => {
+  it("marks assumed when country/tax fields are absent", () => {
+    expect(parseIncomeTaxRateResult(null)).toEqual({ rate: 0, assumed: true });
+    expect(parseIncomeTaxRateResult({})).toEqual({ rate: 0, assumed: true });
+    expect(parseIncomeTaxRateResult({ taxes: {} })).toEqual({ rate: 0, assumed: true });
+  });
+
+  it("keeps explicit income 0 as not assumed", () => {
+    expect(parseIncomeTaxRateResult({ taxes: { income: 0 } })).toEqual({
+      rate: 0,
+      assumed: false,
+    });
   });
 });
 
@@ -46,7 +66,10 @@ describe("fetchIncomeTaxRateForCompany", () => {
       throw new Error(`unexpected path ${path}`);
     });
 
-    await expect(fetchIncomeTaxRateForCompany({ request } as never, "co-1")).resolves.toBe(0.15);
+    await expect(fetchIncomeTaxRateForCompany({ request } as never, "co-1")).resolves.toEqual({
+      rate: 0.15,
+      assumed: false,
+    });
   });
 });
 
