@@ -211,9 +211,7 @@ describe("buildAdvisor caching", () => {
       referenceAeLevel: 6,
       bestBonus: 0.5,
     });
-    expect(ironOpp?.roughDailyValue).toBe(
-      explainAeDaily(6, 0.5, ironOpp!.profitPerPp!).dailyValue,
-    );
+    expect(ironOpp?.roughDailyValue).toBe(explainAeDaily(6, 0.5, ironOpp!.profitPerPp!).dailyValue);
     const steelOpp = result.opportunities.find((o) => o.itemCode === "steel");
     expect(steelOpp).toMatchObject({
       referenceAeLevel: 6,

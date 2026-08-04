@@ -143,9 +143,7 @@ describe("enrichMarketOpportunities", () => {
   });
 
   it("leaves bonus/daily null when region or bonus is unknown", () => {
-    const regions = new Map([
-      ["concrete", { regionId: "r2", regionName: "Tehran", bonus: null }],
-    ]);
+    const regions = new Map([["concrete", { regionId: "r2", regionName: "Tehran", bonus: null }]]);
     const enriched = enrichMarketOpportunities([steak, concrete], regions);
     expect(enriched[0]).toMatchObject({
       bestBonus: null,
