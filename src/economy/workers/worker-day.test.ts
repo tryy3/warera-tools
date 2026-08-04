@@ -19,10 +19,7 @@ describe("workerDay", () => {
       profitPerPp: 0.134,
     });
     expect(r.effectivePpPerDay).toBeCloseTo(base * 1.605, 4);
-    expect(r.contributionPerDay).toBeCloseTo(
-      r.effectivePpPerDay * (0.134 - 0.135),
-      4,
-    );
+    expect(r.contributionPerDay).toBeCloseTo(r.effectivePpPerDay * (0.134 - 0.135), 4);
   });
 
   it("projects higher contribution at max fidelity when wage below profit/PP", () => {

@@ -116,9 +116,7 @@ describe("fetchWorkers / fetchWorkOfferWage", () => {
     expect(request).toHaveBeenCalledWith(expect.stringContaining("worker.getWorkers"));
     expect(request.mock.calls[0]![0]).toContain("userId");
     expect(request.mock.calls[0]![0]).toContain("companyId");
-    expect(rows).toEqual([
-      { userId: "u1", wagePerPp: 0.5, companyId: "co-1", ...nullSkillFields },
-    ]);
+    expect(rows).toEqual([{ userId: "u1", wagePerPp: 0.5, companyId: "co-1", ...nullSkillFields }]);
   });
 
   it("calls workOffer.getWorkOfferByCompanyId", async () => {

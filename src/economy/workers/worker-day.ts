@@ -23,9 +23,7 @@ export type WorkerDayResult = {
 };
 
 export function workerDay(input: WorkerDayInput): WorkerDayResult {
-  const actionsPerDay = dailyActionsFromBar(
-    skillValueFromLevel("energy", input.energyLevel),
-  );
+  const actionsPerDay = dailyActionsFromBar(skillValueFromLevel("energy", input.energyLevel));
   const ppPerAction = skillValueFromLevel("production", input.productionLevel);
   const basePpPerDay = actionsPerDay * ppPerAction;
   const effectivePpPerDay =

@@ -117,19 +117,16 @@ export function companyDay(input: CompanyDayInput): CompanyDayResult {
 
   const totalPpPerDay = ae.dailyPp + selfWorkDailyPp + workerPpPerDay;
   const unitsProduced = unitsFromPp(input.itemCode, totalPpPerDay);
-  const inputCostPerDay =
-    unitsProduced != null ? unitsProduced * input.inputCostPerUnit : 0;
+  const inputCostPerDay = unitsProduced != null ? unitsProduced * input.inputCostPerUnit : 0;
 
   // Gross sales = PP×profitPerPp (already net of inputs) + input costs restored for P&L.
-  const revenuePerDay =
-    ae.dailyValue + selfWorkDailyValue + workerRevenuePerDay + inputCostPerDay;
+  const revenuePerDay = ae.dailyValue + selfWorkDailyValue + workerRevenuePerDay + inputCostPerDay;
   const netPerDay = revenuePerDay - workerWageCostPerDay - inputCostPerDay;
 
   const totalPpAtMax = ae.dailyPp + selfWorkDailyPp + workerPpAtMax;
   const unitsAtMax = unitsFromPp(input.itemCode, totalPpAtMax);
   const inputCostAtMax = unitsAtMax != null ? unitsAtMax * input.inputCostPerUnit : 0;
-  const revenueAtMax =
-    ae.dailyValue + selfWorkDailyValue + workerRevenueAtMax + inputCostAtMax;
+  const revenueAtMax = ae.dailyValue + selfWorkDailyValue + workerRevenueAtMax + inputCostAtMax;
   const netPerDayAtMaxWorkerFidelity = revenueAtMax - workerWageAtMax - inputCostAtMax;
 
   return {

@@ -1,10 +1,8 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";
-import { useCallback, useState } from "react";
-import type { ReactNode } from "react";
-import { Badge } from "@/components/ui/badge";
+import { useCallback, useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { formatDisplayNumber } from "@/lib/formatDisplayNumber";
 import { api } from "../../api";
 import { FlagIcon } from "../../components/FlagIcon";
@@ -15,7 +13,10 @@ import { usePlayerSelection } from "../../player/PlayerSelectionContext";
 import { useSyncPlayerSearch } from "../../player/useSyncPlayerSearch";
 import { queryKeys } from "../../query/keys";
 import { useCompaniesQuery } from "../../query/useCompaniesQuery";
+import { useUserQuery } from "../../query/useUserQuery";
+import { CompanyCardSummary } from "./CompanyCardSummary";
 import { MarketOpportunitiesTable } from "./MarketOpportunitiesTable";
+import { CompanySimProvider, useCompanySim } from "./sim/CompanySimProvider";
 import type { CompanyAdvisorRow } from "./types";
 
 const companiesRoute = getRouteApi("/companies");
@@ -52,6 +53,31 @@ function FormulaDetails({ label, children }: { label: string; children: ReactNod
   );
 }
 
+function SectionPlaceholder({
+  label,
+  defaultOpen = false,
+  children,
+}: {
+  label: string;
+  defaultOpen?: boolean;
+  children?: ReactNode;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <details
+      open={open}
+      onToggle={(event) => setOpen(event.currentTarget.open)}
+      className="group mt-2 rounded border border-border bg-black/15 px-2.5 py-1.5"
+    >
+      <summary className="cursor-pointer list-none text-[0.75em] tracking-wider text-muted-foreground uppercase [&::-webkit-details-marker]:hidden">
+        <span className="inline-block transition-transform group-open:rotate-90">▸ </span>
+        {label}
+      </summary>
+      <div className="pt-1.5 pb-1 text-sm text-muted-foreground">{children ?? "Coming soon."}</div>
+    </details>
+  );
+}
+
 function GoldAmount({
   value,
   digits = 4,
@@ -74,79 +100,38 @@ function GoldAmount({
   );
 }
 
+function PortfolioNetBanner() {
+  const { portfolioNet } = useCompanySim();
+  const sign = portfolioNet > 0 ? "+" : "";
+  return (
+    <p className="mb-2 flex flex-wrap items-center gap-1.5 text-sm">
+      <span className="tracking-wide text-muted-foreground uppercase">Portfolio net</span>
+      <span className="inline-flex items-center gap-1.5 font-medium text-success">
+        <GoldIcon />
+        {sign}
+        {formatDisplayNumber(portfolioNet, 3)}/day
+      </span>
+    </p>
+  );
+}
+
 function CompanyCard({ row }: { row: CompanyAdvisorRow }) {
-  const bonusPct = row.company.productionBonus != null ? row.company.productionBonus * 100 : null;
+  const { cards } = useCompanySim();
+  const summary = cards.find((c) => c.companyId === row.company.id);
+  if (!summary) return null;
 
   return (
     <Card className="gap-0 border-border bg-secondary py-0 shadow-none">
-      <CardHeader className="flex flex-row items-center justify-between gap-2 px-3.5 pt-3 pb-2">
-        <CardTitle className="text-base font-semibold">{row.company.name}</CardTitle>
-        <Badge variant="outline" className="border-success/45 font-normal text-success">
-          {row.currentDailyValue != null ? (
-            <GoldAmount value={row.currentDailyValue} digits={3} prefix="+" suffix="/day" />
-          ) : (
-            "—"
-          )}
-        </Badge>
+      <CardHeader className="px-3.5 pt-3 pb-2">
+        <CompanyCardSummary row={row} summary={summary} />
       </CardHeader>
 
       <CardContent className="px-3.5 pb-3">
-        <dl className="m-0 grid grid-cols-[repeat(auto-fill,minmax(7rem,1fr))] gap-x-3.5 gap-y-1.5">
-          <div>
-            <dt className="m-0 text-[0.75em] tracking-wide text-muted-foreground uppercase">
-              Material
-            </dt>
-            <dd className="mt-0.5 mb-0">
-              {row.company.itemCode ? (
-                <span className="inline-flex items-center gap-1.5">
-                  <ItemIcon itemCode={row.company.itemCode} />
-                  {formatItem(row.company.itemCode)}
-                </span>
-              ) : (
-                "—"
-              )}
-            </dd>
-          </div>
-          <div>
-            <dt className="m-0 text-[0.75em] tracking-wide text-muted-foreground uppercase">
-              Region
-            </dt>
-            <dd className="mt-0.5 mb-0">
-              <span className="inline-flex items-center gap-1.5">
-                <FlagIcon code={row.company.regionCountryCode} />
-                {row.company.regionName ?? row.company.regionId ?? "—"}
-              </span>
-            </dd>
-          </div>
-          <div>
-            <dt className="m-0 text-[0.75em] tracking-wide text-muted-foreground uppercase">
-              AE level
-            </dt>
-            <dd className="mt-0.5 mb-0">{row.company.aeLevel}</dd>
-          </div>
-          <div>
-            <dt className="m-0 text-[0.75em] tracking-wide text-muted-foreground uppercase">
-              Bonus
-            </dt>
-            <dd className="mt-0.5 mb-0">{bonusPct != null ? `${formatNum(bonusPct, 1)}%` : "—"}</dd>
-          </div>
-          <div>
-            <dt className="m-0 text-[0.75em] tracking-wide text-muted-foreground uppercase">
-              Profit/PP
-            </dt>
-            <dd className="mt-0.5 mb-0">
-              <GoldAmount value={row.currentProfitPerPp} digits={4} />
-            </dd>
-          </div>
-          <div>
-            <dt className="m-0 text-[0.75em] tracking-wide text-muted-foreground uppercase">
-              Daily PP
-            </dt>
-            <dd className="mt-0.5 mb-0">
-              {row.aeBreakdown ? formatNum(row.aeBreakdown.dailyPp, 1) : "—"}
-            </dd>
-          </div>
-        </dl>
+        <SectionPlaceholder label="Parameters" />
+        <SectionPlaceholder label="Workers" defaultOpen>
+          Worker rows and actions land in a follow-up.
+        </SectionPlaceholder>
+        <SectionPlaceholder label="Daily breakdown" />
 
         {row.bonusDetails || row.profitBreakdown || row.aeBreakdown ? (
           <FormulaDetails label="How calculated">
@@ -238,6 +223,19 @@ function CompanyCard({ row }: { row: CompanyAdvisorRow }) {
   );
 }
 
+function CompaniesList({ companies }: { companies: CompanyAdvisorRow[] }) {
+  return (
+    <>
+      <PortfolioNetBanner />
+      <div className="flex flex-col gap-3">
+        {companies.map((row) => (
+          <CompanyCard key={row.company.id} row={row} />
+        ))}
+      </div>
+    </>
+  );
+}
+
 export function CompaniesPage() {
   const search = companiesRoute.useSearch();
   const navigate = companiesRoute.useNavigate();
@@ -263,7 +261,13 @@ export function CompaniesPage() {
   });
 
   const companiesQuery = useCompaniesQuery(player?.userId ?? null);
+  const userQuery = useUserQuery(player?.userId ?? null);
   const advisor = companiesQuery.data ?? null;
+
+  const ownerDefaults = {
+    entrepreneurshipLevel: userQuery.data?.skills.entrepreneurship?.level ?? 0,
+    productionSkillLevel: userQuery.data?.skills.production?.level ?? 0,
+  };
 
   const [polling, setPolling] = useState(false);
   const [pollError, setPollError] = useState<string | null>(null);
@@ -341,11 +345,16 @@ export function CompaniesPage() {
           {advisor?.companies.length === 0 ? (
             <p className="text-muted-foreground">No companies found for this user.</p>
           ) : null}
-          <div className="flex flex-col gap-3">
-            {advisor?.companies.map((row) => (
-              <CompanyCard key={row.company.id} row={row} />
-            ))}
-          </div>
+          {advisor && player ? (
+            <CompanySimProvider
+              key={player.userId}
+              companies={advisor.companies}
+              ownerDefaults={ownerDefaults}
+              liveRevision={companiesQuery.dataUpdatedAt}
+            >
+              <CompaniesList companies={advisor.companies} />
+            </CompanySimProvider>
+          ) : null}
         </section>
 
         <section>

@@ -4,12 +4,7 @@ export {
   type CompanyDayResult,
   type CompanyDayWorker,
 } from "./company-day";
-export {
-  maxGrossWagePerPp,
-  netWageFromGross,
-  wagePair,
-  type WagePair,
-} from "./wages";
+export { maxGrossWagePerPp, netWageFromGross, wagePair, type WagePair } from "./wages";
 export {
   MAX_FIDELITY_PCT,
   workerDay,

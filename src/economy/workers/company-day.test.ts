@@ -82,10 +82,7 @@ describe("companyDay", () => {
     expect(withSelfWork.selfWorkDailyValue).toBeCloseTo(expectedSelfValue, 6);
     expect(withSelfWork.totalPpPerDay).toBeCloseTo(expectedSelfPp, 6);
     expect(withSelfWork.netPerDay).toBeCloseTo(expectedSelfValue, 6);
-    expect(withSelfWork.netPerDay - withoutSelfWork.netPerDay).toBeCloseTo(
-      expectedSelfValue,
-      6,
-    );
+    expect(withSelfWork.netPerDay - withoutSelfWork.netPerDay).toBeCloseTo(expectedSelfValue, 6);
   });
 
   it("worker contribution is negative when wage exceeds profit/PP and positive when wage is below profit/PP", () => {
@@ -153,7 +150,7 @@ describe("companyDay", () => {
       entrepreneurshipLevel: 0,
       productionSkillLevel: 0,
       includeSelfWork: false,
-      workers: [] as const,
+      workers: [],
     };
 
     expect(companyDay({ ...base, itemCode: null }).unitsProduced).toBeNull();
