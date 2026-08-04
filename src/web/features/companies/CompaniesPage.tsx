@@ -358,13 +358,17 @@ export function CompaniesPage() {
         <section>
           <h2 className="mt-0 mb-2 text-[1.05rem] font-semibold">Market opportunities</h2>
           <p className="mb-2 text-sm text-muted-foreground">
-            Ranked by Profit/PP = (market price − input cost) / consumed PP.
+            Ranked by Profit/PP = (market price − input cost) / consumed PP. ~G/day uses AE{" "}
+            {advisor?.opportunities[0]?.referenceAeLevel ?? 6} × each item’s best known region
+            bonus.
           </p>
           <Table>
             <TableHeader>
               <TableRow>
                 <TableHead>Item</TableHead>
                 <TableHead>G/PP</TableHead>
+                <TableHead>Best bonus</TableHead>
+                <TableHead>~G/day</TableHead>
                 <TableHead>Formula</TableHead>
               </TableRow>
             </TableHeader>
@@ -380,6 +384,17 @@ export function CompaniesPage() {
                   <TableCell className="font-mono">
                     <GoldAmount value={o.profitPerPp} digits={4} />
                   </TableCell>
+                  <TableCell
+                    className="font-mono"
+                    title={o.bestRegionName ?? o.bestRegionId ?? undefined}
+                  >
+                    {o.bestBonus != null && Number.isFinite(o.bestBonus)
+                      ? `+${formatNum(o.bestBonus * 100, 1)}%`
+                      : "—"}
+                  </TableCell>
+                  <TableCell className="font-mono">
+                    <GoldAmount value={o.roughDailyValue} digits={2} />
+                  </TableCell>
                   <TableCell className="font-mono text-sm text-muted-foreground">
                     {o.formula}
                   </TableCell>
@@ -387,7 +402,7 @@ export function CompaniesPage() {
               ))}
               {!advisor?.opportunities?.length ? (
                 <TableRow>
-                  <TableCell colSpan={3} className="text-muted-foreground">
+                  <TableCell colSpan={5} className="text-muted-foreground">
                     No price data yet — refresh prices.
                   </TableCell>
                 </TableRow>
