@@ -6,6 +6,11 @@ export type Opportunity = {
   consumedPp: number;
   profitPerPp: number | null;
   formula: string;
+  bestBonus: number | null;
+  bestRegionId: string | null;
+  bestRegionName: string | null;
+  roughDailyValue: number | null;
+  referenceAeLevel: number;
 };
 
 export type AeDailyBreakdown = {
