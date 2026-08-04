@@ -15,4 +15,9 @@ export {
   type SkillsLevels,
 } from "./income";
 export { optimizeEcoSkills, type OptimizeMode, type OptimizeResult } from "./optimize";
-export { parseIncomeTaxRate, resolveJobWage, type SkillsJob } from "./job-wage";
+export {
+  fetchIncomeTaxRateForCompany,
+  parseIncomeTaxRate,
+  resolveJobWage,
+  type SkillsJob,
+} from "./job-wage";

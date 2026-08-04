@@ -134,63 +134,110 @@ const logger = {
   child: vi.fn(),
 };
 
+function trpc(data: unknown) {
+  return { result: { data } };
+}
+
+/** Live enrichment: workers + offer + company→region→country tax (not cache paths). */
+function mockLiveCompanyEnrichment(path: string) {
+  if (path.includes("worker.getWorkers")) {
+    return trpc([
+      {
+        userId: "w1",
+        userName: "Alice",
+        wagePerPp: 1.2,
+        energyLevel: 5,
+        productionLevel: 3,
+        fidelityPct: 4,
+      },
+    ]);
+  }
+  if (path.includes("workOffer.getWorkOfferByCompanyId")) {
+    return trpc({ wagePerPp: 0.8 });
+  }
+  if (path.includes("company.getById")) {
+    return trpc({
+      _id: "c1",
+      name: "Mine",
+      region: "reg-home",
+      itemCode: "iron",
+      activeUpgradeLevels: { automatedEngine: 3 },
+    });
+  }
+  if (path.includes("region.getById")) {
+    return trpc({ name: "Home", countryCode: "SE", country: "country-se" });
+  }
+  if (path.includes("country.getCountryById")) {
+    return trpc({ taxes: { income: 10 } });
+  }
+  return null;
+}
+
+async function seedWarmAdvisorCaches(db: Db): Promise<Date> {
+  const fetchedAt = new Date();
+  await upsertCompanyPack(db, {
+    userId: "u1",
+    companies: [
+      {
+        id: "c1",
+        name: "Mine",
+        itemCode: "iron",
+        regionId: "reg-home",
+        aeLevel: 3,
+        productionBonus: 0.1,
+        bonusDetails: {
+          total: 0.1,
+          strategicBonus: 0.1,
+          depositBonus: 0,
+          ethicSpecializationBonus: 0,
+          ethicDepositBonus: 0,
+          formula: "total 10%",
+        },
+      },
+    ],
+    fetchedAt,
+  });
+  await upsertRegionFetched(db, {
+    id: "reg-home",
+    name: "Home",
+    countryCode: "SE",
+    fetchedAt,
+  });
+  for (const recipe of listProducibleRecipes()) {
+    await upsertRecommendedRegion(db, {
+      itemCode: recipe.itemCode,
+      regionId: "reg-best",
+      regionName: "Best",
+      bonus: 0.5,
+      payload: null,
+      fetchedAt,
+    });
+  }
+  await upsertRegionFetched(db, {
+    id: "reg-best",
+    name: "Best",
+    countryCode: "NO",
+    fetchedAt,
+  });
+  return fetchedAt;
+}
+
 describe("buildAdvisor caching", () => {
   let db: Db;
 
   beforeEach(async () => {
     db = await createDb();
     await seedPrices(db);
+    logger.debug.mockClear();
   });
 
-  it("warm caches: no recommended/region/company WarEra calls", async () => {
-    const fetchedAt = new Date();
-    await upsertCompanyPack(db, {
-      userId: "u1",
-      companies: [
-        {
-          id: "c1",
-          name: "Mine",
-          itemCode: "iron",
-          regionId: "reg-home",
-          aeLevel: 3,
-          productionBonus: 0.1,
-          bonusDetails: {
-            total: 0.1,
-            strategicBonus: 0.1,
-            depositBonus: 0,
-            ethicSpecializationBonus: 0,
-            ethicDepositBonus: 0,
-            formula: "total 10%",
-          },
-        },
-      ],
-      fetchedAt,
-    });
-    await upsertRegionFetched(db, {
-      id: "reg-home",
-      name: "Home",
-      countryCode: "SE",
-      fetchedAt,
-    });
-    for (const recipe of listProducibleRecipes()) {
-      await upsertRecommendedRegion(db, {
-        itemCode: recipe.itemCode,
-        regionId: "reg-best",
-        regionName: "Best",
-        bonus: 0.5,
-        payload: null,
-        fetchedAt,
-      });
-    }
-    await upsertRegionFetched(db, {
-      id: "reg-best",
-      name: "Best",
-      countryCode: "NO",
-      fetchedAt,
-    });
+  it("warm caches: no recommended/region/company pack WarEra calls", async () => {
+    const fetchedAt = await seedWarmAdvisorCaches(db);
 
-    const request = vi.fn(async () => {
-      throw new Error("warera should not be called");
+    const request = vi.fn(async (path: string) => {
+      const enrichment = mockLiveCompanyEnrichment(path);
+      if (enrichment) return enrichment;
+      throw new Error(`unexpected cache-path call ${path}`);
     });
 
     const result = await buildAdvisor({
@@ -200,7 +247,9 @@ describe("buildAdvisor caching", () => {
       userId: "u1",
     });
 
-    expect(request).not.toHaveBeenCalled();
+    for (const [path] of request.mock.calls) {
+      expect(String(path)).not.toMatch(/getRecommendedRegion|getCompanies|getProductionBonus/);
+    }
     expect(result.companiesRefreshed).toBe(false);
     expect(result.companies).toHaveLength(1);
     expect(result.companies[0]?.company.regionName).toBe("Home");
@@ -225,6 +274,66 @@ describe("buildAdvisor caching", () => {
         result.opportunities[i]!.profitPerPp!,
       );
     }
+  });
+
+  it("attaches workers, income tax, and offer wage per company", async () => {
+    await seedWarmAdvisorCaches(db);
+
+    const request = vi.fn(async (path: string) => {
+      const enrichment = mockLiveCompanyEnrichment(path);
+      if (enrichment) return enrichment;
+      throw new Error(`unexpected ${path}`);
+    });
+
+    const result = await buildAdvisor({
+      db,
+      warera: { request } as never,
+      logger: logger as never,
+      userId: "u1",
+    });
+
+    const row = result.companies[0]!;
+    expect(row.workersStatus).toBe("ok");
+    expect(row.workers).toEqual([
+      {
+        userId: "w1",
+        username: "Alice",
+        wagePerPp: 1.2,
+        energyLevel: 5,
+        productionLevel: 3,
+        fidelityPct: 4,
+      },
+    ]);
+    expect(row.incomeTaxRate).toBe(0.1);
+    expect(row.incomeTaxAssumed).toBe(false);
+    expect(row.offerWagePerPp).toBe(0.8);
+    expect(logger.debug).toHaveBeenCalledWith(
+      expect.objectContaining({ keys: expect.arrayContaining(["userId", "userName"]) }),
+      "worker.getWorkers first object keys",
+    );
+  });
+
+  it("soft-fails worker enrichment per company when WarEra throws", async () => {
+    await seedWarmAdvisorCaches(db);
+
+    const request = vi.fn(async () => {
+      throw new Error("worker endpoint down");
+    });
+
+    const result = await buildAdvisor({
+      db,
+      warera: { request } as never,
+      logger: logger as never,
+      userId: "u1",
+    });
+
+    const row = result.companies[0]!;
+    expect(row.company.id).toBe("c1");
+    expect(row.workersStatus).toBe("unavailable");
+    expect(row.workers).toEqual([]);
+    expect(row.incomeTaxRate).toBe(0);
+    expect(row.incomeTaxAssumed).toBe(true);
+    expect(row.offerWagePerPp).toBeNull();
   });
 
   it("refresh=true refetches company pack even when fresh", async () => {
@@ -287,6 +396,16 @@ describe("buildAdvisor caching", () => {
       if (String(path).includes("company.getProductionBonus")) {
         return { result: { data: { total: 10 } } };
       }
+      if (String(path).includes("worker.getWorkers")) return trpc([]);
+      if (String(path).includes("workOffer.getWorkOfferByCompanyId")) {
+        return trpc({ wagePerPp: 0.5 });
+      }
+      if (String(path).includes("region.getById")) {
+        return trpc({ name: "Home", countryCode: "SE", country: "country-se" });
+      }
+      if (String(path).includes("country.getCountryById")) {
+        return trpc({ taxes: { income: 0 } });
+      }
       throw new Error(`unexpected path ${path}`);
     });
 
@@ -301,6 +420,8 @@ describe("buildAdvisor caching", () => {
     expect(result.companiesRefreshed).toBe(true);
     expect(result.companies[0]?.company.id).toBe("c-new");
     expect(result.companies[0]?.company.name).toBe("Fresh Co");
+    expect(result.companies[0]?.workersStatus).toBe("ok");
+    expect(result.companies[0]?.offerWagePerPp).toBe(0.5);
   });
 
   it("miss on recommended region live-fetches and persists", async () => {
@@ -337,7 +458,23 @@ describe("buildAdvisor caching", () => {
         };
       }
       if (String(path).includes("region.getById")) {
-        return { result: { data: { name: "LiveRegion", countryCode: "FI" } } };
+        return {
+          result: { data: { name: "LiveRegion", countryCode: "FI", country: "country-fi" } },
+        };
+      }
+      if (String(path).includes("worker.getWorkers")) return trpc([]);
+      if (String(path).includes("workOffer.getWorkOfferByCompanyId")) return trpc({});
+      if (String(path).includes("company.getById")) {
+        return trpc({
+          _id: "c1",
+          name: "Mine",
+          region: "reg-home",
+          itemCode: "iron",
+          activeUpgradeLevels: { automatedEngine: 3 },
+        });
+      }
+      if (String(path).includes("country.getCountryById")) {
+        return trpc({ taxes: { income: 5 } });
       }
       throw new Error(`unexpected ${path}`);
     });

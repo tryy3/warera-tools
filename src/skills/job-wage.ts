@@ -44,7 +44,11 @@ export function parseIncomeTaxRate(countryPayload: unknown): number {
   return 0;
 }
 
-async function fetchIncomeTaxRate(warera: WareraRequester, companyId: string): Promise<number> {
+/** Resolve company region → country income tax (fraction). Returns 0 when missing. */
+export async function fetchIncomeTaxRateForCompany(
+  warera: WareraRequester,
+  companyId: string,
+): Promise<number> {
   const company = await fetchCompanyById(warera, companyId);
   if (!company?.regionId) return 0;
 
@@ -113,7 +117,7 @@ export async function resolveJobWage(warera: WareraRequester, userId: string): P
       grossWage = offerWage;
     }
 
-    const incomeTaxRate = await fetchIncomeTaxRate(warera, companyId);
+    const incomeTaxRate = await fetchIncomeTaxRateForCompany(warera, companyId);
     const netWage = grossWage * (1 - incomeTaxRate);
 
     return {

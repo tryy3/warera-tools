@@ -83,12 +83,18 @@ export function parseWorkOfferWage(data: unknown): number | null {
 export async function fetchWorkers(
   warera: WareraRequester,
   input: { companyId?: string; userId?: string },
+  options?: { onFirstRawKeys?: (keys: string[]) => void },
 ): Promise<WorkerRow[]> {
   const body: Record<string, string> = {};
   if (input.companyId) body.companyId = input.companyId;
   if (input.userId) body.userId = input.userId;
   const json = await warera.request<unknown>(wareraProcedurePath("worker.getWorkers", body));
-  return parseWorkers(unwrapTrpcData(json));
+  const data = unwrapTrpcData(json);
+  if (options?.onFirstRawKeys) {
+    const first = asRecord(extractWorkerList(data)[0]);
+    if (first) options.onFirstRawKeys(Object.keys(first));
+  }
+  return parseWorkers(data);
 }
 
 export async function fetchWorkOfferWage(

@@ -20,6 +20,7 @@ import { enqueueRegions, getRegionsByIds, upsertRegionFetched } from "../db/regi
 import type { Db } from "../db/client";
 import { runPricePoll } from "../jobs/price-poll/run";
 import type { Logger } from "../logging/logger";
+import { fetchIncomeTaxRateForCompany } from "../skills/job-wage";
 import {
   fetchBestRecommendedRegion,
   fetchRegionInfo,
@@ -29,7 +30,10 @@ import {
   type RegionInfo,
 } from "../warera/companies";
 import type { WareraRequester } from "../warera/prices";
+import { fetchWorkOfferWage, fetchWorkers } from "../warera/workers";
 import { loadCompanyPackForUser } from "./load-company-pack";
+
+const WORKER_ENRICH_CHUNK = 3;
 
 export type SwitchRecommendation = {
   itemCode: string;
@@ -51,6 +55,15 @@ export type SwitchRecommendation = {
   paybackFormula: string | null;
 };
 
+export type AdvisorWorker = {
+  userId: string;
+  username: string | null;
+  wagePerPp: number | null;
+  energyLevel: number | null;
+  productionLevel: number | null;
+  fidelityPct: number | null;
+};
+
 export type CompanyAdvisorRow = {
   company: CompanySummary;
   bonusDetails: ProductionBonusDetails | null;
@@ -59,7 +72,82 @@ export type CompanyAdvisorRow = {
   currentProfitPerPp: number | null;
   currentDailyValue: number | null;
   bestSwitch: SwitchRecommendation | null;
+  workers: AdvisorWorker[];
+  workersStatus: "ok" | "unavailable";
+  incomeTaxRate: number;
+  incomeTaxAssumed: boolean;
+  offerWagePerPp: number | null;
 };
+
+type CompanyLiveEnrichment = {
+  workers: AdvisorWorker[];
+  workersStatus: "ok" | "unavailable";
+  incomeTaxRate: number;
+  incomeTaxAssumed: boolean;
+  offerWagePerPp: number | null;
+};
+
+const UNAVAILABLE_ENRICHMENT: CompanyLiveEnrichment = {
+  workers: [],
+  workersStatus: "unavailable",
+  incomeTaxRate: 0,
+  incomeTaxAssumed: true,
+  offerWagePerPp: null,
+};
+
+async function enrichCompanyLive(
+  warera: WareraRequester,
+  logger: Logger,
+  companyId: string,
+  probeFirstWorkerKeys: { done: boolean },
+): Promise<CompanyLiveEnrichment> {
+  try {
+    const [workerRows, offerWagePerPp, incomeTaxRate] = await Promise.all([
+      fetchWorkers(
+        warera,
+        { companyId },
+        {
+          onFirstRawKeys: (keys) => {
+            if (probeFirstWorkerKeys.done) return;
+            probeFirstWorkerKeys.done = true;
+            logger.debug({ keys }, "worker.getWorkers first object keys");
+          },
+        },
+      ),
+      fetchWorkOfferWage(warera, companyId),
+      fetchIncomeTaxRateForCompany(warera, companyId),
+    ]);
+    return {
+      workers: workerRows.map((w) => ({
+        userId: w.userId,
+        username: w.username,
+        wagePerPp: w.wagePerPp,
+        energyLevel: w.energyLevel,
+        productionLevel: w.productionLevel,
+        fidelityPct: w.fidelityPct,
+      })),
+      workersStatus: "ok",
+      incomeTaxRate,
+      incomeTaxAssumed: false,
+      offerWagePerPp,
+    };
+  } catch {
+    return UNAVAILABLE_ENRICHMENT;
+  }
+}
+
+async function mapInChunks<T, R>(
+  items: T[],
+  chunkSize: number,
+  fn: (item: T) => Promise<R>,
+): Promise<R[]> {
+  const out: R[] = [];
+  for (let i = 0; i < items.length; i += chunkSize) {
+    const chunk = items.slice(i, i + chunkSize);
+    out.push(...(await Promise.all(chunk.map(fn))));
+  }
+  return out;
+}
 
 function entryToCompany(entry: CompanyPackEntry): {
   company: CompanySummary;
@@ -329,6 +417,7 @@ export async function buildAdvisor(options: {
       currentProfitPerPp: currentPp,
       currentDailyValue: currentDaily,
       bestSwitch,
+      ...UNAVAILABLE_ENRICHMENT,
     });
   }
 
@@ -338,6 +427,24 @@ export async function buildAdvisor(options: {
       durationMs: Math.round(performance.now() - phaseStarted),
       companies: packEntries.length,
       ...cacheStats,
+    },
+    "advisor",
+  );
+
+  phaseStarted = performance.now();
+  const probeFirstWorkerKeys = { done: false };
+  const enrichments = await mapInChunks(rows, WORKER_ENRICH_CHUNK, (row) =>
+    enrichCompanyLive(warera, logger, row.company.id, probeFirstWorkerKeys),
+  );
+  for (let i = 0; i < rows.length; i++) {
+    Object.assign(rows[i]!, enrichments[i]!);
+  }
+  logger.info(
+    {
+      phase: "workerEnrich",
+      durationMs: Math.round(performance.now() - phaseStarted),
+      companies: rows.length,
+      chunkSize: WORKER_ENRICH_CHUNK,
     },
     "advisor",
   );

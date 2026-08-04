@@ -64,6 +64,15 @@ export type SwitchRecommendation = {
   paybackFormula: string | null;
 };
 
+export type AdvisorWorker = {
+  userId: string;
+  username: string | null;
+  wagePerPp: number | null;
+  energyLevel: number | null;
+  productionLevel: number | null;
+  fidelityPct: number | null;
+};
+
 export type CompanyAdvisorRow = {
   company: {
     id: string;
@@ -81,6 +90,11 @@ export type CompanyAdvisorRow = {
   currentProfitPerPp: number | null;
   currentDailyValue: number | null;
   bestSwitch: SwitchRecommendation | null;
+  workers: AdvisorWorker[];
+  workersStatus: "ok" | "unavailable";
+  incomeTaxRate: number;
+  incomeTaxAssumed: boolean;
+  offerWagePerPp: number | null;
 };
 
 export type SearchUsersResponse = {

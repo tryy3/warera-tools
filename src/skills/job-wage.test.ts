@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vite-plus/test";
-import { parseIncomeTaxRate, resolveJobWage } from "./job-wage";
+import { fetchIncomeTaxRateForCompany, parseIncomeTaxRate, resolveJobWage } from "./job-wage";
 
 describe("parseIncomeTaxRate", () => {
   it("reads taxes.income percent as fraction when > 1", () => {
@@ -24,6 +24,31 @@ describe("parseIncomeTaxRate", () => {
 function trpc(data: unknown) {
   return { result: { data } };
 }
+
+describe("fetchIncomeTaxRateForCompany", () => {
+  it("resolves country income tax via company region", async () => {
+    const request = vi.fn(async (path: string) => {
+      if (path.includes("company.getById")) {
+        return trpc({
+          _id: "co-1",
+          name: "Mine",
+          region: "reg-1",
+          itemCode: "lead",
+          activeUpgradeLevels: { automatedEngine: 1 },
+        });
+      }
+      if (path.includes("region.getById")) {
+        return trpc({ country: "country-1", countryCode: "se" });
+      }
+      if (path.includes("country.getCountryById")) {
+        return trpc({ taxes: { income: 15 } });
+      }
+      throw new Error(`unexpected path ${path}`);
+    });
+
+    await expect(fetchIncomeTaxRateForCompany({ request } as never, "co-1")).resolves.toBe(0.15);
+  });
+});
 
 describe("resolveJobWage", () => {
   it("resolves net wage with income tax", async () => {
