@@ -1,9 +1,11 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { getRouteApi } from "@tanstack/react-router";
 import { useCallback, useState, type ReactNode } from "react";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { formatDisplayNumber } from "@/lib/formatDisplayNumber";
+import { wagePair } from "../../../economy/workers";
 import { api } from "../../api";
 import { FlagIcon } from "../../components/FlagIcon";
 import { GoldIcon } from "../../components/GoldIcon";
@@ -16,8 +18,35 @@ import { useCompaniesQuery } from "../../query/useCompaniesQuery";
 import { useUserQuery } from "../../query/useUserQuery";
 import { CompanyCardSummary } from "./CompanyCardSummary";
 import { MarketOpportunitiesTable } from "./MarketOpportunitiesTable";
+import { MoveWorkerModal } from "./MoveWorkerModal";
+import { SimWorkerModal, type SimWorkerDraft } from "./SimWorkerModal";
+import type { DerivedCompanyCard } from "./sim/derive";
 import { CompanySimProvider, useCompanySim } from "./sim/CompanySimProvider";
+import type { SimWorker } from "./sim/types";
 import type { CompanyAdvisorRow } from "./types";
+import { WorkerRowActions } from "./WorkerRowActions";
+
+function draftFromWorker(worker: SimWorker): SimWorkerDraft {
+  return {
+    name: worker.name,
+    wagePerPp: worker.wagePerPp,
+    fidelityPct: worker.fidelityPct,
+    energyLevel: worker.energyLevel,
+    productionLevel: worker.productionLevel,
+    activeFromStart: worker.assignment != null,
+  };
+}
+
+function defaultCreateDraft(simCount: number): SimWorkerDraft {
+  return {
+    name: `Sim Worker ${simCount + 1}`,
+    wagePerPp: 0.1,
+    fidelityPct: 0,
+    energyLevel: 5,
+    productionLevel: 5,
+    activeFromStart: true,
+  };
+}
 
 const companiesRoute = getRouteApi("/companies");
 
@@ -115,7 +144,247 @@ function PortfolioNetBanner() {
   );
 }
 
-function CompanyCard({ row }: { row: CompanyAdvisorRow }) {
+function GoldAmountInline({
+  value,
+  digits = 3,
+}: {
+  value: number | null | undefined;
+  digits?: number;
+}) {
+  if (value == null || !Number.isFinite(value)) return "—";
+  const sign = value > 0 ? "+" : "";
+  return (
+    <span className="inline-flex items-center gap-1">
+      <GoldIcon />
+      {sign}
+      {formatDisplayNumber(value, digits)}
+    </span>
+  );
+}
+
+function workersForCompany(
+  workers: SimWorker[],
+  companyId: string,
+  liveWorkerIds: Set<string>,
+): SimWorker[] {
+  return workers.filter(
+    (w) =>
+      w.assignment === companyId ||
+      (w.assignment === null && (liveWorkerIds.has(w.id) || w.kind === "simulated")),
+  );
+}
+
+function CompanyWorkersSection({
+  row,
+  summary,
+  companyOptions,
+}: {
+  row: CompanyAdvisorRow;
+  summary: DerivedCompanyCard;
+  companyOptions: { id: string; name: string }[];
+}) {
+  const { state, dispatch } = useCompanySim();
+  const companyId = row.company.id;
+  const liveWorkerIds = new Set(row.workers.map((w) => w.userId));
+  const workers = workersForCompany(state.workers, companyId, liveWorkerIds);
+  const dayById = new Map(summary.day.workers.map((w) => [w.id, w]));
+
+  const [createOpen, setCreateOpen] = useState(false);
+  const [editWorker, setEditWorker] = useState<SimWorker | null>(null);
+  const [moveWorker, setMoveWorker] = useState<SimWorker | null>(null);
+
+  const simCount = state.workers.filter((w) => w.kind === "simulated").length;
+
+  function handleCreate(draft: SimWorkerDraft) {
+    const worker: SimWorker = {
+      id: `sim-${crypto.randomUUID()}`,
+      kind: "simulated",
+      name: draft.name,
+      assignment: draft.activeFromStart ? companyId : null,
+      wagePerPp: draft.wagePerPp,
+      energyLevel: draft.energyLevel,
+      productionLevel: draft.productionLevel,
+      fidelityPct: draft.fidelityPct,
+      assumedFields: [],
+      dirty: true,
+    };
+    dispatch({ type: "addSimWorker", worker });
+    setCreateOpen(false);
+  }
+
+  function handleEdit(draft: SimWorkerDraft) {
+    if (!editWorker) return;
+    dispatch({
+      type: "updateWorker",
+      id: editWorker.id,
+      patch: {
+        name: draft.name,
+        wagePerPp: draft.wagePerPp,
+        energyLevel: draft.energyLevel,
+        productionLevel: draft.productionLevel,
+        fidelityPct: draft.fidelityPct,
+      },
+    });
+    setEditWorker(null);
+  }
+
+  return (
+    <>
+      <SectionPlaceholder label="Workers" defaultOpen>
+        {summary.workersStatus === "unavailable" ? (
+          <p className="m-0 mb-2 text-sm text-muted-foreground">
+            Live workers unavailable for this company. Simulated workers still apply.
+          </p>
+        ) : null}
+
+        {workers.length === 0 ? (
+          <p className="m-0 text-sm text-muted-foreground">No workers assigned.</p>
+        ) : (
+          <ul className="m-0 flex list-none flex-col gap-2 p-0">
+            {workers.map((worker) => {
+              const day = dayById.get(worker.id);
+              const wage = wagePair(worker.wagePerPp, summary.incomeTaxRate);
+              const active = worker.assignment === companyId;
+              return (
+                <li
+                  key={worker.id}
+                  className={`rounded border border-border/70 bg-black/20 px-2.5 py-2 ${
+                    active ? "" : "opacity-70"
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <span className="font-medium text-foreground">{worker.name}</span>
+                        {worker.kind === "simulated" ? (
+                          <Badge variant="outline" className="font-normal">
+                            Simulated
+                          </Badge>
+                        ) : null}
+                        {!active ? (
+                          <Badge
+                            variant="outline"
+                            className="border-muted-foreground/40 font-normal text-muted-foreground"
+                          >
+                            Inactive
+                          </Badge>
+                        ) : null}
+                        {worker.assumedFields.length > 0 ? (
+                          <Badge
+                            variant="outline"
+                            className="border-amber-500/40 font-normal text-amber-200/90"
+                          >
+                            Assumed
+                          </Badge>
+                        ) : null}
+                      </div>
+                      <p className="mt-0.5 mb-0 text-[0.8em] text-muted-foreground">
+                        Energy Lv {worker.energyLevel} · Fid {formatNum(worker.fidelityPct, 0)}%
+                      </p>
+                    </div>
+                    <WorkerRowActions
+                      assigned={active}
+                      onEdit={() => setEditWorker(worker)}
+                      onToggleActive={() =>
+                        dispatch({
+                          type: "setAssignment",
+                          id: worker.id,
+                          assignment: active ? null : companyId,
+                        })
+                      }
+                      onMove={() => setMoveWorker(worker)}
+                    />
+                  </div>
+                  <dl className="m-0 mt-1.5 grid grid-cols-[repeat(auto-fill,minmax(6.5rem,1fr))] gap-x-3 gap-y-1 text-sm">
+                    <div>
+                      <dt className="m-0 text-[0.7em] tracking-wide text-muted-foreground uppercase">
+                        Wage
+                      </dt>
+                      <dd className="mt-0.5 mb-0 inline-flex items-center gap-1 text-foreground">
+                        <GoldIcon />
+                        {formatNum(wage.gross, 4)}
+                        <span className="text-muted-foreground">|</span>
+                        {formatNum(wage.net, 4)}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="m-0 text-[0.7em] tracking-wide text-muted-foreground uppercase">
+                        Daily cost
+                      </dt>
+                      <dd className="mt-0.5 mb-0 text-foreground">
+                        <GoldAmountInline value={day?.current.ownerCostPerDay} digits={3} />
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="m-0 text-[0.7em] tracking-wide text-muted-foreground uppercase">
+                        Contrib now
+                      </dt>
+                      <dd className="mt-0.5 mb-0 text-foreground">
+                        <GoldAmountInline value={day?.current.contributionPerDay} digits={3} />
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="m-0 text-[0.7em] tracking-wide text-muted-foreground uppercase">
+                        Contrib @10%
+                      </dt>
+                      <dd className="mt-0.5 mb-0 text-foreground">
+                        <GoldAmountInline
+                          value={day?.atMaxFidelity.contributionPerDay}
+                          digits={3}
+                        />
+                      </dd>
+                    </div>
+                  </dl>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+
+        <div className="mt-2">
+          <Button type="button" variant="outline" size="sm" onClick={() => setCreateOpen(true)}>
+            + Add simulated worker
+          </Button>
+        </div>
+      </SectionPlaceholder>
+
+      <SimWorkerModal
+        open={createOpen}
+        mode="create"
+        initial={defaultCreateDraft(simCount)}
+        onClose={() => setCreateOpen(false)}
+        onSubmit={handleCreate}
+      />
+      <SimWorkerModal
+        open={editWorker != null}
+        mode="edit"
+        initial={editWorker ? draftFromWorker(editWorker) : defaultCreateDraft(0)}
+        onClose={() => setEditWorker(null)}
+        onSubmit={handleEdit}
+      />
+      <MoveWorkerModal
+        open={moveWorker != null}
+        workerName={moveWorker?.name ?? ""}
+        companies={companyOptions}
+        currentAssignment={moveWorker?.assignment ?? null}
+        onClose={() => setMoveWorker(null)}
+        onSubmit={(assignment) => {
+          if (!moveWorker) return;
+          dispatch({ type: "setAssignment", id: moveWorker.id, assignment });
+          setMoveWorker(null);
+        }}
+      />
+    </>
+  );
+}
+
+function CompanyCard({
+  row,
+  companyOptions,
+}: {
+  row: CompanyAdvisorRow;
+  companyOptions: { id: string; name: string }[];
+}) {
   const { cards } = useCompanySim();
   const summary = cards.find((c) => c.companyId === row.company.id);
   if (!summary) return null;
@@ -128,9 +397,7 @@ function CompanyCard({ row }: { row: CompanyAdvisorRow }) {
 
       <CardContent className="px-3.5 pb-3">
         <SectionPlaceholder label="Parameters" />
-        <SectionPlaceholder label="Workers" defaultOpen>
-          Worker rows and actions land in a follow-up.
-        </SectionPlaceholder>
+        <CompanyWorkersSection row={row} summary={summary} companyOptions={companyOptions} />
         <SectionPlaceholder label="Daily breakdown" />
 
         {row.bonusDetails || row.profitBreakdown || row.aeBreakdown ? (
@@ -224,12 +491,16 @@ function CompanyCard({ row }: { row: CompanyAdvisorRow }) {
 }
 
 function CompaniesList({ companies }: { companies: CompanyAdvisorRow[] }) {
+  const companyOptions = companies.map((row) => ({
+    id: row.company.id,
+    name: row.company.name,
+  }));
   return (
     <>
       <PortfolioNetBanner />
       <div className="flex flex-col gap-3">
         {companies.map((row) => (
-          <CompanyCard key={row.company.id} row={row} />
+          <CompanyCard key={row.company.id} row={row} companyOptions={companyOptions} />
         ))}
       </div>
     </>
