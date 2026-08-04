@@ -1,6 +1,7 @@
 import { Logger as TsLogger } from "tslog";
 import { fileTransport } from "tslog/transports/file";
 import type { AppConfig } from "../config/env";
+import { registerServerTsLogger } from "./context";
 import { MASK_KEYS, resolveMaskEnabled } from "./mask";
 import { attachSentryTransports, initSentry } from "./sentry";
 import type { LogFn, Logger } from "./types";
@@ -47,6 +48,7 @@ export function createServerLogger(config: AppConfig): Logger {
       ? { keys: [...MASK_KEYS], caseInsensitive: true, placeholder: "[***]" }
       : undefined,
   });
+  registerServerTsLogger(log);
 
   if (config.logFile) {
     log.attachTransport(fileTransport({ path: config.logFile, format: "json", append: true }));
@@ -56,10 +58,7 @@ export function createServerLogger(config: AppConfig): Logger {
     if (initSentry(config)) {
       attachSentryTransports(log, config);
       // Visible confirmation that DSN was loaded (also becomes a Sentry Log).
-      log.info(
-        { enableLogs: true, environment: config.nodeEnv },
-        "sentry transports attached",
-      );
+      log.info({ enableLogs: true, environment: config.nodeEnv }, "sentry transports attached");
     }
   }
 
