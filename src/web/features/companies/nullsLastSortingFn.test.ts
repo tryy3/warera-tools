@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { nullsLastSortingFn } from "./nullsLastSortingFn";
 
 type Row = { getValue: (columnId: string) => number | null };
