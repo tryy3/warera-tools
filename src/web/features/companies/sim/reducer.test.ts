@@ -323,6 +323,180 @@ describe("companySimReducer", () => {
     });
     expect(state.workers.map((w) => w.id).sort()).toEqual(["sim-1", "u1"]);
   });
+
+  it("keepOverrides hydrate merges dirty/moved reals and refreshes clean ones", () => {
+    const sim: SimWorker = {
+      id: "sim-1",
+      kind: "simulated",
+      name: "Sim",
+      assignment: null,
+      wagePerPp: 0.2,
+      energyLevel: 5,
+      productionLevel: 5,
+      fidelityPct: 0,
+      assumedFields: [],
+      dirty: true,
+    };
+
+    let state = companySimReducer(initialCompanySimState, {
+      type: "hydrate",
+      live: livePayload([
+        {
+          companyId: "c1",
+          offerWagePerPp: 0.3,
+          workers: [
+            advisorWorker({
+              userId: "dirty-edit",
+              username: "Alice",
+              wagePerPp: 0.3,
+              energyLevel: 5,
+              productionLevel: 5,
+              fidelityPct: 0,
+            }),
+            advisorWorker({
+              userId: "moved",
+              username: "Bob",
+              wagePerPp: 0.3,
+              energyLevel: 5,
+              productionLevel: 5,
+              fidelityPct: 0,
+            }),
+            advisorWorker({
+              userId: "clean",
+              username: "Carol",
+              wagePerPp: 0.3,
+              energyLevel: 5,
+              productionLevel: 5,
+              fidelityPct: 0,
+            }),
+            advisorWorker({
+              userId: "vanished",
+              username: "Dave",
+              wagePerPp: 0.3,
+              energyLevel: 5,
+              productionLevel: 5,
+              fidelityPct: 0,
+            }),
+          ],
+        },
+        {
+          companyId: "c2",
+          offerWagePerPp: 0.4,
+          workers: [],
+        },
+      ]),
+      keepOverrides: false,
+    });
+
+    state = companySimReducer(state, {
+      type: "updateWorker",
+      id: "dirty-edit",
+      patch: { wagePerPp: 0.99, energyLevel: 9 },
+    });
+    state = companySimReducer(state, {
+      type: "setAssignment",
+      id: "moved",
+      assignment: "c2",
+    });
+    state = companySimReducer(state, { type: "addSimWorker", worker: sim });
+    state = companySimReducer(state, {
+      type: "setCompanyOverride",
+      companyId: "c1",
+      patch: { aeLevel: 11 },
+    });
+
+    const refreshedLive = livePayload([
+      {
+        companyId: "c1",
+        offerWagePerPp: 0.35,
+        workers: [
+          advisorWorker({
+            userId: "dirty-edit",
+            username: "Alice",
+            wagePerPp: 0.35,
+            energyLevel: 6,
+            productionLevel: 6,
+            fidelityPct: 2,
+          }),
+          advisorWorker({
+            userId: "moved",
+            username: "Bob",
+            wagePerPp: 0.35,
+            energyLevel: 6,
+            productionLevel: 6,
+            fidelityPct: 2,
+          }),
+          advisorWorker({
+            userId: "clean",
+            username: "Carol",
+            wagePerPp: 0.35,
+            energyLevel: 7,
+            productionLevel: 7,
+            fidelityPct: 3,
+          }),
+          // vanished dropped from live
+          advisorWorker({
+            userId: "new-real",
+            username: "Eve",
+            wagePerPp: 0.5,
+            energyLevel: 4,
+            productionLevel: 4,
+            fidelityPct: 1,
+          }),
+        ],
+      },
+      {
+        companyId: "c2",
+        offerWagePerPp: 0.4,
+        workers: [],
+      },
+    ]);
+
+    state = companySimReducer(state, {
+      type: "hydrate",
+      live: refreshedLive,
+      keepOverrides: true,
+    });
+
+    expect(state.overrides).toEqual({ c1: { aeLevel: 11 } });
+    expect(state.workers.map((w) => w.id).sort()).toEqual([
+      "clean",
+      "dirty-edit",
+      "moved",
+      "new-real",
+      "sim-1",
+    ]);
+
+    expect(state.workers.find((w) => w.id === "dirty-edit")).toMatchObject({
+      wagePerPp: 0.99,
+      energyLevel: 9,
+      assignment: "c1",
+      dirty: true,
+    });
+    expect(state.workers.find((w) => w.id === "moved")).toMatchObject({
+      assignment: "c2",
+      wagePerPp: 0.3,
+      dirty: true,
+    });
+    expect(state.workers.find((w) => w.id === "clean")).toMatchObject({
+      wagePerPp: 0.35,
+      energyLevel: 7,
+      productionLevel: 7,
+      fidelityPct: 3,
+      assignment: "c1",
+      dirty: false,
+    });
+    expect(state.workers.find((w) => w.id === "new-real")).toMatchObject({
+      name: "Eve",
+      assignment: "c1",
+      dirty: false,
+    });
+    expect(state.workers.find((w) => w.id === "vanished")).toBeUndefined();
+    expect(state.workers.find((w) => w.id === "sim-1")).toMatchObject({
+      assignment: null,
+      kind: "simulated",
+    });
+  });
 });
 
 describe("createMemoryPersistence", () => {

@@ -93,9 +93,30 @@ export function companySimReducer(
   switch (action.type) {
     case "hydrate": {
       const simulated = state.workers.filter((w) => w.kind === "simulated");
+      const liveReals = realWorkersFromPayload(action.live);
+
+      if (!action.keepOverrides) {
+        return {
+          workers: [...liveReals, ...simulated],
+          overrides: {},
+          liveEpoch: state.liveEpoch + 1,
+        };
+      }
+
+      // Merge reals by id: dirty/moved keep edits + assignment; clean refresh from live.
+      // Drop reals that vanished from live; always keep simulated workers.
+      const existingReals = new Map(
+        state.workers.filter((w) => w.kind === "real").map((w) => [w.id, w]),
+      );
+      const mergedReals = liveReals.map((liveWorker) => {
+        const existing = existingReals.get(liveWorker.id);
+        if (existing?.dirty) return existing;
+        return liveWorker;
+      });
+
       return {
-        workers: [...realWorkersFromPayload(action.live), ...simulated],
-        overrides: action.keepOverrides ? state.overrides : {},
+        workers: [...mergedReals, ...simulated],
+        overrides: state.overrides,
         liveEpoch: state.liveEpoch + 1,
       };
     }

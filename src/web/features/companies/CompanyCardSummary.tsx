@@ -52,11 +52,15 @@ function GoldPerDay({ value, digits = 3 }: { value: number; digits?: number }) {
 export function CompanyCardSummary({
   row,
   summary,
+  aeLevel,
+  productionBonus,
 }: {
   row: CompanyAdvisorRow;
   summary: DerivedCompanyCard;
+  aeLevel: number;
+  productionBonus: number | null;
 }) {
-  const bonusPct = row.company.productionBonus != null ? row.company.productionBonus * 100 : null;
+  const bonusPct = productionBonus != null ? productionBonus * 100 : null;
 
   return (
     <>
@@ -93,7 +97,7 @@ export function CompanyCardSummary({
               {row.company.regionName ?? row.company.regionId ?? "—"}
             </span>
             <span aria-hidden>·</span>
-            <span>AE {row.company.aeLevel}</span>
+            <span>AE {aeLevel}</span>
             <span aria-hidden>·</span>
             <span>Bonus {bonusPct != null ? `${formatNum(bonusPct, 1)}%` : "—"}</span>
           </p>
