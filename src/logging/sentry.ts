@@ -1,6 +1,7 @@
 import * as Sentry from "@sentry/node";
 import type { Transport } from "tslog";
 import type { AppConfig } from "../config/env";
+import { promoteCorrelationAttrs } from "./correlation";
 
 const TO_SENTRY_LOG = {
   SILLY: "trace",
@@ -22,6 +23,10 @@ export function resetSentryStateForTests(): void {
   initialized = false;
 }
 
+export function isSentryInitialized(): boolean {
+  return initialized;
+}
+
 export function initSentry(config: Pick<AppConfig, "sentryDsn" | "nodeEnv">): boolean {
   if (!config.sentryDsn) return false;
   if (initialized) return true;
@@ -29,6 +34,7 @@ export function initSentry(config: Pick<AppConfig, "sentryDsn" | "nodeEnv">): bo
     Sentry.init({
       dsn: config.sentryDsn,
       enableLogs: true,
+      tracesSampleRate: 1,
       environment: config.nodeEnv,
       debug: process.env.SENTRY_DEBUG === "true" || process.env.SENTRY_DEBUG === "1",
     });
@@ -103,7 +109,8 @@ export function attachSentryTransports(
         _logMeta?: { logLevelName?: string };
         message?: unknown;
       } & Record<string, unknown>;
-      const { _logMeta, message, ...attributes } = parsed;
+      const { _logMeta, message, ...restAttributes } = parsed;
+      const attributes = promoteCorrelationAttrs(_logMeta, restAttributes);
       const levelName = (_logMeta?.logLevelName ?? "INFO") as LogLevelName;
       const method = (TO_SENTRY_LOG[levelName] ?? "info") as SentryLogMethod;
       Sentry.logger[method](messageText(message, ""), attributes);

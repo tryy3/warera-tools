@@ -60,6 +60,7 @@ describe("sentry logging", () => {
       expect.objectContaining({
         dsn: "https://key@o0.ingest.sentry.io/1",
         enableLogs: true,
+        tracesSampleRate: 1,
         environment: "development",
       }),
     );
@@ -93,6 +94,23 @@ describe("sentry logging", () => {
     expect(loggerMethods.info).toHaveBeenCalledWith(
       "user logged in",
       expect.objectContaining({ userId: 42 }),
+    );
+  });
+
+  it("Logs transport promotes job_run_id from _logMeta", async () => {
+    initSentry({ sentryDsn: "https://key@o0.ingest.sentry.io/1", nodeEnv: "test" });
+    const log = new TsLogger({ type: "hidden", minLevel: "INFO" });
+    attachSentryTransports(log, {
+      sentryDsn: "https://key@o0.ingest.sentry.io/1",
+      logLevel: "info",
+    });
+    log.runInContext({ job_run_id: 99, job_id: "example-heartbeat" }, () => {
+      log.info("poll complete");
+    });
+    await log.flush();
+    expect(loggerMethods.info).toHaveBeenCalledWith(
+      "poll complete",
+      expect.objectContaining({ job_run_id: 99, job_id: "example-heartbeat" }),
     );
   });
 
