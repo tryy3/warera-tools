@@ -126,6 +126,26 @@ Respect `LOG_MASK_SECRETS` (default **on** in production). Set `LOG_MASK_SECRETS
 
 Optional `LOG_FILE=logs/app.log` enables a JSON file transport. Leave unset in normal development.
 
+### Correlation (HTTP + jobs)
+
+Use snake_case correlation attributes on structured logs:
+
+| Attribute | When |
+| --- | --- |
+| `request_id` | Inside an `/api/*` request (`withLogContext` / access middleware) |
+| `job_id` | Inside a job run |
+| `job_run_id` | Inside a job run (DB `job_runs.id`) |
+
+Do not invent parallel camelCase ids (`requestId`, `jobId`) in new log fields.
+
+**Sentry Logs filters (examples):**
+
+- One job run: `job_run_id:<id>`
+- One HTTP request: `request_id:<uuid>`
+- Exclude cron/job noise: `!has:job_run_id`
+
+Each request/job also opens a Sentry span (`http.server` / `job.run`) when `SENTRY_DSN` is set (`tracesSampleRate: 1`). Prefer filtering on `request_id` / `job_run_id` for “everything in this unit of work”; use the trace UI to see the waterfall.
+
 ### Sentry
 
 Optional. Set `SENTRY_DSN` to forward server logs via tslog transports: **Issues** for `error`/`fatal`, and **Sentry Logs** at the same min level as `LOG_LEVEL`. Unset disables Sentry (default for local/CI). Browser Sentry is not wired yet.
