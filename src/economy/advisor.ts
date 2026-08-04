@@ -1,4 +1,5 @@
 import {
+  enrichMarketOpportunities,
   explainAeDaily,
   calculateProfitPerPp,
   listMarketOpportunities,
@@ -6,6 +7,7 @@ import {
   paybackDays,
   transferCostGold,
   type AeDailyBreakdown,
+  type MarketOpportunity,
   type ProfitPpBreakdown,
 } from "../economy";
 import type { CompanyPackEntry } from "../db/company-packs";
@@ -88,7 +90,7 @@ export async function buildAdvisor(options: {
   recordedAt: string | null;
   companiesFetchedAt: number | null;
   companiesRefreshed: boolean;
-  opportunities: ProfitPpBreakdown[];
+  opportunities: MarketOpportunity[];
   companies: CompanyAdvisorRow[];
 }> {
   const { db, warera, logger, userId, refresh = false } = options;
@@ -118,7 +120,7 @@ export async function buildAdvisor(options: {
     latest = await getLatestPrices(db);
   }
   const prices = latest ? marketPriceMap(latest) : {};
-  const opportunities = listMarketOpportunities(prices);
+  const opportunitiesBase = listMarketOpportunities(prices);
   const concretePrice = prices.concrete ?? 0;
 
   cacheStats.recommendedHit = recommendedByItem.size;
@@ -339,6 +341,36 @@ export async function buildAdvisor(options: {
     },
     "advisor",
   );
+
+  for (const o of opportunitiesBase) {
+    if (!bestRegionCache.has(o.itemCode)) {
+      await bestRegion(o.itemCode);
+    }
+  }
+
+  const regionHints = new Map<
+    string,
+    { regionId: string; regionName: string | null; bonus: number | null }
+  >();
+  for (const [itemCode, row] of recommendedByItem) {
+    regionHints.set(itemCode, {
+      regionId: row.regionId,
+      regionName: row.regionName,
+      bonus: row.bonus,
+    });
+  }
+  for (const [itemCode, region] of bestRegionCache) {
+    if (region == null) continue;
+    const existing = regionHints.get(itemCode);
+    // Prefer DB row (preserves null bonus). Only add live-fetched items absent from DB.
+    if (existing) continue;
+    regionHints.set(itemCode, {
+      regionId: region.regionId,
+      regionName: region.regionName,
+      bonus: region.bonus,
+    });
+  }
+  const opportunities = enrichMarketOpportunities(opportunitiesBase, regionHints);
 
   logger.info(
     {

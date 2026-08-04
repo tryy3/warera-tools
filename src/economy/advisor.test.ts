@@ -11,6 +11,7 @@ import { getRecommendedRegion, upsertRecommendedRegion } from "../db/recommended
 import { upsertRegionFetched } from "../db/regions";
 import * as schema from "../db/schema";
 import { listProducibleRecipes } from "./recipes";
+import { explainAeDaily } from "./profit";
 import { buildAdvisor } from "./advisor";
 
 async function createDb(): Promise<Db> {
@@ -204,6 +205,28 @@ describe("buildAdvisor caching", () => {
     expect(result.companies).toHaveLength(1);
     expect(result.companies[0]?.company.regionName).toBe("Home");
     expect(result.companiesFetchedAt).toBe(fetchedAt.getTime());
+
+    const ironOpp = result.opportunities.find((o) => o.itemCode === "iron");
+    expect(ironOpp).toMatchObject({
+      referenceAeLevel: 6,
+      bestBonus: 0.5,
+    });
+    expect(ironOpp?.roughDailyValue).toBe(
+      explainAeDaily(6, 0.5, ironOpp!.profitPerPp!).dailyValue,
+    );
+    const steelOpp = result.opportunities.find((o) => o.itemCode === "steel");
+    expect(steelOpp).toMatchObject({
+      referenceAeLevel: 6,
+      bestBonus: 0.5,
+    });
+    expect(steelOpp?.roughDailyValue).toBe(
+      explainAeDaily(6, 0.5, steelOpp!.profitPerPp!).dailyValue,
+    );
+    for (let i = 1; i < result.opportunities.length; i++) {
+      expect(result.opportunities[i - 1]!.profitPerPp!).toBeGreaterThanOrEqual(
+        result.opportunities[i]!.profitPerPp!,
+      );
+    }
   });
 
   it("refresh=true refetches company pack even when fresh", async () => {
