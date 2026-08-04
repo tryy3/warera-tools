@@ -6,7 +6,7 @@ export const exampleHeartbeatJob: JobDefinition = {
   description: "Logs a heartbeat to prove the scheduler wiring",
   defaultCron: "0 * * * * *", // every minute at second 0
   async run({ logger }) {
-    logger.debug({ jobId: "example-heartbeat" }, "heartbeat");
+    logger.debug({ job_id: "example-heartbeat" }, "heartbeat");
     return "ok";
   },
 };

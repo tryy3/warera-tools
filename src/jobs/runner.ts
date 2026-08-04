@@ -1,6 +1,7 @@
 import { and, eq } from "drizzle-orm";
 import type { Db } from "../db/client";
 import { jobRuns, jobs } from "../db/schema";
+import { withLogContext } from "../logging/context";
 import type { Logger } from "../logging/logger";
 import type { WareraRequester } from "../warera/prices";
 import { pruneJobRuns } from "./prune";
@@ -67,7 +68,7 @@ export async function recordJobOverrun(db: Db, logger: Logger, jobId: string): P
     message: OVERUN_MESSAGE,
     durationMs: 0,
   });
-  logger.warn({ jobId }, "job overrun blocked");
+  logger.warn({ job_id: jobId }, "job overrun blocked");
   // Intentionally do not change jobs.last_status while a real run may still be running.
 }
 
@@ -89,7 +90,7 @@ export async function reconcileInterruptedRuns(db: Db, logger: Logger): Promise<
         lastError: INTERRUPTED_MESSAGE,
       })
       .where(eq(jobs.id, job.id));
-    logger.warn({ jobId: job.id }, "reconciled interrupted job run");
+    logger.warn({ job_id: job.id }, "reconciled interrupted job run");
   }
 }
 
@@ -131,7 +132,7 @@ async function runJobLocked(
 
   if (job?.lastStatus === "running") {
     await markOpenRunsInterrupted(db, def.id, now);
-    logger.warn({ jobId: def.id }, "marking stale running job as interrupted before restart");
+    logger.warn({ job_id: def.id }, "marking stale running job as interrupted before restart");
   }
 
   const startedAt = now;
@@ -163,13 +164,28 @@ async function runJobLocked(
   };
 
   try {
-    const message = await def.run({
-      db,
-      logger,
-      warera: opts.warera,
-      state: (job?.state as Record<string, unknown> | null) ?? null,
-      setState,
+    const job_id = def.id;
+    const job_run_id = runId;
+    const runLogger = logger.child({
+      name: `job:${job_id}`,
+      bindings: { job_id, job_run_id },
     });
+
+    const message = await withLogContext(
+      {
+        attributes: { job_id, job_run_id },
+        spanName: job_id,
+        spanOp: "job.run",
+      },
+      () =>
+        def.run({
+          db,
+          logger: runLogger,
+          warera: opts.warera,
+          state: (job?.state as Record<string, unknown> | null) ?? null,
+          setState,
+        }),
+    );
 
     const finishedAt = new Date();
     const durationMs = finishedAt.getTime() - startedAt.getTime();
@@ -198,7 +214,7 @@ async function runJobLocked(
     const durationMs = finishedAt.getTime() - startedAt.getTime();
     const errorMessage = err instanceof Error ? err.message : String(err);
 
-    logger.error({ jobId: def.id }, "job failed", err);
+    logger.error({ job_id: def.id }, "job failed", err);
 
     await db
       .update(jobRuns)

@@ -40,7 +40,7 @@ export async function startScheduler(deps: {
     const rows = await db.select().from(jobs).where(eq(jobs.id, def.id)).limit(1);
     const row = rows[0];
     if (!row || !row.enabled) {
-      logger.info({ jobId: def.id }, "job not scheduled (missing or disabled)");
+      logger.info({ job_id: def.id }, "job not scheduled (missing or disabled)");
       return;
     }
 
@@ -49,7 +49,7 @@ export async function startScheduler(deps: {
 
     const protectCallback = () => {
       void recordJobOverrun(db, logger, def.id).catch((err) => {
-        logger.error({ jobId: def.id }, "failed to record job overrun", err);
+        logger.error({ job_id: def.id }, "failed to record job overrun", err);
       });
     };
 
@@ -65,11 +65,11 @@ export async function startScheduler(deps: {
       try {
         await runJob(db, logger, def, { keep: jobRunHistoryLimit, warera });
       } catch (err) {
-        logger.error({ jobId: def.id }, "unhandled job error", err);
+        logger.error({ job_id: def.id }, "unhandled job error", err);
       }
     });
     crons.set(def.id, jobCron);
-    logger.info({ jobId: def.id, cron: cronExpr, next: jobCron.nextRun() }, "job scheduled");
+    logger.info({ job_id: def.id, cron: cronExpr, next: jobCron.nextRun() }, "job scheduled");
   }
 
   await Promise.all([...defs.values()].map((def) => scheduleOne(def)));
@@ -81,7 +81,7 @@ export async function startScheduler(deps: {
     async reloadJob(jobId: string) {
       const def = defs.get(jobId);
       if (!def) {
-        logger.warn({ jobId }, "reloadJob: unknown job");
+        logger.warn({ job_id: jobId }, "reloadJob: unknown job");
         return;
       }
       await scheduleOne(def);

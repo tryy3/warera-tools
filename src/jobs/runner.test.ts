@@ -1,12 +1,30 @@
 import { createClient } from "@libsql/client";
 import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/libsql";
-import { describe, expect, it } from "vite-plus/test";
+import { describe, expect, it, vi } from "vite-plus/test";
 import type { Db } from "../db/client";
 import * as schema from "../db/schema";
 import { jobRuns, jobs } from "../db/schema";
 import type { Logger } from "../logging/logger";
-import { INTERRUPTED_MESSAGE, isStaleRunning, OVERUN_MESSAGE, recordJobOverrun } from "./runner";
+import type { WareraRequester } from "../warera/prices";
+import type { JobDefinition } from "./types";
+import {
+  INTERRUPTED_MESSAGE,
+  isStaleRunning,
+  OVERUN_MESSAGE,
+  recordJobOverrun,
+  runJob,
+} from "./runner";
+
+vi.mock("../logging/context", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../logging/context")>();
+  return {
+    ...actual,
+    withLogContext: vi.fn(actual.withLogContext),
+  };
+});
+
+import { withLogContext } from "../logging/context";
 
 const silentLogger = {
   silly: () => {},
@@ -72,6 +90,69 @@ describe("isStaleRunning", () => {
 describe("INTERRUPTED_MESSAGE", () => {
   it("uses a stable interrupted/stale label", () => {
     expect(INTERRUPTED_MESSAGE).toBe("interrupted/stale");
+  });
+});
+
+describe("runJob log correlation", () => {
+  it("wraps def.run in withLogContext and passes a child logger with job_id and job_run_id", async () => {
+    const db = await createMemoryJobsDb();
+    await db.insert(jobs).values({
+      id: "test-job",
+      name: "Test",
+      description: "",
+      cron: "0 * * * * *",
+      enabled: true,
+    });
+
+    let loggerPassedToRun: Logger | undefined;
+    const def: JobDefinition = {
+      id: "test-job",
+      name: "Test",
+      description: "",
+      defaultCron: "0 * * * * *",
+      async run(ctx) {
+        loggerPassedToRun = ctx.logger;
+        ctx.logger.debug({ marker: true }, "inside run");
+        return "ok";
+      },
+    };
+
+    const childCalls: Array<{ name?: string; bindings?: Record<string, unknown> }> = [];
+    const parentLogger = {
+      ...silentLogger,
+      child: (opts?: { name?: string; bindings?: Record<string, unknown> }) => {
+        childCalls.push(opts ?? {});
+        const child = {
+          ...silentLogger,
+          debug: () => {},
+          child: () => child,
+        };
+        return child as Logger;
+      },
+    } as Logger;
+
+    const warera = { request: vi.fn() } as unknown as WareraRequester;
+
+    vi.mocked(withLogContext).mockClear();
+    await runJob(db, parentLogger, def, { warera });
+
+    expect(withLogContext).toHaveBeenCalledWith(
+      expect.objectContaining({
+        attributes: expect.objectContaining({
+          job_id: "test-job",
+          job_run_id: expect.any(Number),
+        }),
+        spanName: "test-job",
+        spanOp: "job.run",
+      }),
+      expect.any(Function),
+    );
+
+    expect(childCalls[0]?.bindings).toMatchObject({
+      job_id: "test-job",
+      job_run_id: expect.any(Number),
+    });
+    expect(loggerPassedToRun).toBeDefined();
   });
 });
 
