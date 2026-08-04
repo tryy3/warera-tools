@@ -16,5 +16,7 @@ export type JobDefinition = {
   description: string;
   defaultCron: string; // 6-field cron
   defaultEnabled?: boolean;
+  /** Mapped to Croner maxRuns; omit / undefined = infinite. */
+  defaultMaxRuns?: number;
   run: (ctx: JobContext) => Promise<string | void>;
 };

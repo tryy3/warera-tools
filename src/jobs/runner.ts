@@ -9,7 +9,7 @@ import type { JobDefinition } from "./types";
 const STALE_RUNNING_MS = 30 * 60 * 1000;
 const DEFAULT_JOB_RUN_HISTORY_LIMIT = 50;
 export const INTERRUPTED_MESSAGE = "interrupted/stale";
-const SKIP_ALREADY_RUNNING = "job already running";
+export const OVERUN_MESSAGE = "job already running";
 
 export type RunJobResult = {
   started: boolean;
@@ -60,6 +60,24 @@ async function markOpenRunsInterrupted(
  * Clears jobs left in `running` after a process crash/restart so they are not
  * locked out until the stale timeout.
  */
+export async function recordJobOverrun(
+  db: Db,
+  logger: Logger,
+  jobId: string,
+): Promise<void> {
+  const now = new Date();
+  await db.insert(jobRuns).values({
+    jobId,
+    startedAt: now,
+    finishedAt: now,
+    status: "error",
+    message: OVERUN_MESSAGE,
+    durationMs: 0,
+  });
+  logger.warn({ jobId }, "job overrun blocked");
+  // Intentionally do not change jobs.last_status while a real run may still be running.
+}
+
 export async function reconcileInterruptedRuns(db: Db, logger: Logger): Promise<void> {
   const now = new Date();
   const interrupted = await db.select().from(jobs).where(eq(jobs.lastStatus, "running"));
@@ -85,8 +103,8 @@ export async function runJob(
   opts: RunJobOptions,
 ): Promise<RunJobResult> {
   if (inflightJobs.has(def.id)) {
-    logger.info({ jobId: def.id }, "job already running in-process; skip");
-    return { started: false, skippedReason: SKIP_ALREADY_RUNNING };
+    await recordJobOverrun(db, logger, def.id);
+    return { started: false, skippedReason: OVERUN_MESSAGE };
   }
 
   inflightJobs.add(def.id);
@@ -110,8 +128,8 @@ async function runJobLocked(
 
   // force does not bypass overlap; stale (>30m) running rows may restart
   if (job?.lastStatus === "running" && !isStaleRunning(job.lastStartedAt as Date | null, now)) {
-    logger.info({ jobId: def.id }, "job already running; skip");
-    return { started: false, skippedReason: SKIP_ALREADY_RUNNING };
+    await recordJobOverrun(db, logger, def.id);
+    return { started: false, skippedReason: OVERUN_MESSAGE };
   }
 
   if (job?.lastStatus === "running") {

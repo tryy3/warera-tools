@@ -29,12 +29,14 @@ export async function syncJobsToDb(db: Db, defs: JobDefinition[]): Promise<void>
         description: def.description,
         cron: def.defaultCron,
         enabled: def.defaultEnabled ?? true,
+        maxRuns: def.defaultMaxRuns ?? null,
       })
       .onConflictDoUpdate({
         target: jobs.id,
         set: {
           name: def.name,
           description: def.description,
+          // do not overwrite cron, enabled, or maxRuns
         },
       });
   }

@@ -6,7 +6,7 @@ import type { Logger } from "../logging/logger";
 import type { WareraRequester } from "../warera/prices";
 import { listJobDefinitions } from "./registry";
 import { resolveCron } from "./resolve-cron";
-import { runJob } from "./runner";
+import { recordJobOverrun, runJob } from "./runner";
 import type { JobDefinition } from "./types";
 
 export type SchedulerHandle = {
@@ -45,10 +45,28 @@ export async function startScheduler(deps: {
     }
 
     const cronExpr = resolveCron(row.cron, def.defaultCron, logger);
-    const jobCron = new Cron(cronExpr, { protect: true, name: def.id }, () => {
-      void runJob(db, logger, def, { keep: jobRunHistoryLimit, warera }).catch((err) => {
-        logger.error({ jobId: def.id }, "unhandled job error", err);
+    const maxRuns = row.maxRuns ?? def.defaultMaxRuns ?? undefined;
+
+    const protectCallback = () => {
+      void recordJobOverrun(db, logger, def.id).catch((err) => {
+        logger.error({ jobId: def.id }, "failed to record job overrun", err);
       });
+    };
+
+    const cronOpts: { protect: typeof protectCallback; name: string; maxRuns?: number } = {
+      protect: protectCallback,
+      name: def.id,
+    };
+    if (maxRuns != null && maxRuns > 0) {
+      cronOpts.maxRuns = maxRuns;
+    }
+
+    const jobCron = new Cron(cronExpr, cronOpts, async () => {
+      try {
+        await runJob(db, logger, def, { keep: jobRunHistoryLimit, warera });
+      } catch (err) {
+        logger.error({ jobId: def.id }, "unhandled job error", err);
+      }
     });
     crons.set(def.id, jobCron);
     logger.info({ jobId: def.id, cron: cronExpr, next: jobCron.nextRun() }, "job scheduled");
