@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vite-plus/test";
+import { dailyActionsFromBar } from "../../skills/income";
+import { skillValueFromLevel } from "../../skills/values";
 import { explainAeDaily } from "../profit";
 import { getRecipe } from "../recipes";
 import { companyDay } from "./company-day";
@@ -36,7 +38,57 @@ describe("companyDay", () => {
     expect(r.maxGrossWagePerPp).toBe(profitPerPp);
   });
 
-  it("one worker is loss-making at 0% fidelity and profitable at 10% when wage is between break-even margins", () => {
+  it("self-work PP and value match entrepreneurship/production skills and add to netPerDay", () => {
+    const entrepreneurshipLevel = 2;
+    const productionSkillLevel = 3;
+    const productionBonus = 0.35;
+    const profitPerPp = 0.12;
+
+    const selfActions = dailyActionsFromBar(
+      skillValueFromLevel("entrepreneurship", entrepreneurshipLevel),
+    );
+    const ppPerAction = skillValueFromLevel("production", productionSkillLevel);
+    const expectedSelfPp = selfActions * ppPerAction * (1 + productionBonus);
+    const expectedSelfValue = expectedSelfPp * profitPerPp;
+
+    expect(selfActions).toBeCloseTo(9.6, 6);
+    expect(ppPerAction).toBe(19);
+
+    const withoutSelfWork = companyDay({
+      aeLevel: 0,
+      productionBonus,
+      profitPerPp,
+      itemCode: null,
+      inputCostPerUnit: 0,
+      entrepreneurshipLevel,
+      productionSkillLevel,
+      includeSelfWork: false,
+      workers: [],
+    });
+
+    const withSelfWork = companyDay({
+      aeLevel: 0,
+      productionBonus,
+      profitPerPp,
+      itemCode: null,
+      inputCostPerUnit: 0,
+      entrepreneurshipLevel,
+      productionSkillLevel,
+      includeSelfWork: true,
+      workers: [],
+    });
+
+    expect(withSelfWork.selfWorkDailyPp).toBeCloseTo(expectedSelfPp, 6);
+    expect(withSelfWork.selfWorkDailyValue).toBeCloseTo(expectedSelfValue, 6);
+    expect(withSelfWork.totalPpPerDay).toBeCloseTo(expectedSelfPp, 6);
+    expect(withSelfWork.netPerDay).toBeCloseTo(expectedSelfValue, 6);
+    expect(withSelfWork.netPerDay - withoutSelfWork.netPerDay).toBeCloseTo(
+      expectedSelfValue,
+      6,
+    );
+  });
+
+  it("worker contribution is negative when wage exceeds profit/PP and positive when wage is below profit/PP", () => {
     // With wage above profit/PP, contribution is negative at any fidelity (scales both sides).
     // Cover the brief's loss-making case, then a wage-below-profit case where 10% is more profitable.
     const loss = companyDay({
