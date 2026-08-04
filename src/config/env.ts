@@ -13,6 +13,7 @@ export type AppConfig = {
   logLevel: string;
   logMaskSecrets: boolean;
   logFile: string | undefined;
+  sentryDsn: string | undefined;
   jobRunHistoryLimit: number;
 };
 
@@ -44,6 +45,7 @@ export function parseConfig(
     logLevel: env.LOG_LEVEL ?? "info",
     logMaskSecrets: parseBoolEnv(env.LOG_MASK_SECRETS, nodeEnv === "production"),
     logFile: env.LOG_FILE || undefined,
+    sentryDsn: env.SENTRY_DSN || undefined,
     jobRunHistoryLimit: Number(env.JOB_RUN_HISTORY_LIMIT ?? 50),
   };
 }

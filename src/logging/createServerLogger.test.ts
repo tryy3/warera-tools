@@ -20,6 +20,7 @@ function baseConfig(overrides: Partial<AppConfig> = {}): AppConfig {
     logLevel: "info",
     logMaskSecrets: false,
     logFile: undefined,
+    sentryDsn: undefined,
     jobRunHistoryLimit: 50,
     ...overrides,
   };
@@ -29,6 +30,13 @@ describe("resolveMaskEnabled", () => {
   it("follows config.logMaskSecrets", () => {
     expect(resolveMaskEnabled(baseConfig({ logMaskSecrets: true }))).toBe(true);
     expect(resolveMaskEnabled(baseConfig({ logMaskSecrets: false }))).toBe(false);
+  });
+});
+
+describe("MASK_KEYS", () => {
+  it("includes Sentry DSN fields", () => {
+    expect(MASK_KEYS).toContain("SENTRY_DSN");
+    expect(MASK_KEYS).toContain("dsn");
   });
 });
 

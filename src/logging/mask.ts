@@ -9,6 +9,8 @@ export const MASK_KEYS = [
   "WARERA_API_KEY",
   "TURSO_AUTH_TOKEN",
   "DISCORD_WEBHOOK_URL",
+  "SENTRY_DSN",
+  "dsn",
 ] as const;
 
 export function resolveMaskEnabled(config: Pick<AppConfig, "logMaskSecrets">): boolean {

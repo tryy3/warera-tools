@@ -61,4 +61,14 @@ describe("parseConfig", () => {
       }).logFile,
     ).toBe("logs/app.log");
   });
+
+  it("parses optional SENTRY_DSN", () => {
+    expect(parseConfig({ TURSO_DATABASE_URL: "file:test.db" }).sentryDsn).toBeUndefined();
+    expect(
+      parseConfig({
+        TURSO_DATABASE_URL: "file:test.db",
+        SENTRY_DSN: "https://key@o0.ingest.sentry.io/1",
+      }).sentryDsn,
+    ).toBe("https://key@o0.ingest.sentry.io/1");
+  });
 });
