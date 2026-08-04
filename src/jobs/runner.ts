@@ -56,10 +56,7 @@ async function markOpenRunsInterrupted(
   }
 }
 
-/**
- * Clears jobs left in `running` after a process crash/restart so they are not
- * locked out until the stale timeout.
- */
+/** Records a blocked overlap attempt without changing jobs.last_status. */
 export async function recordJobOverrun(
   db: Db,
   logger: Logger,
@@ -78,6 +75,10 @@ export async function recordJobOverrun(
   // Intentionally do not change jobs.last_status while a real run may still be running.
 }
 
+/**
+ * Clears jobs left in `running` after a process crash/restart so they are not
+ * locked out until the stale timeout.
+ */
 export async function reconcileInterruptedRuns(db: Db, logger: Logger): Promise<void> {
   const now = new Date();
   const interrupted = await db.select().from(jobs).where(eq(jobs.lastStatus, "running"));
