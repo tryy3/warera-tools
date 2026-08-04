@@ -95,6 +95,45 @@ export function listMarketOpportunities(prices: Record<string, number>): ProfitP
     .toSorted((a, b) => (b.profitPerPp ?? 0) - (a.profitPerPp ?? 0));
 }
 
+export const OPPORTUNITY_REFERENCE_AE = 6;
+
+export type OpportunityRegionHint = {
+  regionId: string;
+  regionName: string | null;
+  bonus: number | null;
+};
+
+export type MarketOpportunity = ProfitPpBreakdown & {
+  bestBonus: number | null;
+  bestRegionId: string | null;
+  bestRegionName: string | null;
+  roughDailyValue: number | null;
+  referenceAeLevel: number;
+};
+
+export function enrichMarketOpportunities(
+  opportunities: ProfitPpBreakdown[],
+  regionsByItem: ReadonlyMap<string, OpportunityRegionHint>,
+): MarketOpportunity[] {
+  return opportunities.map((o) => {
+    const region = regionsByItem.get(o.itemCode);
+    const bonus = region?.bonus;
+    const hasBonus = bonus != null && Number.isFinite(bonus);
+    const hasPp = o.profitPerPp != null && Number.isFinite(o.profitPerPp);
+    return {
+      ...o,
+      bestBonus: hasBonus ? bonus : null,
+      bestRegionId: region?.regionId ?? null,
+      bestRegionName: region?.regionName ?? null,
+      roughDailyValue:
+        hasBonus && hasPp
+          ? explainAeDaily(OPPORTUNITY_REFERENCE_AE, bonus, o.profitPerPp!).dailyValue
+          : null,
+      referenceAeLevel: OPPORTUNITY_REFERENCE_AE,
+    };
+  });
+}
+
 export type AeDailyBreakdown = {
   aeLevel: number;
   /** Production bonus as fraction (0.505 = +50.5%). */
