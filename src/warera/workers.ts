@@ -3,8 +3,13 @@ import { unwrapTrpcData, wareraProcedurePath } from "./trpc";
 
 export type WorkerRow = {
   userId: string;
+  username: string | null;
   wagePerPp: number | null;
   companyId: string | null;
+  energyLevel: number | null;
+  productionLevel: number | null;
+  fidelityPct: number | null;
+  assumedFields: string[];
 };
 
 function asRecord(value: unknown): Record<string, unknown> | null {
@@ -21,12 +26,16 @@ function pickString(obj: Record<string, unknown>, keys: string[]): string | null
   return null;
 }
 
-function pickWage(obj: Record<string, unknown>): number | null {
-  for (const key of ["wagePerPp", "wagePerPP", "wage", "wagePerProductionPoint"]) {
+function pickNumber(obj: Record<string, unknown>, keys: string[]): number | null {
+  for (const key of keys) {
     const v = obj[key];
     if (typeof v === "number" && Number.isFinite(v)) return v;
   }
   return null;
+}
+
+function pickWage(obj: Record<string, unknown>): number | null {
+  return pickNumber(obj, ["wagePerPp", "wagePerPP", "wage", "wagePerProductionPoint"]);
 }
 
 function extractWorkerList(data: unknown): unknown[] {
@@ -51,7 +60,16 @@ export function parseWorkers(data: unknown): WorkerRow[] {
     const companyId =
       pickString(obj, ["companyId", "company"]) ??
       (companyNested ? pickString(companyNested, ["_id", "id", "companyId"]) : null);
-    out.push({ userId, wagePerPp, companyId });
+    out.push({
+      userId,
+      username: pickString(obj, ["username", "userName"]),
+      wagePerPp,
+      companyId,
+      energyLevel: pickNumber(obj, ["energyLevel", "energy"]),
+      productionLevel: pickNumber(obj, ["productionLevel", "production"]),
+      fidelityPct: pickNumber(obj, ["fidelityPct", "fidelity", "fidelityBonus"]),
+      assumedFields: [],
+    });
   }
   return out;
 }
