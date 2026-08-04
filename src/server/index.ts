@@ -11,6 +11,7 @@ import {
   syncJobsToDb,
 } from "../jobs";
 import { createLogger } from "../logging/logger";
+import { closeSentry } from "../logging/sentry";
 import { createWareraClient } from "../warera";
 import { createApp } from "./app";
 
@@ -45,11 +46,18 @@ async function main(): Promise<void> {
     shuttingDown = true;
     logger.info({ signal }, "shutting down");
     scheduler.stop();
-    server.close(() => {
-      client.close();
-      process.exit(0);
-    });
-    // Fallback if close hangs
+    void (async () => {
+      try {
+        await logger.flush?.();
+        await closeSentry();
+      } catch (err) {
+        console.error("shutdown flush failed", err);
+      }
+      server.close(() => {
+        client.close();
+        process.exit(0);
+      });
+    })();
     setTimeout(() => {
       client.close();
       process.exit(0);

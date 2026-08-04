@@ -126,6 +126,10 @@ Respect `LOG_MASK_SECRETS` (default **on** in production). Set `LOG_MASK_SECRETS
 
 Optional `LOG_FILE=logs/app.log` enables a JSON file transport. Leave unset in normal development.
 
+### Sentry
+
+Optional. Set `SENTRY_DSN` to forward server logs via tslog transports: **Issues** for `error`/`fatal`, and **Sentry Logs** at the same min level as `LOG_LEVEL`. Unset disables Sentry (default for local/CI). Browser Sentry is not wired yet.
+
 ## Commands
 
 | Task | Command |
