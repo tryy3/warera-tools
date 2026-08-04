@@ -5,14 +5,6 @@ import type { ReactNode } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { formatDisplayNumber } from "@/lib/formatDisplayNumber";
 import { api } from "../../api";
 import { FlagIcon } from "../../components/FlagIcon";
@@ -23,6 +15,7 @@ import { usePlayerSelection } from "../../player/PlayerSelectionContext";
 import { useSyncPlayerSearch } from "../../player/useSyncPlayerSearch";
 import { queryKeys } from "../../query/keys";
 import { useCompaniesQuery } from "../../query/useCompaniesQuery";
+import { MarketOpportunitiesTable } from "./MarketOpportunitiesTable";
 import type { CompanyAdvisorRow } from "./types";
 
 const companiesRoute = getRouteApi("/companies");
@@ -362,53 +355,7 @@ export function CompaniesPage() {
             {advisor?.opportunities[0]?.referenceAeLevel ?? 6} × each item’s best known region
             bonus.
           </p>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Item</TableHead>
-                <TableHead>G/PP</TableHead>
-                <TableHead>Best bonus</TableHead>
-                <TableHead>~G/day</TableHead>
-                <TableHead>Formula</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {(advisor?.opportunities ?? []).map((o) => (
-                <TableRow key={o.itemCode}>
-                  <TableCell>
-                    <span className="inline-flex items-center gap-1.5">
-                      <ItemIcon itemCode={o.itemCode} />
-                      {formatItem(o.itemCode)}
-                    </span>
-                  </TableCell>
-                  <TableCell className="font-mono">
-                    <GoldAmount value={o.profitPerPp} digits={4} />
-                  </TableCell>
-                  <TableCell
-                    className="font-mono"
-                    title={o.bestRegionName ?? o.bestRegionId ?? undefined}
-                  >
-                    {o.bestBonus != null && Number.isFinite(o.bestBonus)
-                      ? `+${formatNum(o.bestBonus * 100, 1)}%`
-                      : "—"}
-                  </TableCell>
-                  <TableCell className="font-mono">
-                    <GoldAmount value={o.roughDailyValue} digits={2} />
-                  </TableCell>
-                  <TableCell className="font-mono text-sm text-muted-foreground">
-                    {o.formula}
-                  </TableCell>
-                </TableRow>
-              ))}
-              {!advisor?.opportunities?.length ? (
-                <TableRow>
-                  <TableCell colSpan={5} className="text-muted-foreground">
-                    No price data yet — refresh prices.
-                  </TableCell>
-                </TableRow>
-              ) : null}
-            </TableBody>
-          </Table>
+          <MarketOpportunitiesTable opportunities={advisor?.opportunities ?? []} />
         </section>
       </div>
     </div>
