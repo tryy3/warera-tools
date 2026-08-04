@@ -76,6 +76,10 @@ describe("createServerLogger", () => {
     expect(MASK_KEYS).toContain("apiKey");
   });
 
+  it("does not throw when sentryDsn is unset", () => {
+    expect(() => createServerLogger(baseConfig({ sentryDsn: undefined }))).not.toThrow();
+  });
+
   it("writes JSON lines to LOG_FILE when set", async () => {
     const dir = mkdtempSync(join(tmpdir(), "warera-log-"));
     dirs.push(dir);

@@ -2,6 +2,7 @@ import { Logger as TsLogger } from "tslog";
 import { fileTransport } from "tslog/transports/file";
 import type { AppConfig } from "../config/env";
 import { MASK_KEYS, resolveMaskEnabled } from "./mask";
+import { attachSentryTransports, initSentry } from "./sentry";
 import type { LogFn, Logger } from "./types";
 
 function toMinLevel(level: string): string {
@@ -49,6 +50,12 @@ export function createServerLogger(config: AppConfig): Logger {
 
   if (config.logFile) {
     log.attachTransport(fileTransport({ path: config.logFile, format: "json", append: true }));
+  }
+
+  if (config.sentryDsn) {
+    if (initSentry(config)) {
+      attachSentryTransports(log, config);
+    }
   }
 
   return adapt(log);
