@@ -2,8 +2,17 @@ import { Hono } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { describe, expect, it, vi } from "vite-plus/test";
 import { HttpError, errorPayload } from "../server/errors";
-import { httpAccess } from "./httpAccess";
 import type { Logger } from "./types";
+
+const { withLogContext } = vi.hoisted(() => ({
+  withLogContext: vi.fn((_opts: unknown, fn: () => unknown) => fn()),
+}));
+
+vi.mock("./context", () => ({
+  withLogContext,
+}));
+
+import { httpAccess } from "./httpAccess";
 
 function mockLogger() {
   const child = {
@@ -25,6 +34,24 @@ function mockLogger() {
 }
 
 describe("httpAccess", () => {
+  it("wraps the request in withLogContext with request_id", async () => {
+    const { logger } = mockLogger();
+    const app = new Hono();
+    app.use("/api/*", httpAccess(logger));
+    app.get("/api/health", (c) => c.json({ ok: true }));
+
+    await app.request("/api/health");
+
+    expect(withLogContext).toHaveBeenCalledWith(
+      expect.objectContaining({
+        attributes: { request_id: expect.any(String) },
+        spanName: "GET /api/health",
+        spanOp: "http.server",
+      }),
+      expect.any(Function),
+    );
+  });
+
   it("logs 2xx at debug with structured fields", async () => {
     const { logger, child } = mockLogger();
     const app = new Hono();
@@ -39,7 +66,7 @@ describe("httpAccess", () => {
         path: "/api/health",
         status: 200,
         durationMs: expect.any(Number),
-        requestId: expect.any(String),
+        request_id: expect.any(String),
       }),
       "http request",
     );
@@ -85,7 +112,7 @@ describe("httpAccess", () => {
         path: "/api/missing",
         status: 404,
         durationMs: expect.any(Number),
-        requestId: expect.any(String),
+        request_id: expect.any(String),
       }),
       "http request",
     );
