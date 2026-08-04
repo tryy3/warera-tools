@@ -9,6 +9,7 @@ export const jobs = sqliteTable("jobs", {
   description: text("description").notNull().default(""),
   enabled: integer("enabled", { mode: "boolean" }).notNull().default(true),
   cron: text("cron").notNull(),
+  maxRuns: integer("max_runs"),
   lastStartedAt: integer("last_started_at", { mode: "timestamp_ms" }),
   lastFinishedAt: integer("last_finished_at", { mode: "timestamp_ms" }),
   lastStatus: text("last_status"),
@@ -209,4 +210,33 @@ export const muMemberStatSnapshots = sqliteTable(
     payload: text("payload", { mode: "json" }).$type<Record<string, unknown> | null>(),
   },
   (t) => [index("mu_member_stat_snapshots_mu_user_poll_idx").on(t.muId, t.userId, t.pollId)],
+);
+
+export const itemMarketTransactions = sqliteTable(
+  "item_market_transactions",
+  {
+    id: text("id").primaryKey(),
+    money: real("money").notNull(),
+    itemCode: text("item_code").notNull(),
+    quantity: integer("quantity").notNull(),
+    sellerId: text("seller_id").notNull(),
+    buyerId: text("buyer_id").notNull(),
+    transactionType: text("transaction_type").notNull(),
+    itemId: text("item_id").notNull(),
+    itemType: text("item_type"),
+    itemState: integer("item_state"),
+    itemMaxState: integer("item_max_state"),
+    itemQuantity: integer("item_quantity"),
+    itemLastAcquisitionAt: integer("item_last_acquisition_at", { mode: "timestamp_ms" }),
+    skills: text("skills", { mode: "json" }).$type<Record<string, unknown> | null>(),
+    offerCreatedAt: integer("offer_created_at", { mode: "timestamp_ms" }),
+    createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+    updatedAt: integer("updated_at", { mode: "timestamp_ms" }),
+    payload: text("payload", { mode: "json" }).$type<Record<string, unknown> | null>(),
+    ingestedAt: integer("ingested_at", { mode: "timestamp_ms" }).notNull(),
+  },
+  (t) => [
+    index("item_market_tx_item_code_created_at_idx").on(t.itemCode, t.createdAt),
+    index("item_market_tx_created_at_idx").on(t.createdAt),
+  ],
 );
