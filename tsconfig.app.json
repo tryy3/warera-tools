@@ -28,6 +28,7 @@
   "include": [
     "src/web",
     "src/calculator",
+    "src/equipment/skills.ts",
     "src/lib",
     "src/components",
     "src/logging/createBrowserLogger.ts",
