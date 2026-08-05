@@ -53,7 +53,7 @@ describe("buildEquipmentOverview", () => {
     });
 
     const unknownTier = buildEquipmentOverview(
-      [tx({ id: "b", itemCode: "sniper", money: 100 })],
+      [tx({ id: "b", itemCode: "unknownWeapon", money: 100 })],
       0.2,
     );
     expect(unknownTier[0]).toMatchObject({

@@ -1,6 +1,6 @@
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { GEAR_TIERS, type GearTierId } from "@/calculator";
+import type { GearTierId } from "@/calculator";
 import {
   Table,
   TableBody,
@@ -9,16 +9,21 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { formatEquipmentItem } from "@/equipment/catalog";
+import {
+  compareEquipmentItems,
+  EQUIPMENT_TIER_DISPLAY_ORDER,
+  equipmentTierShortLabel,
+  formatEquipmentItem,
+} from "@/equipment/catalog";
 import { formatDisplayNumber } from "@/lib/formatDisplayNumber";
 import { api } from "../../api";
+import { GearItemIcon } from "../../components/GearItemIcon";
 import { GoldIcon } from "../../components/GoldIcon";
-import { ItemIcon } from "../../components/ItemIcon";
 import { loadEquipmentCountryId, saveEquipmentCountryId } from "../../lib/equipmentPrefs";
 import { CountrySelect } from "../calculator/CountrySelect";
 import type { CountriesResponse, Country, OverviewItem, OverviewResponse } from "./types";
 
-const TIER_ORDER: Array<GearTierId | null> = [...GEAR_TIERS.map((t) => t.id), null];
+const TIER_ORDER: Array<GearTierId | null> = [...EQUIPMENT_TIER_DISPLAY_ORDER, null];
 
 function pickDefaultCountryId(countries: Country[]): string {
   return countries.find((c) => c.isoCode === "SE")?.id ?? countries[0]?.id ?? "";
@@ -33,11 +38,6 @@ function formatWindow(windowMs: number): string {
   const hours = windowMs / (60 * 60 * 1000);
   if (Number.isInteger(hours)) return `${hours}h`;
   return `${formatDisplayNumber(hours, 1)}h`;
-}
-
-function tierLabel(tier: GearTierId | null): string {
-  if (tier == null) return "Unknown";
-  return GEAR_TIERS.find((t) => t.id === tier)?.label ?? tier;
 }
 
 function spreadClass(spread: number | null): string {
@@ -60,7 +60,12 @@ function groupByTier(items: OverviewItem[]): Array<{
   return TIER_ORDER.flatMap((tier) => {
     const group = buckets.get(tier) ?? [];
     if (group.length === 0) return [];
-    return [{ tier, items: group }];
+    return [
+      {
+        tier,
+        items: [...group].sort((a, b) => compareEquipmentItems(a.itemCode, b.itemCode)),
+      },
+    ];
   });
 }
 
@@ -185,7 +190,9 @@ export function EquipmentOverviewPage() {
       {!loading && hasItems
         ? grouped.map(({ tier, items: tierItems }) => (
             <section key={tier ?? "unknown"} className="mt-5">
-              <h2 className="mt-0 mb-2 text-[1.05rem] font-semibold">{tierLabel(tier)}</h2>
+              <h2 className="mt-0 mb-2 text-[1.05rem] font-semibold">
+                {equipmentTierShortLabel(tier)}
+              </h2>
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -215,9 +222,7 @@ export function EquipmentOverviewPage() {
                           className="inline-flex items-center gap-2 text-inherit no-underline"
                           onClick={(e) => e.stopPropagation()}
                         >
-                          <span className="grid size-8 shrink-0 place-items-center rounded-md bg-background/60">
-                            <ItemIcon itemCode={item.itemCode} className="size-6 object-contain" />
-                          </span>
+                          <GearItemIcon itemCode={item.itemCode} tier={item.tier} />
                           <span className="font-medium">{formatEquipmentItem(item.itemCode)}</span>
                         </Link>
                       </TableCell>

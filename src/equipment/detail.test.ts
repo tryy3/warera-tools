@@ -195,8 +195,8 @@ describe("buildEquipmentDetail", () => {
     expect(noScrap.sellerNet).toBeCloseTo(40 / 1.01, 5);
 
     const unknown = buildEquipmentDetail({
-      itemCode: "sniper",
-      txs: [tx({ id: "a", itemCode: "sniper", money: 100, skills: { attack: 10 } })],
+      itemCode: "unknownWeapon",
+      txs: [tx({ id: "a", itemCode: "unknownWeapon", money: 100, skills: { attack: 10 } })],
       scrapPrice: 0.2,
       taxRate: 0.01,
       countryId: "sweden",

@@ -1,13 +1,12 @@
 import { getRouteApi, Link } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
-import { GEAR_TIERS, type GearTierId } from "@/calculator";
 import { Button } from "@/components/ui/button";
-import { formatEquipmentItem } from "@/equipment/catalog";
+import { equipmentTierShortLabel, formatEquipmentItem } from "@/equipment/catalog";
 import type { SkillBand } from "@/equipment/skills";
 import { formatDisplayNumber } from "@/lib/formatDisplayNumber";
 import { ApiError, api } from "../../api";
+import { GearItemIcon } from "../../components/GearItemIcon";
 import { GoldIcon } from "../../components/GoldIcon";
-import { ItemIcon } from "../../components/ItemIcon";
 import { loadEquipmentCountryId, saveEquipmentCountryId } from "../../lib/equipmentPrefs";
 import { loadStats, saveStoredEquipmentStats } from "../../lib/equipmentStats";
 import { CountrySelect } from "../calculator/CountrySelect";
@@ -34,11 +33,6 @@ function GoldAmount({ value }: { value: number | null | undefined }) {
       {formatDisplayNumber(value)}
     </span>
   );
-}
-
-function tierLabel(tier: GearTierId | null): string {
-  if (tier == null) return "Unknown";
-  return GEAR_TIERS.find((t) => t.id === tier)?.label ?? tier;
 }
 
 function bandsToStored(bands: SkillBand[]) {
@@ -212,16 +206,17 @@ export function EquipmentDetailPage() {
 
       <div className="mb-4 flex flex-wrap items-start justify-between gap-4">
         <div className="flex min-w-0 items-center gap-3">
-          <span className="grid size-12 shrink-0 place-items-center rounded-md bg-background/60">
-            <ItemIcon itemCode={itemCode} className="size-9 object-contain" />
-          </span>
+          <GearItemIcon
+            itemCode={itemCode}
+            tier={detail?.tier ?? null}
+            className="gear-item-icon--lg"
+          />
           <div className="min-w-0">
             <h1 className="mb-0.5 truncate text-[1.35rem] font-semibold tracking-tight">
               {formatEquipmentItem(itemCode)}
             </h1>
             <p className="m-0 text-sm text-muted-foreground">
-              {itemCode}
-              {detail ? ` · ${tierLabel(detail.tier)}` : null}
+              {detail ? equipmentTierShortLabel(detail.tier) : null}
               {detail != null ? ` · ${detail.trades} trades in band` : null}
               {refreshing ? " · updating…" : null}
             </p>
