@@ -11,6 +11,8 @@ import { ItemIcon } from "../../components/ItemIcon";
 import { loadEquipmentCountryId, saveEquipmentCountryId } from "../../lib/equipmentPrefs";
 import { loadStats, saveStoredEquipmentStats } from "../../lib/equipmentStats";
 import { CountrySelect } from "../calculator/CountrySelect";
+import { EquipmentLadderChart } from "./EquipmentLadderChart";
+import { EquipmentTrendChart } from "./EquipmentTrendChart";
 import { SkillBandControls } from "./SkillBandControls";
 import type { CountriesResponse, Country, DetailResponse } from "./types";
 
@@ -355,6 +357,30 @@ export function EquipmentDetailPage() {
                 </div>
               </dl>
             )}
+          </section>
+
+          <section className="mt-5">
+            <h2 className="mt-0 mb-2 text-[1.05rem] font-semibold">Daily median trend</h2>
+            <EquipmentTrendChart
+              dailyMedians={detail?.dailyMedians ?? []}
+              scrapFloor={detail?.scrapFloor}
+              itemLabel={formatEquipmentItem(itemCode)}
+            />
+          </section>
+
+          <section className="mt-5">
+            <h2 className="mt-0 mb-2 text-[1.05rem] font-semibold">
+              Stat ladder
+              {detail?.skillKeys[0] ? (
+                <span className="ml-2 text-sm font-normal text-muted-foreground">
+                  ({detail.skillKeys[0]})
+                </span>
+              ) : null}
+            </h2>
+            <EquipmentLadderChart
+              ladder={detail?.ladder ?? []}
+              itemLabel={formatEquipmentItem(itemCode)}
+            />
           </section>
         </>
       ) : null}
