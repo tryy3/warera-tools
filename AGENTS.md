@@ -76,6 +76,7 @@ Rules:
 2. User data is demand-driven (no per-user cron). Shell player Load/Refresh is the control — keep it always visible.
 3. Prefer shared TanStack Query keys for data reused across tools when live freshness is not critical (e.g. prices). Avoid loading heavy Geo dumps into the client unless a tool needs a narrow slice.
 4. Event-driven Geo (`enqueueGeoRefresh` from battles/laws/etc.) is planned; not implemented yet. Jobs remain the bulk WarEra callers.
+5. **Equipment Market** reads `item_market_transactions` via `/api/equipment`.
 
 ### Storage style (case by case)
 
