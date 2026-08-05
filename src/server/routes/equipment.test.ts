@@ -85,7 +85,56 @@ async function createMemoryDb(): Promise<Db> {
     CREATE INDEX item_market_tx_created_at_idx
     ON item_market_transactions (created_at)
   `);
+  await client.execute(`
+    CREATE TABLE countries (
+      id TEXT PRIMARY KEY NOT NULL,
+      name TEXT NOT NULL UNIQUE,
+      tax_rate REAL NOT NULL,
+      iso_code TEXT,
+      source TEXT NOT NULL DEFAULT 'manual',
+      synced_at INTEGER,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL
+    )
+  `);
   return drizzle(client, { schema });
+}
+
+async function seedCountry(
+  db: Db,
+  row: { id: string; name: string; taxRate: number },
+): Promise<void> {
+  const now = new Date();
+  await db.insert(schema.countries).values({
+    id: row.id,
+    name: row.name,
+    taxRate: row.taxRate,
+    isoCode: null,
+    source: "manual",
+    syncedAt: null,
+    createdAt: now,
+    updatedAt: now,
+  });
+}
+
+async function seedScrap(db: Db, marketPrice: number, recordedAt = new Date()): Promise<void> {
+  const pollId = await insertPricePoll(db, {
+    recordedAt,
+    status: "success",
+    itemCount: 1,
+  });
+  await insertPriceSnapshots(db, pollId, [
+    {
+      itemCode: "scraps",
+      marketPrice,
+      buyMin: null,
+      buyMax: null,
+      buyAvg: null,
+      sellMin: null,
+      sellMax: null,
+      sellAvg: null,
+    },
+  ]);
 }
 
 function makeTx(overrides: Partial<ItemMarketTransaction> = {}): ItemMarketTransaction {
@@ -142,23 +191,7 @@ describe("GET /overview", () => {
 
   it("returns aggregated equipment overview with scrap meta", async () => {
     const recordedAt = new Date("2026-08-05T10:00:00.000Z");
-    const pollId = await insertPricePoll(db, {
-      recordedAt,
-      status: "success",
-      itemCount: 1,
-    });
-    await insertPriceSnapshots(db, pollId, [
-      {
-        itemCode: "scraps",
-        marketPrice: 0.2,
-        buyMin: null,
-        buyMax: null,
-        buyAvg: null,
-        sellMin: null,
-        sellMax: null,
-        sellAvg: null,
-      },
-    ]);
+    await seedScrap(db, 0.2, recordedAt);
 
     const now = Date.now();
     await insertItemMarketTransactionsIgnoreConflicts(db, [
@@ -218,5 +251,154 @@ describe("GET /overview", () => {
     expect(body.scrapPrice).toBeNull();
     expect(body.scrapedAt).toBeNull();
     expect(body.items).toEqual([]);
+  });
+});
+
+describe("GET /:itemCode", () => {
+  let db: Db;
+
+  beforeEach(async () => {
+    db = await createMemoryDb();
+  });
+
+  it("returns detail with skill bands, country tax, and triad", async () => {
+    await seedScrap(db, 0.2);
+    await seedCountry(db, { id: "sweden", name: "Sweden", taxRate: 0.01 });
+
+    const now = Date.now();
+    await insertItemMarketTransactionsIgnoreConflicts(db, [
+      makeTx({
+        id: "a",
+        itemCode: "chest4",
+        money: 40,
+        skills: { armor: 22 },
+        createdAt: new Date(now - 60_000),
+      }),
+      makeTx({
+        id: "b",
+        itemCode: "chest4",
+        money: 50,
+        skills: { armor: 22 },
+        createdAt: new Date(now - 30_000),
+      }),
+      makeTx({
+        id: "c",
+        itemCode: "chest4",
+        money: 90,
+        skills: { armor: 30 },
+        createdAt: new Date(now - 20_000),
+      }),
+      makeTx({
+        id: "other",
+        itemCode: "helmet4",
+        money: 10,
+        skills: { armor: 22 },
+        createdAt: new Date(now - 10_000),
+      }),
+    ]);
+
+    const skills = encodeURIComponent(JSON.stringify([{ key: "armor", target: 22, band: 0 }]));
+    const res = await appFor(db).request(
+      `http://localhost/chest4?skills=${skills}&countryId=sweden`,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      itemCode: string;
+      tier: string | null;
+      scrapPrice: number | null;
+      taxRate: number | null;
+      countryId: string | null;
+      marketMedian: number | null;
+      sellerNet: number | null;
+      scrapFloor: number | null;
+      recommend: { scrapFloor: number; breakEvenIncl: number; attractiveIncl: number } | null;
+      trades: number;
+      activeBands: Array<{ key: string; target: number; band: number }>;
+      lowestObserved: Record<string, number> | null;
+    };
+
+    expect(body.itemCode).toBe("chest4");
+    expect(body.tier).toBe("purple");
+    expect(body.scrapPrice).toBe(0.2);
+    expect(body.taxRate).toBe(0.01);
+    expect(body.countryId).toBe("sweden");
+    expect(body.activeBands).toEqual([{ key: "armor", target: 22, band: 0 }]);
+    expect(body.lowestObserved).toEqual({ armor: 22 });
+    expect(body.marketMedian).toBe(45);
+    expect(body.trades).toBe(2);
+    expect(body.sellerNet).toBeCloseTo(45 / 1.01, 5);
+    expect(body.scrapFloor).toBe(32.4);
+    expect(body.recommend?.scrapFloor).toBe(32.4);
+    expect(body.recommend?.breakEvenIncl).toBeCloseTo(32.4 * 1.01, 5);
+  });
+
+  it("defaults skills to lowestObserved band 1 when skills omitted", async () => {
+    await seedScrap(db, 0.2);
+    await seedCountry(db, { id: "sweden", name: "Sweden", taxRate: 0.01 });
+    const now = Date.now();
+    await insertItemMarketTransactionsIgnoreConflicts(db, [
+      makeTx({
+        id: "a",
+        money: 40,
+        skills: { armor: 22 },
+        createdAt: new Date(now - 60_000),
+      }),
+      makeTx({
+        id: "b",
+        money: 80,
+        skills: { armor: 30 },
+        createdAt: new Date(now - 30_000),
+      }),
+    ]);
+
+    const res = await appFor(db).request("http://localhost/chest4?countryId=sweden");
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      activeBands: Array<{ key: string; target: number; band: number }>;
+      marketMedian: number | null;
+      trades: number;
+    };
+    expect(body.activeBands).toEqual([{ key: "armor", target: 22, band: 1 }]);
+    expect(body.marketMedian).toBe(40);
+    expect(body.trades).toBe(1);
+  });
+
+  it("nulls tax-dependent fields when country is missing", async () => {
+    await seedScrap(db, 0.2);
+    const now = Date.now();
+    await insertItemMarketTransactionsIgnoreConflicts(db, [
+      makeTx({
+        id: "a",
+        money: 40,
+        skills: { armor: 22 },
+        createdAt: new Date(now - 60_000),
+      }),
+    ]);
+
+    const skills = encodeURIComponent(JSON.stringify([{ key: "armor", target: 22, band: 1 }]));
+    const res = await appFor(db).request(
+      `http://localhost/chest4?skills=${skills}&countryId=nope`,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      taxRate: number | null;
+      sellerNet: number | null;
+      recommend: unknown;
+      scrapFloor: number | null;
+      marketMedian: number | null;
+    };
+    expect(body.taxRate).toBeNull();
+    expect(body.sellerNet).toBeNull();
+    expect(body.recommend).toBeNull();
+    expect(body.scrapFloor).toBe(32.4);
+    expect(body.marketMedian).toBe(40);
+  });
+
+  it("rejects malformed skills query with 400", async () => {
+    const res = await appFor(db).request("http://localhost/chest4?skills=not-json");
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { error: { code: string; message: string } };
+    expect(body.error.code).toBe("bad_request");
+    expect(body.error.message).toContain("skills");
   });
 });
