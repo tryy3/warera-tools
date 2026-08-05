@@ -29,6 +29,8 @@
     "src/web",
     "src/calculator",
     "src/equipment/skills.ts",
+    "src/equipment/catalog.ts",
+
     "src/lib",
     "src/components",
     "src/logging/createBrowserLogger.ts",

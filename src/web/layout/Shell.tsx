@@ -22,6 +22,7 @@ const tabs = [
   { to: "/growth", label: "Growth" },
   { to: "/skills", label: "Skills" },
   { to: "/market", label: "Market" },
+  { to: "/equipment", label: "Equipment" },
   { to: "/countries", label: "Countries" },
 ] as const;
 

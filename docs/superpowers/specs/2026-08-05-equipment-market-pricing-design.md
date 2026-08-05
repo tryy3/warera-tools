@@ -1,7 +1,7 @@
 # Equipment Market Pricing UI — Design
 
 **Date:** 2026-08-05  
-**Status:** Draft for review  
+**Status:** Approved for implementation  
 **Depends on / extends:**
 
 - [Item Market Transactions Poll](./2026-08-04-item-market-transactions-design.md) (sales history ingest)
