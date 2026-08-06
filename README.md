@@ -57,12 +57,42 @@ vp test                # Vitest unit tests
 # or: pnpm check / pnpm test
 ```
 
-## Production
+## Production / Deploy
+
+Single Node process serves the API, static WebUI (`dist/web`), and Croner jobs.
+
+### Docker (recommended)
 
 ```bash
-vp run build           # dist/web + dist/server
-NODE_ENV=production pnpm start   # API + static UI from dist/web
+cp .env.example .env   # on the server; fill secrets
+# Turso: primary DB URL for production; Turso branch URL for local/dev dry-runs
+docker compose -f docker-compose.example.yml --env-file .env up -d --build
 ```
+
+- Listen: `HOST=0.0.0.0` / `PORT=8787` (compose sets these)
+- Access on Tailscale: `http://<tailscale-hostname>:8787`
+- Health: `GET /api/health` → `{ "ok": true }` (liveness only; Turso errors appear in logs/jobs)
+- Migrations run automatically on boot
+- Do not commit `.env`
+
+Copy `docker-compose.example.yml` to a host-local compose file if you need machine-specific overrides.
+
+### Without Docker
+
+```bash
+vp run build
+NODE_ENV=production pnpm start
+```
+
+### Checklist
+
+| Item | Notes |
+| --- | --- |
+| Turso | Prod → primary DB; Dev → [Turso branch](https://docs.turso.tech/features/branching) of that DB |
+| Sentry | Set `SENTRY_DSN`; `NODE_ENV=production` tags `environment` (override with `SENTRY_ENVIRONMENT` if needed) |
+| WarEra | `WARERA_API_KEY` is account-bound; a dedicated key is optional later |
+| Discord | Optional `DISCORD_WEBHOOK_URL` (use a prod channel webhook if desired) |
+| Auth | Not required while Tailscale is the only ingress |
 
 ## WarEra API
 

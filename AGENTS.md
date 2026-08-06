@@ -44,7 +44,7 @@ Docs are local at `node_modules/vite-plus/docs` or online at https://viteplus.de
 
 ## Architecture
 
-Single package, one Node process: Hono API + static SPA + in-process Croner jobs. Turso (libSQL) + Drizzle. No auth yet (localhost); plan BetterAuth when adding auth. Production later may use Docker — keep multi-user / deploy options open without building them now.
+Single package, one Node process: Hono API + static SPA + in-process Croner jobs. Turso (libSQL) + Drizzle. No auth yet (Tailscale / localhost); plan BetterAuth when adding auth. Production: Docker (`Dockerfile` + `docker-compose.example.yml`) — see README Deploy.
 
 | Area | Location |
 | --- | --- |
@@ -149,7 +149,7 @@ Each request/job also opens a Sentry span (`http.server` / `job.run`) when `SENT
 
 ### Sentry
 
-Optional. Set `SENTRY_DSN` to forward server logs via tslog transports: **Issues** for `error`/`fatal`, and **Sentry Logs** at the same min level as `LOG_LEVEL`. Unset disables Sentry (default for local/CI). Browser Sentry is not wired yet.
+Optional. Set `SENTRY_DSN` to forward server logs via tslog transports: **Issues** for `error`/`fatal`, and **Sentry Logs** at the same min level as `LOG_LEVEL`. Unset disables Sentry (default for local/CI). Browser Sentry is not wired yet. Optional `SENTRY_ENVIRONMENT` overrides the Sentry `environment` tag (defaults to `NODE_ENV`).
 
 Restart the server after changing `.env` (`tsx watch` does not reload env). On successful attach you should see `sentry transports attached` in the console. Issues only appear for `error`/`fatal` — look under **Explore → Logs** for `info`/`debug` (filter `environment:development`). Set `SENTRY_DEBUG=true` to print SDK transport traffic.
 
