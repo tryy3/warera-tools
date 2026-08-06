@@ -86,16 +86,6 @@ vp run build
 NODE_ENV=production pnpm start
 ```
 
-### Checklist
-
-| Item | Notes |
-| --- | --- |
-| Turso | Prod → primary DB; Dev → [Turso branch](https://docs.turso.tech/features/branching) of that DB |
-| Sentry | Set `SENTRY_DSN`; `NODE_ENV=production` tags `environment` (override with `SENTRY_ENVIRONMENT` if needed) |
-| WarEra | `WARERA_API_KEY` is account-bound; a dedicated key is optional later |
-| Discord | Optional `DISCORD_WEBHOOK_URL` (use a prod channel webhook if desired) |
-| Auth | Not required while Tailscale is the only ingress |
-
 ## WarEra API
 
 Allowed public surface is the official tRPC API (not undocumented in-game hosts):
