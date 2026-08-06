@@ -272,7 +272,7 @@ export function EquipmentDetailPage() {
 
             {detail?.scrapPrice == null ? (
               <p className="mb-2 text-sm text-amber-200/90">
-                Scrap price missing — floor and recommend unavailable.
+                Scrap price missing — scrap value and recommend unavailable.
               </p>
             ) : null}
 
@@ -297,7 +297,7 @@ export function EquipmentDetailPage() {
               ) : null}
               <div className="rounded-md border border-border/60 bg-background/40 px-3 py-2">
                 <dt className="m-0 text-[0.75em] tracking-wide text-muted-foreground uppercase">
-                  Scrap floor
+                  Scrap price
                 </dt>
                 <dd className="mt-1 mb-0">
                   <GoldAmount value={detail?.scrapFloor} />

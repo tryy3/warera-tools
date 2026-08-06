@@ -71,7 +71,7 @@ export function EquipmentTrendChart({
     <div>
       {floor != null ? (
         <div className="mb-2 text-xs text-muted-foreground">
-          Dashed line = scrap floor ({formatDisplayNumber(floor)})
+          Dashed line = scrap price ({formatDisplayNumber(floor)})
         </div>
       ) : null}
       <Chart

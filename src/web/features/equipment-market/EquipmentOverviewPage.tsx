@@ -1,26 +1,16 @@
-import { Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import type { GearTierId } from "@/calculator";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { scrapAmountForTier, type GearTierId } from "@/calculator";
 import {
   compareEquipmentItems,
   EQUIPMENT_TIER_DISPLAY_ORDER,
   equipmentTierShortLabel,
-  formatEquipmentItem,
 } from "@/equipment/catalog";
 import { formatDisplayNumber } from "@/lib/formatDisplayNumber";
 import { api } from "../../api";
-import { GearItemIcon } from "../../components/GearItemIcon";
 import { GoldIcon } from "../../components/GoldIcon";
 import { loadEquipmentCountryId, saveEquipmentCountryId } from "../../lib/equipmentPrefs";
 import { CountrySelect } from "../calculator/CountrySelect";
+import { EquipmentItemCard } from "./EquipmentItemCard";
 import type { CountriesResponse, Country, OverviewItem, OverviewResponse } from "./types";
 
 const TIER_ORDER: Array<GearTierId | null> = [...EQUIPMENT_TIER_DISPLAY_ORDER, null];
@@ -29,22 +19,29 @@ function pickDefaultCountryId(countries: Country[]): string {
   return countries.find((c) => c.isoCode === "SE")?.id ?? countries[0]?.id ?? "";
 }
 
-function formatNum(value: number | null | undefined, digits = 4): string {
-  if (value == null || !Number.isFinite(value)) return "—";
-  return formatDisplayNumber(value, digits);
-}
-
 function formatWindow(windowMs: number): string {
+  const dayMs = 24 * 60 * 60 * 1000;
+  if (windowMs === dayMs) return "24h";
+  if (windowMs % dayMs === 0) return `${windowMs / dayMs}d`;
   const hours = windowMs / (60 * 60 * 1000);
   if (Number.isInteger(hours)) return `${hours}h`;
   return `${formatDisplayNumber(hours, 1)}h`;
 }
 
-function spreadClass(spread: number | null): string {
-  if (spread == null || !Number.isFinite(spread)) return "text-muted-foreground";
-  if (spread >= 10) return "font-mono text-success";
-  if (spread < 3) return "font-mono text-destructive";
-  return "font-mono";
+function tradesLabelForWindow(windowMs: number | null): string {
+  if (windowMs == null) return "Trades";
+  return `Trades (${formatWindow(windowMs)})`;
+}
+
+function formatNum(value: number | null | undefined, digits = 4): string {
+  if (value == null || !Number.isFinite(value)) return "—";
+  return formatDisplayNumber(value, digits);
+}
+
+function sellerNetFromMarket(marketMedian: number | null, taxRate: number | null): number | null {
+  if (marketMedian == null || !Number.isFinite(marketMedian)) return null;
+  if (taxRate == null || !Number.isFinite(taxRate)) return null;
+  return marketMedian / (1 + taxRate);
 }
 
 function groupByTier(items: OverviewItem[]): Array<{
@@ -69,8 +66,92 @@ function groupByTier(items: OverviewItem[]): Array<{
   });
 }
 
+function tierStripStats(
+  tier: GearTierId | null,
+  tierItems: OverviewItem[],
+  scrapPrice: number | null,
+): {
+  scrapQty: number | null;
+  scrapFloor: number | null;
+  trades: number;
+} {
+  const scrapQty = tier != null ? scrapAmountForTier(tier) : null;
+  const fromItems = tierItems.find((i) => i.scrapFloor != null)?.scrapFloor ?? null;
+  const scrapFloor =
+    fromItems ?? (scrapQty != null && scrapPrice != null ? scrapQty * scrapPrice : null);
+  const trades = tierItems.reduce((sum, i) => sum + i.trades, 0);
+  return { scrapQty, scrapFloor, trades };
+}
+
+function TierStatsStrip({
+  tier,
+  scrapFloor,
+  scrapQty,
+  scrapPrice,
+  trades,
+  tradesLabel,
+}: {
+  tier: GearTierId | null;
+  scrapFloor: number | null;
+  scrapQty: number | null;
+  scrapPrice: number | null;
+  trades: number;
+  tradesLabel: string;
+}) {
+  const tierClass = tier != null ? `tier-stats-strip--${tier}` : "";
+  return (
+    <div className={`tier-stats-strip mb-2.5 px-3 py-2 ${tierClass}`}>
+      <dl className="m-0 grid grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-4">
+        <div>
+          <dt className="m-0 text-[0.75em] tracking-wide text-muted-foreground uppercase">
+            Scrap price
+          </dt>
+          <dd className="mt-0.5 mb-0 inline-flex items-center gap-1 font-mono font-semibold">
+            {scrapFloor != null ? (
+              <>
+                <GoldIcon />
+                {formatDisplayNumber(scrapFloor)}
+              </>
+            ) : (
+              <span className="text-muted-foreground">—</span>
+            )}
+          </dd>
+        </div>
+        <div>
+          <dt className="m-0 text-[0.75em] tracking-wide text-muted-foreground uppercase">
+            Scraps
+          </dt>
+          <dd className="mt-0.5 mb-0 font-mono font-semibold">
+            {scrapQty != null ? formatDisplayNumber(scrapQty, 0) : "—"}
+          </dd>
+        </div>
+        <div>
+          <dt className="m-0 text-[0.75em] tracking-wide text-muted-foreground uppercase">
+            Unit scrap
+          </dt>
+          <dd className="mt-0.5 mb-0 inline-flex items-center gap-1 font-mono">
+            {scrapPrice != null ? (
+              <>
+                <GoldIcon />
+                {formatDisplayNumber(scrapPrice)}
+              </>
+            ) : (
+              <span className="text-muted-foreground">—</span>
+            )}
+          </dd>
+        </div>
+        <div>
+          <dt className="m-0 text-[0.75em] tracking-wide text-muted-foreground uppercase">
+            {tradesLabel}
+          </dt>
+          <dd className="mt-0.5 mb-0 font-mono">{formatNum(trades, 0)}</dd>
+        </div>
+      </dl>
+    </div>
+  );
+}
+
 export function EquipmentOverviewPage() {
-  const navigate = useNavigate();
   const [items, setItems] = useState<OverviewItem[]>([]);
   const [scrapPrice, setScrapPrice] = useState<number | null>(null);
   const [scrapedAt, setScrapedAt] = useState<string | null>(null);
@@ -129,10 +210,11 @@ export function EquipmentOverviewPage() {
   }
 
   const selectedCountry = countries.find((c) => c.id === countryId) ?? null;
+  const taxRate = selectedCountry?.taxRate ?? null;
   const grouped = groupByTier(items);
   const hasItems = items.length > 0;
-  const taxPct =
-    selectedCountry != null ? formatDisplayNumber(selectedCountry.taxRate * 100, 2) : null;
+  const taxPct = taxRate != null ? formatDisplayNumber(taxRate * 100, 2) : null;
+  const tradesLabel = tradesLabelForWindow(windowMs);
 
   return (
     <div className="mx-auto max-w-[1200px] rounded-md border border-border bg-card p-4 pb-6">
@@ -140,8 +222,8 @@ export function EquipmentOverviewPage() {
         <div>
           <h1 className="mb-0.5 text-[1.35rem] font-semibold tracking-tight">Equipment</h1>
           <p className="m-0 text-muted-foreground">
-            Market median vs scrap floor by item.
-            {windowMs != null ? ` · window ${formatWindow(windowMs)}` : null}
+            Market median vs scrap price by item.
+            {windowMs != null ? ` · last ${formatWindow(windowMs)}` : null}
           </p>
         </div>
         <div className="flex flex-wrap items-end gap-3">
@@ -188,60 +270,43 @@ export function EquipmentOverviewPage() {
       ) : null}
 
       {!loading && hasItems
-        ? grouped.map(({ tier, items: tierItems }) => (
-            <section key={tier ?? "unknown"} className="mt-5">
-              <h2 className="mt-0 mb-2 text-[1.05rem] font-semibold">
-                {equipmentTierShortLabel(tier)}
-              </h2>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Item</TableHead>
-                    <TableHead className="text-right">Market</TableHead>
-                    <TableHead className="text-right">Scrap floor</TableHead>
-                    <TableHead className="text-right">Spread</TableHead>
-                    <TableHead className="text-right">Trades</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
+        ? grouped.map(({ tier, items: tierItems }) => {
+            const strip = tierStripStats(tier, tierItems, scrapPrice);
+            return (
+              <section key={tier ?? "unknown"} className="mt-5">
+                <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
+                  <h2 className="m-0 text-[1.05rem] font-semibold">
+                    {equipmentTierShortLabel(tier)}
+                  </h2>
+                  <span className="text-xs text-muted-foreground">
+                    {tierItems.length} slot{tierItems.length === 1 ? "" : "s"}
+                  </span>
+                </div>
+                <TierStatsStrip
+                  tier={tier}
+                  scrapFloor={strip.scrapFloor}
+                  scrapQty={strip.scrapQty}
+                  scrapPrice={scrapPrice}
+                  trades={strip.trades}
+                  tradesLabel={tradesLabel}
+                />
+                <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 md:grid-cols-3">
                   {tierItems.map((item) => (
-                    <TableRow
+                    <EquipmentItemCard
                       key={item.itemCode}
-                      className="cursor-pointer hover:bg-secondary/50"
-                      onClick={() => {
-                        void navigate({
-                          to: "/equipment/$itemCode",
-                          params: { itemCode: item.itemCode },
-                        });
-                      }}
-                    >
-                      <TableCell>
-                        <Link
-                          to="/equipment/$itemCode"
-                          params={{ itemCode: item.itemCode }}
-                          className="inline-flex items-center gap-2 text-inherit no-underline"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <GearItemIcon itemCode={item.itemCode} tier={item.tier} />
-                          <span className="font-medium">{formatEquipmentItem(item.itemCode)}</span>
-                        </Link>
-                      </TableCell>
-                      <TableCell className="text-right font-mono">
-                        {formatNum(item.marketMedian)}
-                      </TableCell>
-                      <TableCell className="text-right font-mono">
-                        {formatNum(item.scrapFloor)}
-                      </TableCell>
-                      <TableCell className={`text-right ${spreadClass(item.spread)}`}>
-                        {formatNum(item.spread)}
-                      </TableCell>
-                      <TableCell className="text-right font-mono">{item.trades}</TableCell>
-                    </TableRow>
+                      itemCode={item.itemCode}
+                      tier={item.tier}
+                      marketMedian={item.marketMedian}
+                      sellerNet={sellerNetFromMarket(item.marketMedian, taxRate)}
+                      spread={item.spread}
+                      trades={item.trades}
+                      tradesLabel={tradesLabel}
+                    />
                   ))}
-                </TableBody>
-              </Table>
-            </section>
-          ))
+                </div>
+              </section>
+            );
+          })
         : null}
     </div>
   );
