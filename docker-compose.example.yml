@@ -1,0 +1,19 @@
+# Copy to docker-compose.yml (gitignored if you add host-specific overrides) or:
+#   docker compose -f docker-compose.example.yml --env-file .env up -d --build
+#
+# Tailscale: open http://<tailscale-hostname>:8787
+# Turso: point .env at the primary DB in production; use a branch URL for dry-runs.
+
+services:
+  warera:
+    build: .
+    ports:
+      - "8787:8787"
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      HOST: "0.0.0.0"
+      PORT: "8787"
+    restart: unless-stopped
+    # Image HEALTHCHECK probes /api/health; compose inherits it.
