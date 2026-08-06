@@ -14,6 +14,7 @@ export type AppConfig = {
   logMaskSecrets: boolean;
   logFile: string | undefined;
   sentryDsn: string | undefined;
+  sentryEnvironment: string;
   jobRunHistoryLimit: number;
 };
 
@@ -32,9 +33,10 @@ export function parseConfig(
     throw new Error("TURSO_DATABASE_URL is required");
   }
   const nodeEnv = (env.NODE_ENV ?? "development") as AppConfig["nodeEnv"];
+  const defaultHost = nodeEnv === "production" ? "0.0.0.0" : "127.0.0.1";
   return {
     nodeEnv,
-    host: env.HOST ?? "127.0.0.1",
+    host: env.HOST ?? defaultHost,
     port: Number(env.PORT ?? 8787),
     tursoDatabaseUrl,
     tursoAuthToken: env.TURSO_AUTH_TOKEN,
@@ -46,6 +48,7 @@ export function parseConfig(
     logMaskSecrets: parseBoolEnv(env.LOG_MASK_SECRETS, nodeEnv === "production"),
     logFile: env.LOG_FILE || undefined,
     sentryDsn: env.SENTRY_DSN || undefined,
+    sentryEnvironment: env.SENTRY_ENVIRONMENT || nodeEnv,
     jobRunHistoryLimit: Number(env.JOB_RUN_HISTORY_LIMIT ?? 50),
   };
 }

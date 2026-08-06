@@ -71,4 +71,42 @@ describe("parseConfig", () => {
       }).sentryDsn,
     ).toBe("https://key@o0.ingest.sentry.io/1");
   });
+
+  it("defaults HOST to loopback except production → 0.0.0.0", () => {
+    expect(
+      parseConfig({
+        TURSO_DATABASE_URL: "file:test.db",
+        NODE_ENV: "development",
+      }).host,
+    ).toBe("127.0.0.1");
+    expect(
+      parseConfig({
+        TURSO_DATABASE_URL: "file:test.db",
+        NODE_ENV: "production",
+      }).host,
+    ).toBe("0.0.0.0");
+    expect(
+      parseConfig({
+        TURSO_DATABASE_URL: "file:test.db",
+        NODE_ENV: "production",
+        HOST: "127.0.0.1",
+      }).host,
+    ).toBe("127.0.0.1");
+  });
+
+  it("sentryEnvironment falls back to nodeEnv and honors SENTRY_ENVIRONMENT", () => {
+    expect(
+      parseConfig({
+        TURSO_DATABASE_URL: "file:test.db",
+        NODE_ENV: "production",
+      }).sentryEnvironment,
+    ).toBe("production");
+    expect(
+      parseConfig({
+        TURSO_DATABASE_URL: "file:test.db",
+        NODE_ENV: "production",
+        SENTRY_ENVIRONMENT: "staging",
+      }).sentryEnvironment,
+    ).toBe("staging");
+  });
 });

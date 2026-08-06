@@ -27,7 +27,7 @@ export function isSentryInitialized(): boolean {
   return initialized;
 }
 
-export function initSentry(config: Pick<AppConfig, "sentryDsn" | "nodeEnv">): boolean {
+export function initSentry(config: Pick<AppConfig, "sentryDsn" | "sentryEnvironment">): boolean {
   if (!config.sentryDsn) return false;
   if (initialized) return true;
   try {
@@ -35,7 +35,7 @@ export function initSentry(config: Pick<AppConfig, "sentryDsn" | "nodeEnv">): bo
       dsn: config.sentryDsn,
       enableLogs: true,
       tracesSampleRate: 1,
-      environment: config.nodeEnv,
+      environment: config.sentryEnvironment,
       debug: process.env.SENTRY_DEBUG === "true" || process.env.SENTRY_DEBUG === "1",
     });
     initialized = true;

@@ -21,6 +21,7 @@ function baseConfig(overrides: Partial<AppConfig> = {}): AppConfig {
     logMaskSecrets: false,
     logFile: undefined,
     sentryDsn: undefined,
+    sentryEnvironment: "test",
     jobRunHistoryLimit: 50,
     ...overrides,
   };

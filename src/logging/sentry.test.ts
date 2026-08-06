@@ -45,7 +45,7 @@ describe("sentry logging", () => {
   });
 
   it("initSentry no-ops without DSN", () => {
-    expect(initSentry({ sentryDsn: undefined, nodeEnv: "development" })).toBe(false);
+    expect(initSentry({ sentryDsn: undefined, sentryEnvironment: "development" })).toBe(false);
     expect(init).not.toHaveBeenCalled();
   });
 
@@ -53,7 +53,7 @@ describe("sentry logging", () => {
     expect(
       initSentry({
         sentryDsn: "https://key@o0.ingest.sentry.io/1",
-        nodeEnv: "development",
+        sentryEnvironment: "development",
       }),
     ).toBe(true);
     expect(init).toHaveBeenCalledWith(
@@ -66,8 +66,22 @@ describe("sentry logging", () => {
     );
   });
 
+  it("initSentry uses sentryEnvironment for Sentry environment", () => {
+    expect(
+      initSentry({
+        sentryDsn: "https://key@o0.ingest.sentry.io/1",
+        sentryEnvironment: "staging",
+      }),
+    ).toBe(true);
+    expect(init).toHaveBeenCalledWith(
+      expect.objectContaining({
+        environment: "staging",
+      }),
+    );
+  });
+
   it("Issues transport captures Error on error()", async () => {
-    initSentry({ sentryDsn: "https://key@o0.ingest.sentry.io/1", nodeEnv: "test" });
+    initSentry({ sentryDsn: "https://key@o0.ingest.sentry.io/1", sentryEnvironment: "test" });
     const log = new TsLogger({ type: "hidden", minLevel: "INFO" });
     attachSentryTransports(log, {
       sentryDsn: "https://key@o0.ingest.sentry.io/1",
@@ -83,7 +97,7 @@ describe("sentry logging", () => {
   });
 
   it("Logs transport forwards info fields", async () => {
-    initSentry({ sentryDsn: "https://key@o0.ingest.sentry.io/1", nodeEnv: "test" });
+    initSentry({ sentryDsn: "https://key@o0.ingest.sentry.io/1", sentryEnvironment: "test" });
     const log = new TsLogger({ type: "hidden", minLevel: "INFO" });
     attachSentryTransports(log, {
       sentryDsn: "https://key@o0.ingest.sentry.io/1",
@@ -98,7 +112,7 @@ describe("sentry logging", () => {
   });
 
   it("Logs transport promotes job_run_id from _logMeta", async () => {
-    initSentry({ sentryDsn: "https://key@o0.ingest.sentry.io/1", nodeEnv: "test" });
+    initSentry({ sentryDsn: "https://key@o0.ingest.sentry.io/1", sentryEnvironment: "test" });
     const log = new TsLogger({ type: "hidden", minLevel: "INFO" });
     attachSentryTransports(log, {
       sentryDsn: "https://key@o0.ingest.sentry.io/1",
