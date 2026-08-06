@@ -73,6 +73,8 @@ docker compose -f docker-compose.example.yml --env-file .env up -d --build
 - Access on Tailscale: `http://<tailscale-hostname>:8787`
 - Health: `GET /api/health` → `{ "ok": true }` (liveness only; Turso errors appear in logs/jobs)
 - Migrations run automatically on boot
+- First boot may take longer while migrations run; the healthcheck start-period is 60s
+- If you set `LOG_FILE`, mount a writable volume for that path (the container runs as non-root)
 - Do not commit `.env`
 
 Copy `docker-compose.example.yml` to a host-local compose file if you need machine-specific overrides.
