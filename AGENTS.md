@@ -112,6 +112,8 @@ Prefer structured fields plus a short message:
 logger.info({ jobId, pollId, itemCount }, "price poll complete");
 ```
 
+**Complex objects:** Sentry Logs (and similar attribute stores) keep primitives (`string` / `number` / `boolean`) and may drop nested objects or arrays-of-objects. Prefer flat primitive fields for anything you want to filter on (`company_id`, `worker_count`, …). When you need to inspect a nested payload, stringify it (`workers_json: JSON.stringify(...)`) so it survives to Sentry and can be pasted into a JSON viewer. Do not rely on nested objects remaining visible in remote log UIs.
+
 Do not default everything to `info`. Pick the level that matches operational severity (see [SRE School — log levels](https://sreschool.com/blog/log-level/)).
 
 | Level | When to use |

@@ -108,7 +108,10 @@ async function enrichCompanyLive(
       onFirstRawWorker: ({ keys, sample }) => {
         if (probeFirstWorkerKeys.done) return;
         probeFirstWorkerKeys.done = true;
-        logger.debug({ keys, sample }, "worker.getWorkers first object keys");
+        logger.debug(
+          { keys, sample_json: JSON.stringify(sample) },
+          "worker.getWorkers first object keys",
+        );
       },
     },
   ).then(
@@ -116,11 +119,14 @@ async function enrichCompanyLive(
       logger.debug(
         {
           company_id: companyId,
-          workers: workerRows.map((w) => ({
-            user_id: w.userId,
-            username: w.username,
-            fields: workerFieldProvenance(w),
-          })),
+          worker_count: workerRows.length,
+          workers_json: JSON.stringify(
+            workerRows.map((w) => ({
+              user_id: w.userId,
+              username: w.username,
+              fields: workerFieldProvenance(w),
+            })),
+          ),
         },
         "worker field sources from worker.getWorkers",
       );

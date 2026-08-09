@@ -35,12 +35,15 @@ function logSimWorkerFieldSources(state: CompanySimState, reason: string) {
     {
       reason,
       live_epoch: state.liveEpoch,
-      workers: realWorkers.map((w) => ({
-        user_id: w.id,
-        company_id: w.assignment,
-        assumed_fields: w.assumedFields,
-        fields: simWorkerFieldSources(w),
-      })),
+      worker_count: realWorkers.length,
+      workers_json: JSON.stringify(
+        realWorkers.map((w) => ({
+          user_id: w.id,
+          company_id: w.assignment,
+          assumed_fields: w.assumedFields,
+          fields: simWorkerFieldSources(w),
+        })),
+      ),
     },
     "company sim worker field sources",
   );
