@@ -1,6 +1,6 @@
 # WarEra data inventory (as-is)
 
-**Last reviewed:** 2026-08-06  
+**Last reviewed:** 2026-08-10  
 **Status:** Living — update when cadence, ownership, or major consumers change  
 **Tier rules:** [Data tier caching strategy](../superpowers/specs/2026-08-02-data-tier-caching-strategy-design.md)
 
@@ -23,7 +23,9 @@ Browser (SPA)
 | --- | --- |
 | `WARERA_API_BASE_URL` | `https://gateway.warerastats.io/trpc` |
 | Soft limiter | `WARERA_MAX_REQUESTS_PER_MINUTE` (default 120) |
-| Batching / dedup / header-aware 429 pause | Not implemented |
+| Client tRPC HTTP batch | `requestBatch` (`batch=1`); used for worker `user.getUserLite` enrich |
+| Gateway batching / dedup | Upstream gateway ~400ms window + cache (separate from our client batch) |
+| Header-aware 429 pause | Not implemented |
 | Browser shared cache | TanStack Query, memory-only (~9m stale for company pack) |
 | localStorage | Prefs / recent players / equipment prefs — not TTL’d API payloads |
 
@@ -62,7 +64,7 @@ Event-driven Geo (`enqueueGeoRefresh` from battles/laws/etc.) is **documented as
 | Selected player | `userId` + username | Shell selection (no WarEra cron) | Session / explicit Load | Search/lite via client default | Shell state; recent list in localStorage | All user tools |
 | Company pack | Companies + advisor inputs for a player | Shell Load/Refresh (`refresh=1` busts pack) | Server TTL ~600s | Mix: companies/regions via default; some company helpers forced api2 | `company_packs` + TQ memory | Companies, Growth |
 | User aggregate | Skills / job / income-oriented payload | `GET /api/user` on demand | Aligned with pack / Load | Prefer gateway + fallbacks | Server TTL patterns + TQ | Skills optimizer, income views |
-| Workers / wages | Work offers / worker rows when needed | Demand paths inside user/economy flows | On Load / tool need | Prefer gateway | Ephemeral / pack-adjacent — not a long Global history | Companies, wage helpers |
+| Workers / wages | Work offers / worker rows + lite skills/username | Advisor on Companies Load/Refresh: `worker.getWorkers` then batched `user.getUserLite` for unique worker ids | On Load / tool need | Prefer gateway | Ephemeral / pack-adjacent — not a long Global history | Companies (sim + badges); wage helpers |
 
 ## Storage styles in use
 

@@ -1,7 +1,7 @@
 # Worker user enrichment via tRPC batch
 
 **Date:** 2026-08-10  
-**Status:** Draft — pending review  
+**Status:** Implemented  
 **Related:** [Company worker simulation](./2026-08-04-company-worker-simulation-design.md), [Company economy advisor](./2026-07-31-company-economy-advisor-design.md), [WarEra API skill](../../../.agents/skills/warera-api/SKILL.md), [Data inventory](../../warera-api/inventory.md)
 
 ## Problem
