@@ -30,6 +30,7 @@ import {
   type RegionInfo,
 } from "../warera/companies";
 import type { WareraRequester } from "../warera/prices";
+import { fetchUserLiteBatch, type UserLiteSkills } from "../warera/users";
 import { fetchWorkOfferWage, fetchWorkers, workerFieldProvenance } from "../warera/workers";
 import { loadCompanyPackForUser } from "./load-company-pack";
 
@@ -62,6 +63,8 @@ export type AdvisorWorker = {
   energyLevel: number | null;
   productionLevel: number | null;
   fidelityPct: number | null;
+  /** True when user.getUserLite failed for this worker (skills/name unavailable). */
+  enrichmentError: boolean;
 };
 
 export type CompanyAdvisorRow = {
@@ -94,6 +97,27 @@ const UNAVAILABLE_ENRICHMENT: CompanyLiveEnrichment = {
   incomeTaxAssumed: true,
   offerWagePerPp: null,
 };
+
+export function mergeWorkersWithUserLite(
+  workers: AdvisorWorker[],
+  liteByUserId: Map<string, UserLiteSkills | null>,
+): AdvisorWorker[] {
+  return workers.map((w) => {
+    const lite = liteByUserId.get(w.userId);
+    if (lite == null) {
+      return { ...w, enrichmentError: true };
+    }
+    return {
+      ...w,
+      username: lite.username || w.username,
+      energyLevel:
+        typeof lite.skillLevels.energy === "number" ? lite.skillLevels.energy : null,
+      productionLevel:
+        typeof lite.skillLevels.production === "number" ? lite.skillLevels.production : null,
+      enrichmentError: false,
+    };
+  });
+}
 
 async function enrichCompanyLive(
   warera: WareraRequester,
@@ -139,6 +163,7 @@ async function enrichCompanyLive(
           energyLevel: w.energyLevel,
           productionLevel: w.productionLevel,
           fidelityPct: w.fidelityPct,
+          enrichmentError: false,
         })),
       } as const;
     },
@@ -482,12 +507,35 @@ export async function buildAdvisor(options: {
   for (let i = 0; i < rows.length; i++) {
     Object.assign(rows[i]!, enrichments[i]!);
   }
+
+  const workerUserIds = [
+    ...new Set(rows.flatMap((row) => row.workers.map((w) => w.userId)).filter(Boolean)),
+  ];
+  const liteByUserId =
+    workerUserIds.length > 0
+      ? await fetchUserLiteBatch(warera, workerUserIds)
+      : new Map<string, UserLiteSkills | null>();
+  let enrichmentErrorCount = 0;
+  for (const row of rows) {
+    row.workers = mergeWorkersWithUserLite(row.workers, liteByUserId);
+    enrichmentErrorCount += row.workers.filter((w) => w.enrichmentError).length;
+  }
+  logger.debug(
+    {
+      worker_user_count: workerUserIds.length,
+      enrichment_error_count: enrichmentErrorCount,
+    },
+    "worker user.getUserLite batch enrich",
+  );
+
   logger.info(
     {
       phase: "workerEnrich",
       durationMs: Math.round(performance.now() - phaseStarted),
       companies: rows.length,
       chunkSize: WORKER_ENRICH_CHUNK,
+      worker_user_count: workerUserIds.length,
+      enrichment_error_count: enrichmentErrorCount,
     },
     "advisor",
   );

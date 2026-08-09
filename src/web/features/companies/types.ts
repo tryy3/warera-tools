@@ -71,6 +71,7 @@ export type AdvisorWorker = {
   energyLevel: number | null;
   productionLevel: number | null;
   fidelityPct: number | null;
+  enrichmentError: boolean;
 };
 
 export type CompanyAdvisorRow = {

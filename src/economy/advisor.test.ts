@@ -138,16 +138,43 @@ function trpc(data: unknown) {
   return { result: { data } };
 }
 
+function mockUserLiteBatch(overrides?: {
+  failUserIds?: Set<string>;
+}) {
+  return vi.fn(async (items: { input?: { userId?: string } }[]) =>
+    items.map((item) => {
+      const userId = item.input?.userId ?? "unknown";
+      if (overrides?.failUserIds?.has(userId)) {
+        return { ok: false as const, error: { message: "NOT_FOUND" } };
+      }
+      return {
+        ok: true as const,
+        data: {
+          _id: userId,
+          username: userId === "w1" ? "Alice" : userId,
+          leveling: {
+            level: 1,
+            availableSkillPoints: 0,
+            spentSkillPoints: 0,
+            totalSkillPoints: 0,
+          },
+          skills: {
+            energy: { level: 5, total: 80 },
+            production: { level: 3, total: 19 },
+          },
+        },
+      };
+    }),
+  );
+}
+
 /** Live enrichment: workers + offer + company→region→country tax (not cache paths). */
 function mockLiveCompanyEnrichment(path: string) {
   if (path.includes("worker.getWorkers")) {
     return trpc([
       {
         userId: "w1",
-        userName: "Alice",
         wagePerPp: 1.2,
-        energyLevel: 5,
-        productionLevel: 3,
         fidelityPct: 4,
       },
     ]);
@@ -242,7 +269,7 @@ describe("buildAdvisor caching", () => {
 
     const result = await buildAdvisor({
       db,
-      warera: { request } as never,
+      warera: { request, requestBatch: mockUserLiteBatch() } as never,
       logger: logger as never,
       userId: "u1",
     });
@@ -284,10 +311,11 @@ describe("buildAdvisor caching", () => {
       if (enrichment) return enrichment;
       throw new Error(`unexpected ${path}`);
     });
+    const requestBatch = mockUserLiteBatch();
 
     const result = await buildAdvisor({
       db,
-      warera: { request } as never,
+      warera: { request, requestBatch } as never,
       logger: logger as never,
       userId: "u1",
     });
@@ -302,14 +330,16 @@ describe("buildAdvisor caching", () => {
         energyLevel: 5,
         productionLevel: 3,
         fidelityPct: 4,
+        enrichmentError: false,
       },
     ]);
+    expect(requestBatch).toHaveBeenCalled();
     expect(row.incomeTaxRate).toBe(0.1);
     expect(row.incomeTaxAssumed).toBe(false);
     expect(row.offerWagePerPp).toBe(0.8);
     expect(logger.debug).toHaveBeenCalledWith(
       expect.objectContaining({
-        keys: expect.arrayContaining(["userId", "userName"]),
+        keys: expect.arrayContaining(["userId"]),
         sample_json: expect.stringContaining('"userId":"w1"'),
       }),
       "worker.getWorkers first object keys",
@@ -322,21 +352,34 @@ describe("buildAdvisor caching", () => {
       }),
       "worker field sources from worker.getWorkers",
     );
-    const fieldSourcesCall = logger.debug.mock.calls.find(
-      (call) => call[1] === "worker field sources from worker.getWorkers",
-    );
-    expect(JSON.parse(String(fieldSourcesCall?.[0]?.workers_json))).toEqual([
-      {
-        user_id: "w1",
-        username: "Alice",
-        fields: {
-          wagePerPp: { value: 1.2, source: "api" },
-          energyLevel: { value: 5, source: "api" },
-          productionLevel: { value: 3, source: "api" },
-          fidelityPct: { value: 4, source: "api" },
-        },
-      },
-    ]);
+  });
+
+  it("marks enrichmentError when user.getUserLite batch slot fails", async () => {
+    await seedWarmAdvisorCaches(db);
+
+    const request = vi.fn(async (path: string) => {
+      const enrichment = mockLiveCompanyEnrichment(path);
+      if (enrichment) return enrichment;
+      throw new Error(`unexpected ${path}`);
+    });
+
+    const result = await buildAdvisor({
+      db,
+      warera: {
+        request,
+        requestBatch: mockUserLiteBatch({ failUserIds: new Set(["w1"]) }),
+      } as never,
+      logger: logger as never,
+      userId: "u1",
+    });
+
+    const worker = result.companies[0]!.workers[0]!;
+    expect(worker.enrichmentError).toBe(true);
+    expect(worker.wagePerPp).toBe(1.2);
+    expect(worker.fidelityPct).toBe(4);
+    expect(worker.energyLevel).toBeNull();
+    expect(worker.productionLevel).toBeNull();
+    expect(result.companies[0]!.workersStatus).toBe("ok");
   });
 
   it("soft-fails worker enrichment per company when WarEra throws", async () => {
@@ -348,7 +391,7 @@ describe("buildAdvisor caching", () => {
 
     const result = await buildAdvisor({
       db,
-      warera: { request } as never,
+      warera: { request, requestBatch: mockUserLiteBatch() } as never,
       logger: logger as never,
       userId: "u1",
     });
@@ -390,7 +433,7 @@ describe("buildAdvisor caching", () => {
 
     const result = await buildAdvisor({
       db,
-      warera: { request } as never,
+      warera: { request, requestBatch: mockUserLiteBatch() } as never,
       logger: logger as never,
       userId: "u1",
     });
@@ -400,11 +443,12 @@ describe("buildAdvisor caching", () => {
     expect(row.workers).toEqual([
       {
         userId: "w1",
-        username: null,
+        username: "Alice",
         wagePerPp: 1.2,
-        energyLevel: null,
-        productionLevel: null,
+        energyLevel: 5,
+        productionLevel: 3,
         fidelityPct: 4,
+        enrichmentError: false,
       },
     ]);
     expect(row.offerWagePerPp).toBeNull();
@@ -487,7 +531,7 @@ describe("buildAdvisor caching", () => {
 
     const result = await buildAdvisor({
       db,
-      warera: { request } as never,
+      warera: { request, requestBatch: mockUserLiteBatch() } as never,
       logger: logger as never,
       userId: "u1",
       refresh: true,
@@ -557,7 +601,7 @@ describe("buildAdvisor caching", () => {
 
     await buildAdvisor({
       db,
-      warera: { request } as never,
+      warera: { request, requestBatch: mockUserLiteBatch() } as never,
       logger: logger as never,
       userId: "u1",
     });
