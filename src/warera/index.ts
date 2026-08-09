@@ -26,6 +26,7 @@ export {
 export {
   fetchUserById,
   fetchUserLite,
+  fetchUserLiteBatch,
   parseUserByIdCompany,
   parseUserLiteSkills,
   type UserCompanyRef,

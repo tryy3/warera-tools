@@ -96,6 +96,51 @@ export async function fetchUserLite(
   return parseUserLiteSkills(unwrapTrpcData(json));
 }
 
+/**
+ * Batch-fetch public lite profiles. Dedupes ids. Failed / missing slots → null.
+ * Requires `warera.requestBatch` (production client always has it).
+ */
+export async function fetchUserLiteBatch(
+  warera: WareraRequester,
+  userIds: string[],
+): Promise<Map<string, UserLiteSkills | null>> {
+  const unique = [...new Set(userIds.filter((id) => id.length > 0))];
+  const out = new Map<string, UserLiteSkills | null>();
+  if (unique.length === 0) return out;
+
+  if (!warera.requestBatch) {
+    throw new Error("fetchUserLiteBatch requires warera.requestBatch");
+  }
+
+  try {
+    const slots = await warera.requestBatch(
+      unique.map((userId) => ({
+        procedure: "user.getUserLite",
+        input: { userId },
+      })),
+    );
+    for (let i = 0; i < unique.length; i++) {
+      const userId = unique[i]!;
+      const slot = slots[i];
+      if (!slot?.ok) {
+        out.set(userId, null);
+        continue;
+      }
+      try {
+        out.set(userId, parseUserLiteSkills(slot.data));
+      } catch {
+        out.set(userId, null);
+      }
+    }
+  } catch {
+    for (const userId of unique) {
+      out.set(userId, null);
+    }
+  }
+
+  return out;
+}
+
 export async function fetchUserById(
   warera: WareraRequester,
   userId: string,

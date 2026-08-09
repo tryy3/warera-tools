@@ -1,5 +1,11 @@
 import { describe, expect, it, vi } from "vite-plus/test";
-import { fetchUserById, fetchUserLite, parseUserByIdCompany, parseUserLiteSkills } from "./users";
+import {
+  fetchUserById,
+  fetchUserLite,
+  fetchUserLiteBatch,
+  parseUserByIdCompany,
+  parseUserLiteSkills,
+} from "./users";
 
 describe("parseUserLiteSkills", () => {
   it("parses getUserLite leveling and skill levels/values", () => {
@@ -105,5 +111,55 @@ describe("fetchUserLite / fetchUserById", () => {
     const row = await fetchUserById({ request } as never, "user-1");
     expect(request).toHaveBeenCalledWith(expect.stringContaining("user.getUserById"));
     expect(row).toEqual({ companyId: "co-9" });
+  });
+});
+
+describe("fetchUserLiteBatch", () => {
+  it("dedupes ids and maps ok / failed slots", async () => {
+    const requestBatch = vi.fn(async () => [
+      {
+        ok: true as const,
+        data: {
+          _id: "u1",
+          username: "Alice",
+          leveling: {
+            level: 1,
+            availableSkillPoints: 0,
+            spentSkillPoints: 0,
+            totalSkillPoints: 0,
+          },
+          skills: { energy: { level: 4, total: 70 }, production: { level: 6, total: 25 } },
+        },
+      },
+      { ok: false as const, error: { message: "NOT_FOUND" } },
+    ]);
+
+    const map = await fetchUserLiteBatch({ request: vi.fn(), requestBatch } as never, [
+      "u1",
+      "u2",
+      "u1",
+    ]);
+
+    expect(requestBatch).toHaveBeenCalledTimes(1);
+    expect(requestBatch.mock.calls[0]![0]).toHaveLength(2);
+    expect(map.get("u1")?.username).toBe("Alice");
+    expect(map.get("u1")?.skillLevels.energy).toBe(4);
+    expect(map.get("u1")?.skillLevels.production).toBe(6);
+    expect(map.get("u2")).toBeNull();
+  });
+
+  it("marks all ids null when requestBatch throws", async () => {
+    const requestBatch = vi.fn(async () => {
+      throw new Error("batch down");
+    });
+    const map = await fetchUserLiteBatch({ request: vi.fn(), requestBatch } as never, ["a", "b"]);
+    expect(map.get("a")).toBeNull();
+    expect(map.get("b")).toBeNull();
+  });
+
+  it("throws when requestBatch is missing", async () => {
+    await expect(fetchUserLiteBatch({ request: vi.fn() } as never, ["u1"])).rejects.toThrow(
+      /requestBatch/,
+    );
   });
 });
