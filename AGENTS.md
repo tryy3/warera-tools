@@ -60,9 +60,13 @@ Browser talks only to the Hono API. Notifications: Discord **webhooks** only (`s
 
 Deep feature designs live under `docs/superpowers/specs/`. Specs can drift from code — prefer this file + skills + source of truth in code when they conflict.
 
+WarEra data access (inventory + future access/caching vision): `docs/warera-api/`.
+
+**Keep `docs/warera-api/inventory.md` current on larger changes.** When a change adds, removes, or materially alters WarEra-related data flows — new/removed jobs, tier ownership, fetch cadence/TTL, storage style (latest vs history), upstream path (gateway/api2), or major consumers — update the inventory in the same work. Skip it for small/detail-level work that does not change those facts. Do not habitually update `vision.md`; only when we explicitly revise architectural direction.
+
 ## Data tiers
 
-Classify new persisted / fetched data before inventing a one-off cache. Full model: `docs/superpowers/specs/2026-08-02-data-tier-caching-strategy-design.md`.
+Classify new persisted / fetched data before inventing a one-off cache. Full model: `docs/superpowers/specs/2026-08-02-data-tier-caching-strategy-design.md`. Living as-is catalog: `docs/warera-api/inventory.md`.
 
 | Tier | Who refreshes | Examples |
 | --- | --- | --- |
