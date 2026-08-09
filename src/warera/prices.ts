@@ -1,5 +1,10 @@
 import type { WareraRequestInit } from "./client";
-import { unwrapTrpcData, wareraProcedurePath } from "./trpc";
+import {
+  unwrapTrpcData,
+  wareraProcedurePath,
+  type TrpcBatchSlotResult,
+  type WareraBatchItem,
+} from "./trpc";
 
 export type ItemPriceMap = Record<string, number>;
 
@@ -28,6 +33,11 @@ export function parseScrapsPrice(trpcJson: unknown): number {
 
 export type WareraRequester = {
   request: <T>(path: string, init?: WareraRequestInit) => Promise<T>;
+  /** Optional: production client always provides this for tRPC HTTP batching. */
+  requestBatch?: (
+    items: WareraBatchItem[],
+    init?: WareraRequestInit,
+  ) => Promise<TrpcBatchSlotResult[]>;
 };
 
 export async function fetchItemPrices(warera: WareraRequester): Promise<ItemPriceMap> {

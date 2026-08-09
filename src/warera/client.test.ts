@@ -217,6 +217,53 @@ describe("createWareraClient", () => {
     expect(String(fetchMock.mock.calls[1]![0])).toContain("api2.warera.io");
   });
 
+  it("requestBatch returns [] without fetch for empty items", async () => {
+    const fetchMock = vi.fn();
+    const client = createWareraClient({
+      config: baseConfig,
+      logger: testLogger(),
+      fetchImpl: fetchMock,
+      sleep: async () => {},
+    });
+    await expect(client.requestBatch([])).resolves.toEqual([]);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("requestBatch sends one GET with batch=1 for multiple items", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify([
+          { result: { data: { username: "A" } } },
+          { result: { data: { username: "B" } } },
+          { error: { message: "nope" } },
+        ]),
+        { status: 207 },
+      ),
+    );
+    const client = createWareraClient({
+      config: { ...baseConfig, wareraMaxRequestsPerMinute: 1 },
+      logger: testLogger(),
+      fetchImpl: fetchMock,
+      sleep: async () => {},
+    });
+
+    const results = await client.requestBatch([
+      { procedure: "user.getUserLite", input: { userId: "u1" } },
+      { procedure: "user.getUserLite", input: { userId: "u2" } },
+      { procedure: "user.getUserLite", input: { userId: "u3" } },
+    ]);
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const url = String(fetchMock.mock.calls[0]![0]);
+    expect(url).toContain("user.getUserLite,user.getUserLite,user.getUserLite");
+    expect(url).toContain("batch=1");
+    expect(results).toEqual([
+      { ok: true, data: { username: "A" } },
+      { ok: true, data: { username: "B" } },
+      { ok: false, error: { message: "nope" } },
+    ]);
+  });
+
   it("POSTs JSON with X-API-Key when authStyle is api-key", async () => {
     const fetchMock = vi
       .fn()

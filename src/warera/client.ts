@@ -1,11 +1,22 @@
 import type { AppConfig } from "../config/env";
 import type { Logger } from "../logging/logger";
 import { createRateLimiter } from "./rate-limit";
+import {
+  chunkBatchItemsByMaxUrlLength,
+  parseTrpcBatchResponse,
+  wareraBatchPath,
+  type TrpcBatchSlotResult,
+  type WareraBatchItem,
+} from "./trpc";
 
 const RETRYABLE_STATUSES = new Set([502, 503, 504]);
 const MAX_RETRIES = 2;
 const BODY_SNIPPET_LEN = 200;
+/** Soft cap for tRPC batch GET URLs (split into multiple HTTP calls beyond this). */
+export const WARERA_MAX_BATCH_URL_LENGTH = 2000;
 export const API2_TRPC_BASE = "https://api2.warera.io/trpc";
+
+export type { TrpcBatchSlotResult, WareraBatchItem };
 
 function isUnknownMethodBody(body: string): boolean {
   return /unknown method/i.test(body);
@@ -98,19 +109,14 @@ export function createWareraClient(options: CreateWareraClientOptions) {
     return { ok: false, status: response.status, bodyText };
   }
 
-  async function request<T>(path: string, init: WareraRequestInit = {}): Promise<T> {
-    const { skipRateLimit, json, authStyle = "auto", baseUrl: baseUrlOverride, ...rest } = init;
-    const method = (rest.method ?? (json !== undefined ? "POST" : "GET")).toUpperCase();
-    const fetchInit: RequestInit = { ...rest };
-    if (json !== undefined) {
-      fetchInit.body = JSON.stringify(json);
-      const headers = new Headers(fetchInit.headers);
-      if (!headers.has("content-type")) {
-        headers.set("content-type", "application/json");
-      }
-      fetchInit.headers = headers;
-    }
-
+  async function executeRequest(
+    path: string,
+    fetchInit: RequestInit,
+    method: string,
+    authStyle: WareraAuthStyle,
+    skipRateLimit: boolean,
+    baseUrlOverride: string | undefined,
+  ): Promise<unknown> {
     const primaryBase = baseUrlOverride ?? options.config.wareraApiBaseUrl;
     const canFallbackToApi2 =
       !baseUrlOverride &&
@@ -133,7 +139,7 @@ export function createWareraClient(options: CreateWareraClientOptions) {
 
         if (primary.ok) {
           options.logger.debug({ path, status: 200, durationMs }, "warera request");
-          return primary.json as T;
+          return primary.json;
         }
 
         // Gateway may not mirror every api2 procedure — retry once on official API.
@@ -157,7 +163,7 @@ export function createWareraClient(options: CreateWareraClientOptions) {
               { path, status: 200, durationMs: fallbackMs, via: "api2" },
               "warera request",
             );
-            return fallback.json as T;
+            return fallback.json;
           }
           lastStatus = fallback.status;
           lastBodySnippet = fallback.bodyText.slice(0, BODY_SNIPPET_LEN);
@@ -204,5 +210,54 @@ export function createWareraClient(options: CreateWareraClientOptions) {
       : new Error(`WarEra request failed: ${lastStatus ?? "unknown"} ${lastBodySnippet}`.trim());
   }
 
-  return { request };
+  async function request<T>(path: string, init: WareraRequestInit = {}): Promise<T> {
+    const { skipRateLimit, json, authStyle = "auto", baseUrl: baseUrlOverride, ...rest } = init;
+    const method = (rest.method ?? (json !== undefined ? "POST" : "GET")).toUpperCase();
+    const fetchInit: RequestInit = { ...rest };
+    if (json !== undefined) {
+      fetchInit.body = JSON.stringify(json);
+      const headers = new Headers(fetchInit.headers);
+      if (!headers.has("content-type")) {
+        headers.set("content-type", "application/json");
+      }
+      fetchInit.headers = headers;
+    }
+
+    return (await executeRequest(
+      path,
+      fetchInit,
+      method,
+      authStyle,
+      Boolean(skipRateLimit),
+      baseUrlOverride,
+    )) as T;
+  }
+
+  async function requestBatch(
+    items: WareraBatchItem[],
+    init: WareraRequestInit = {},
+  ): Promise<TrpcBatchSlotResult[]> {
+    if (items.length === 0) return [];
+
+    const { skipRateLimit, authStyle = "auto", baseUrl: baseUrlOverride } = init;
+    const chunks = chunkBatchItemsByMaxUrlLength(items, WARERA_MAX_BATCH_URL_LENGTH);
+    const out: TrpcBatchSlotResult[] = [];
+
+    for (const chunk of chunks) {
+      const path = wareraBatchPath(chunk);
+      const json = await executeRequest(
+        path,
+        {},
+        "GET",
+        authStyle,
+        Boolean(skipRateLimit),
+        baseUrlOverride,
+      );
+      out.push(...parseTrpcBatchResponse(json));
+    }
+
+    return out;
+  }
+
+  return { request, requestBatch };
 }
