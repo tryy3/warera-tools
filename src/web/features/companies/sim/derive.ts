@@ -24,8 +24,13 @@ type OwnerDefaults = {
   productionSkillLevel: number;
 };
 
-function activeWorkers(state: CompanySimState, companyId: string): SimWorker[] {
+function assignedWorkers(state: CompanySimState, companyId: string): SimWorker[] {
   return state.workers.filter((w) => w.assignment === companyId);
+}
+
+/** Workers that contribute to company day math (error rows need a manual edit first). */
+export function workersIncludedInTotals(workers: SimWorker[]): SimWorker[] {
+  return workers.filter((w) => !w.enrichmentError || w.dirty);
 }
 
 function isDirty(overrides: CompanyOverrides | undefined, assigned: SimWorker[]): boolean {
@@ -50,7 +55,8 @@ export function deriveCompanyCard(
 ): DerivedCompanyCard {
   const companyId = row.company.id;
   const overrides = state.overrides[companyId];
-  const assigned = activeWorkers(state, companyId);
+  const assigned = assignedWorkers(state, companyId);
+  const included = workersIncludedInTotals(assigned);
 
   const aeLevel = overrides?.aeLevel ?? row.company.aeLevel;
   const productionBonus = overrides?.productionBonus ?? row.company.productionBonus ?? 0;
@@ -72,7 +78,7 @@ export function deriveCompanyCard(
     entrepreneurshipLevel,
     productionSkillLevel,
     includeSelfWork,
-    workers: assigned.map((w) => ({
+    workers: included.map((w) => ({
       id: w.id,
       energyLevel: w.energyLevel,
       productionLevel: w.productionLevel,
@@ -87,7 +93,7 @@ export function deriveCompanyCard(
     workersStatus: row.workersStatus,
     incomeTaxRate,
     incomeTaxAssumed: row.incomeTaxAssumed,
-    activeWorkerCount: assigned.length,
+    activeWorkerCount: included.length,
     day,
     offerWage: offerWagePerPp != null ? wagePair(offerWagePerPp, incomeTaxRate) : null,
     maxWage: wagePair(day.maxGrossWagePerPp, incomeTaxRate),

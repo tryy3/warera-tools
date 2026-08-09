@@ -11,6 +11,8 @@ export type SimWorker = {
   fidelityPct: number;
   assumedFields: string[];
   dirty: boolean;
+  /** user.getUserLite failed; excluded from totals until dirty (manual edit). */
+  enrichmentError: boolean;
 };
 
 export type CompanyOverrides = {

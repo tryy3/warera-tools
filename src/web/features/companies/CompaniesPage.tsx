@@ -209,7 +209,15 @@ function WorkerListItem({
                 Inactive
               </Badge>
             ) : null}
-            {worker.assumedFields.length > 0 ? (
+            {worker.enrichmentError ? (
+              <Badge
+                variant="outline"
+                className="border-destructive/50 font-normal text-destructive"
+              >
+                Error
+              </Badge>
+            ) : null}
+            {!worker.enrichmentError && worker.assumedFields.length > 0 ? (
               <Badge
                 variant="outline"
                 className="border-amber-500/40 font-normal text-amber-200/90"
@@ -300,6 +308,7 @@ function CompanyWorkersSection({
       fidelityPct: draft.fidelityPct,
       assumedFields: [],
       dirty: true,
+      enrichmentError: false,
     };
     dispatch({ type: "addSimWorker", worker });
     setCreateOpen(false);

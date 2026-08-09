@@ -65,6 +65,7 @@ function simWorker(partial: Partial<SimWorker> & Pick<SimWorker, "id" | "assignm
     fidelityPct: partial.fidelityPct ?? 0,
     assumedFields: partial.assumedFields ?? [],
     dirty: partial.dirty ?? false,
+    enrichmentError: partial.enrichmentError ?? false,
   };
 }
 
@@ -73,6 +74,38 @@ function emptyState(workers: SimWorker[] = []): CompanySimState {
 }
 
 describe("deriveCompanyCard", () => {
+  it("excludes enrichmentError workers from totals until dirty", () => {
+    const company = row({ company: { id: "a" } });
+    const errorWorker = simWorker({
+      id: "err",
+      assignment: "a",
+      wagePerPp: 0.2,
+      enrichmentError: true,
+      dirty: false,
+    });
+    const okWorker = simWorker({
+      id: "ok",
+      assignment: "a",
+      wagePerPp: 0.05,
+      enrichmentError: false,
+    });
+
+    const withErrorOnly = deriveCompanyCard(company, emptyState([errorWorker]), OWNER);
+    const withBoth = deriveCompanyCard(company, emptyState([errorWorker, okWorker]), OWNER);
+    const afterEdit = deriveCompanyCard(
+      company,
+      emptyState([{ ...errorWorker, dirty: true }, okWorker]),
+      OWNER,
+    );
+
+    expect(withErrorOnly.activeWorkerCount).toBe(0);
+    expect(withErrorOnly.day.workers).toHaveLength(0);
+    expect(withBoth.activeWorkerCount).toBe(1);
+    expect(withBoth.day.workers.map((w) => w.id)).toEqual(["ok"]);
+    expect(afterEdit.activeWorkerCount).toBe(2);
+    expect(afterEdit.day.workers.map((w) => w.id).toSorted()).toEqual(["err", "ok"]);
+  });
+
   it("moving a worker moves their wage cost between company cards", () => {
     const rowA = row({ company: { id: "a" } });
     const rowB = row({ company: { id: "b" } });

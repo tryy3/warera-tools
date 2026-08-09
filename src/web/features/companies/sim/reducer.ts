@@ -52,6 +52,8 @@ function simWorkerFromAdvisor(
     fidelityPct = worker.fidelityPct;
   }
 
+  const enrichmentError = worker.enrichmentError === true;
+
   return {
     id: worker.userId,
     kind: "real",
@@ -61,8 +63,10 @@ function simWorkerFromAdvisor(
     energyLevel,
     productionLevel,
     fidelityPct,
-    assumedFields,
+    // Prefer Error badge over Assumed noise when lite enrich failed.
+    assumedFields: enrichmentError ? [] : assumedFields,
     dirty: false,
+    enrichmentError,
   };
 }
 
@@ -110,7 +114,10 @@ export function companySimReducer(
       );
       const mergedReals = liveReals.map((liveWorker) => {
         const existing = existingReals.get(liveWorker.id);
-        if (existing?.dirty) return existing;
+        if (existing?.dirty) {
+          // Keep edits; refresh enrichmentError from live (clears Error after successful lite).
+          return { ...existing, enrichmentError: liveWorker.enrichmentError };
+        }
         return liveWorker;
       });
 

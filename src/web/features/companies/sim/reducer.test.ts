@@ -13,6 +13,7 @@ function advisorWorker(
     energyLevel: null,
     productionLevel: null,
     fidelityPct: null,
+    enrichmentError: false,
     ...partial,
   };
 }
@@ -22,6 +23,34 @@ function livePayload(companies: HydratePayload["companies"]): HydratePayload {
 }
 
 describe("companySimReducer", () => {
+  it("clears assumedFields and sets enrichmentError when lite enrich failed", () => {
+    const live = livePayload([
+      {
+        companyId: "c1",
+        offerWagePerPp: 0.42,
+        workers: [
+          advisorWorker({
+            userId: "u1",
+            wagePerPp: 0.1,
+            energyLevel: null,
+            productionLevel: null,
+            fidelityPct: 2,
+            enrichmentError: true,
+          }),
+        ],
+      },
+    ]);
+    const next = companySimReducer(initialCompanySimState, {
+      type: "hydrate",
+      live,
+      keepOverrides: false,
+    });
+    const w = next.workers[0]!;
+    expect(w.enrichmentError).toBe(true);
+    expect(w.assumedFields).toEqual([]);
+    expect(w.energyLevel).toBe(5);
+  });
+
   it("hydrates real workers with defaults and assumedFields for nulls", () => {
     const live = livePayload([
       {
@@ -164,6 +193,7 @@ describe("companySimReducer", () => {
       fidelityPct: 0,
       assumedFields: [],
       dirty: false,
+      enrichmentError: false,
     };
     state = companySimReducer(state, { type: "addSimWorker", worker: sim });
     expect(state.workers.some((w) => w.id === "sim-1")).toBe(true);
@@ -257,6 +287,7 @@ describe("companySimReducer", () => {
       fidelityPct: 0,
       assumedFields: [],
       dirty: false,
+      enrichmentError: false,
     };
     let state = companySimReducer(initialCompanySimState, {
       type: "hydrate",
@@ -297,6 +328,7 @@ describe("companySimReducer", () => {
       fidelityPct: 0,
       assumedFields: [],
       dirty: false,
+      enrichmentError: false,
     };
     let state: CompanySimState = {
       ...initialCompanySimState,
@@ -336,6 +368,7 @@ describe("companySimReducer", () => {
       fidelityPct: 0,
       assumedFields: [],
       dirty: true,
+      enrichmentError: false,
     };
 
     let state = companySimReducer(initialCompanySimState, {
