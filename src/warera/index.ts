@@ -14,7 +14,15 @@ export {
   type WareraRequester,
 } from "./prices";
 export { fetchTopOrderAggregates, parseTopOrderAggregates } from "./top-orders";
-export { wareraProcedurePath, unwrapTrpcData } from "./trpc";
+export {
+  wareraProcedurePath,
+  wareraBatchPath,
+  parseTrpcBatchResponse,
+  chunkBatchItemsByMaxUrlLength,
+  unwrapTrpcData,
+  type WareraBatchItem,
+  type TrpcBatchSlotResult,
+} from "./trpc";
 export {
   fetchUserById,
   fetchUserLite,
