@@ -1,5 +1,11 @@
 import { describe, expect, it, vi } from "vite-plus/test";
-import { fetchWorkOfferWage, fetchWorkers, parseWorkOfferWage, parseWorkers } from "./workers";
+import {
+  fetchWorkOfferWage,
+  fetchWorkers,
+  parseWorkOfferWage,
+  parseWorkers,
+  workerFieldProvenance,
+} from "./workers";
 
 const nullSkillFields = {
   username: null,
@@ -8,6 +14,24 @@ const nullSkillFields = {
   fidelityPct: null,
   assumedFields: [] as string[],
 };
+
+describe("workerFieldProvenance", () => {
+  it("marks null fields as assumed and present numbers as api", () => {
+    expect(
+      workerFieldProvenance({
+        wagePerPp: 0.12,
+        energyLevel: null,
+        productionLevel: 5,
+        fidelityPct: null,
+      }),
+    ).toEqual({
+      wagePerPp: { value: 0.12, source: "api" },
+      energyLevel: { value: null, source: "assumed" },
+      productionLevel: { value: 5, source: "api" },
+      fidelityPct: { value: null, source: "assumed" },
+    });
+  });
+});
 
 describe("parseWorkers", () => {
   it("maps userId and wagePerPp from array rows", () => {

@@ -308,8 +308,28 @@ describe("buildAdvisor caching", () => {
     expect(row.incomeTaxAssumed).toBe(false);
     expect(row.offerWagePerPp).toBe(0.8);
     expect(logger.debug).toHaveBeenCalledWith(
-      expect.objectContaining({ keys: expect.arrayContaining(["userId", "userName"]) }),
+      expect.objectContaining({
+        keys: expect.arrayContaining(["userId", "userName"]),
+        sample: expect.objectContaining({ userId: "w1" }),
+      }),
       "worker.getWorkers first object keys",
+    );
+    expect(logger.debug).toHaveBeenCalledWith(
+      expect.objectContaining({
+        company_id: "c1",
+        workers: [
+          expect.objectContaining({
+            user_id: "w1",
+            fields: {
+              wagePerPp: { value: 1.2, source: "api" },
+              energyLevel: { value: 5, source: "api" },
+              productionLevel: { value: 3, source: "api" },
+              fidelityPct: { value: 4, source: "api" },
+            },
+          }),
+        ],
+      }),
+      "worker field sources from worker.getWorkers",
     );
   });
 

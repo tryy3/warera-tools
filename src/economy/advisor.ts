@@ -30,7 +30,7 @@ import {
   type RegionInfo,
 } from "../warera/companies";
 import type { WareraRequester } from "../warera/prices";
-import { fetchWorkOfferWage, fetchWorkers } from "../warera/workers";
+import { fetchWorkOfferWage, fetchWorkers, workerFieldProvenance } from "../warera/workers";
 import { loadCompanyPackForUser } from "./load-company-pack";
 
 const WORKER_ENRICH_CHUNK = 3;
@@ -105,15 +105,26 @@ async function enrichCompanyLive(
     warera,
     { companyId },
     {
-      onFirstRawKeys: (keys) => {
+      onFirstRawWorker: ({ keys, sample }) => {
         if (probeFirstWorkerKeys.done) return;
         probeFirstWorkerKeys.done = true;
-        logger.debug({ keys }, "worker.getWorkers first object keys");
+        logger.debug({ keys, sample }, "worker.getWorkers first object keys");
       },
     },
   ).then(
-    (workerRows) =>
-      ({
+    (workerRows) => {
+      logger.debug(
+        {
+          company_id: companyId,
+          workers: workerRows.map((w) => ({
+            user_id: w.userId,
+            username: w.username,
+            fields: workerFieldProvenance(w),
+          })),
+        },
+        "worker field sources from worker.getWorkers",
+      );
+      return {
         ok: true as const,
         workers: workerRows.map((w) => ({
           userId: w.userId,
@@ -123,7 +134,8 @@ async function enrichCompanyLive(
           productionLevel: w.productionLevel,
           fidelityPct: w.fidelityPct,
         })),
-      }) as const,
+      } as const;
+    },
     () => ({ ok: false as const }),
   );
 

@@ -12,6 +12,28 @@ export type WorkerRow = {
   assumedFields: string[];
 };
 
+export type WorkerFieldSource = "api" | "assumed";
+
+export type WorkerFieldProvenance = {
+  wagePerPp: { value: number | null; source: WorkerFieldSource };
+  energyLevel: { value: number | null; source: WorkerFieldSource };
+  productionLevel: { value: number | null; source: WorkerFieldSource };
+  fidelityPct: { value: number | null; source: WorkerFieldSource };
+};
+
+/** Mark each parseable worker field as API-provided or missing (will be assumed downstream). */
+export function workerFieldProvenance(
+  worker: Pick<WorkerRow, "wagePerPp" | "energyLevel" | "productionLevel" | "fidelityPct">,
+): WorkerFieldProvenance {
+  const source = (value: number | null): WorkerFieldSource => (value == null ? "assumed" : "api");
+  return {
+    wagePerPp: { value: worker.wagePerPp, source: source(worker.wagePerPp) },
+    energyLevel: { value: worker.energyLevel, source: source(worker.energyLevel) },
+    productionLevel: { value: worker.productionLevel, source: source(worker.productionLevel) },
+    fidelityPct: { value: worker.fidelityPct, source: source(worker.fidelityPct) },
+  };
+}
+
 function asRecord(value: unknown): Record<string, unknown> | null {
   return value != null && typeof value === "object" && !Array.isArray(value)
     ? (value as Record<string, unknown>)
@@ -90,16 +112,21 @@ export function parseWorkOfferWage(data: unknown): number | null {
 export async function fetchWorkers(
   warera: WareraRequester,
   input: { companyId?: string; userId?: string },
-  options?: { onFirstRawKeys?: (keys: string[]) => void },
+  options?: {
+    onFirstRawKeys?: (keys: string[]) => void;
+    onFirstRawWorker?: (info: { keys: string[]; sample: Record<string, unknown> }) => void;
+  },
 ): Promise<WorkerRow[]> {
   const body: Record<string, string> = {};
   if (input.companyId) body.companyId = input.companyId;
   if (input.userId) body.userId = input.userId;
   const json = await warera.request<unknown>(wareraProcedurePath("worker.getWorkers", body));
   const data = unwrapTrpcData(json);
-  if (options?.onFirstRawKeys) {
-    const first = asRecord(extractWorkerList(data)[0]);
-    if (first) options.onFirstRawKeys(Object.keys(first));
+  const first = asRecord(extractWorkerList(data)[0]);
+  if (first) {
+    const keys = Object.keys(first);
+    options?.onFirstRawKeys?.(keys);
+    options?.onFirstRawWorker?.({ keys, sample: first });
   }
   return parseWorkers(data);
 }

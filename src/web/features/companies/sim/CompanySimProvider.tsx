@@ -7,11 +7,44 @@ import {
   type Dispatch,
   type ReactNode,
 } from "react";
+import { webLogger } from "../../../logger";
 import type { CompanyAdvisorRow } from "../types";
 import { deriveCompanyCard, derivePortfolioNet, type DerivedCompanyCard } from "./derive";
 import { toHydratePayload } from "./hydrate";
 import { companySimReducer, initialCompanySimState } from "./reducer";
-import type { CompanySimAction, CompanySimState } from "./types";
+import type { CompanySimAction, CompanySimState, SimWorker } from "./types";
+
+function simWorkerFieldSources(worker: SimWorker) {
+  const assumed = new Set(worker.assumedFields);
+  const field = (name: string, value: number) => ({
+    value,
+    source: assumed.has(name) ? ("assumed" as const) : ("api" as const),
+  });
+  return {
+    wagePerPp: field("wagePerPp", worker.wagePerPp),
+    energyLevel: field("energyLevel", worker.energyLevel),
+    productionLevel: field("productionLevel", worker.productionLevel),
+    fidelityPct: field("fidelityPct", worker.fidelityPct),
+  };
+}
+
+function logSimWorkerFieldSources(state: CompanySimState, reason: string) {
+  const realWorkers = state.workers.filter((w) => w.kind === "real");
+  if (realWorkers.length === 0) return;
+  webLogger.debug(
+    {
+      reason,
+      live_epoch: state.liveEpoch,
+      workers: realWorkers.map((w) => ({
+        user_id: w.id,
+        company_id: w.assignment,
+        assumed_fields: w.assumedFields,
+        fields: simWorkerFieldSources(w),
+      })),
+    },
+    "company sim worker field sources",
+  );
+}
 
 export type OwnerDefaults = {
   entrepreneurshipLevel: number;
@@ -61,6 +94,13 @@ export function CompanySimProvider({
       keepOverrides: true,
     });
   }, [liveRevision, companies]);
+
+  const loggedEpochRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (loggedEpochRef.current === state.liveEpoch) return;
+    loggedEpochRef.current = state.liveEpoch;
+    logSimWorkerFieldSources(state, "hydrate");
+  }, [state]);
 
   const cards = companies.map((row) => deriveCompanyCard(row, state, ownerDefaults));
   const portfolioNet = derivePortfolioNet(cards);
