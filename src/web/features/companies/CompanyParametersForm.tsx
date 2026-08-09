@@ -12,7 +12,7 @@ const AE_LEVELS = [1, 2, 3, 4, 5, 6, 7] as const;
 const SKILL_LEVELS = Array.from({ length: 21 }, (_, i) => i);
 
 const selectClassName =
-  "h-8 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm text-foreground outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30";
+  "h-8 w-full rounded-lg border border-input bg-secondary px-2.5 text-sm text-foreground scheme-dark outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50";
 
 function formatBonusPct(fraction: number): string {
   const pct = fraction * 100;

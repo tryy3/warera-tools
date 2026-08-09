@@ -7,7 +7,7 @@ import { skillValueFromLevel } from "@/skills/values";
 const SKILL_LEVELS = Array.from({ length: 21 }, (_, i) => i);
 
 const selectClassName =
-  "h-8 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30";
+  "h-8 w-full rounded-lg border border-input bg-secondary px-2.5 text-sm text-foreground scheme-dark outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50";
 
 export type SimWorkerDraft = {
   name: string;
@@ -100,7 +100,7 @@ export function SimWorkerModal({ open, mode, initial, onClose, onSubmit }: SimWo
   return (
     <dialog
       ref={dialogRef}
-      className="m-auto w-[min(24rem,calc(100%-2rem))] rounded-lg border border-border bg-card p-4 text-foreground shadow-lg backdrop:bg-black/60"
+      className="m-auto w-[min(24rem,calc(100%-2rem))] rounded-lg border border-border bg-card p-4 text-foreground shadow-lg scheme-dark backdrop:bg-black/60"
       onClose={onClose}
       onClick={(event) => {
         if (event.target === dialogRef.current) onClose();
@@ -115,6 +115,7 @@ export function SimWorkerModal({ open, mode, initial, onClose, onSubmit }: SimWo
           <Label htmlFor={`${formId}-name`}>Name</Label>
           <Input
             id={`${formId}-name`}
+            className="bg-secondary dark:bg-secondary"
             value={name}
             onChange={(e) => setName(e.target.value)}
             required
@@ -126,6 +127,7 @@ export function SimWorkerModal({ open, mode, initial, onClose, onSubmit }: SimWo
           <Label htmlFor={`${formId}-wage`}>Wage / PP (gross)</Label>
           <Input
             id={`${formId}-wage`}
+            className="bg-secondary dark:bg-secondary"
             type="number"
             inputMode="decimal"
             min={0}
@@ -140,6 +142,7 @@ export function SimWorkerModal({ open, mode, initial, onClose, onSubmit }: SimWo
           <Label htmlFor={`${formId}-fidelity`}>Fidelity %</Label>
           <Input
             id={`${formId}-fidelity`}
+            className="bg-secondary dark:bg-secondary"
             type="number"
             inputMode="decimal"
             min={0}

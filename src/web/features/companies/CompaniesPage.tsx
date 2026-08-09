@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { formatDisplayNumber } from "@/lib/formatDisplayNumber";
+import { skillValueFromLevel } from "@/skills/values";
 import { wagePair } from "../../../economy/workers";
 import { api } from "../../api";
 import { FlagIcon } from "../../components/FlagIcon";
@@ -227,7 +228,11 @@ function WorkerListItem({
             ) : null}
           </div>
           <p className="mt-0.5 mb-0 text-[0.8em] text-muted-foreground">
-            Energy Lv {worker.energyLevel} · Fid {formatNum(worker.fidelityPct, 0)}%
+            Energy Lv {worker.energyLevel} (
+            {formatNum(skillValueFromLevel("energy", worker.energyLevel), 0)}) · Prod Lv{" "}
+            {worker.productionLevel} (
+            {formatNum(skillValueFromLevel("production", worker.productionLevel), 0)}) · Fid{" "}
+            {formatNum(worker.fidelityPct, 0)}%
           </p>
         </div>
         <WorkerRowActions
