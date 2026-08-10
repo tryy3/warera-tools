@@ -1,9 +1,11 @@
+import type { BookPrices } from "../../../../economy/profit";
 import {
   companyDay,
   type CompanyDayResult,
   wagePair,
   type WagePair,
 } from "../../../../economy/workers";
+import { effectiveProfitForItem } from "../sessionPrices/effective";
 import type { CompanyAdvisorRow } from "../types";
 import type { CompanyOverrides, CompanySimState, SimWorker } from "./types";
 
@@ -14,6 +16,8 @@ export type DerivedCompanyCard = {
   incomeTaxRate: number;
   incomeTaxAssumed: boolean;
   activeWorkerCount: number;
+  /** Effective Profit/PP after session buy/sell overrides. */
+  profitPerPp: number;
   day: CompanyDayResult;
   offerWage: WagePair | null;
   maxWage: WagePair;
@@ -52,6 +56,7 @@ export function deriveCompanyCard(
   row: CompanyAdvisorRow,
   state: CompanySimState,
   ownerDefaults: OwnerDefaults,
+  book?: BookPrices,
 ): DerivedCompanyCard {
   const companyId = row.company.id;
   const overrides = state.overrides[companyId];
@@ -66,15 +71,17 @@ export function deriveCompanyCard(
     overrides?.productionSkillLevel ?? ownerDefaults.productionSkillLevel;
   const includeSelfWork = overrides?.includeSelfWork ?? false;
   const offerWagePerPp = overrides?.offerWagePerPp ?? row.offerWagePerPp;
-  const profitPerPp = resolveProfitPerPp(row);
+  const fromBook = book ? effectiveProfitForItem(row.company.itemCode, book) : null;
+  const profitPerPp = fromBook?.profitPerPp ?? resolveProfitPerPp(row);
+  const inputCostPerUnit = fromBook?.inputCost ?? resolveInputCostPerUnit(row);
   const incomeTaxRate = row.incomeTaxRate;
 
   const day = companyDay({
     aeLevel,
     productionBonus,
-    profitPerPp,
+    profitPerPp: profitPerPp ?? 0,
     itemCode: row.company.itemCode,
-    inputCostPerUnit: resolveInputCostPerUnit(row),
+    inputCostPerUnit,
     entrepreneurshipLevel,
     productionSkillLevel,
     includeSelfWork,
@@ -94,6 +101,7 @@ export function deriveCompanyCard(
     incomeTaxRate,
     incomeTaxAssumed: row.incomeTaxAssumed,
     activeWorkerCount: included.length,
+    profitPerPp: profitPerPp ?? 0,
     day,
     offerWage: offerWagePerPp != null ? wagePair(offerWagePerPp, incomeTaxRate) : null,
     maxWage: wagePair(day.maxGrossWagePerPp, incomeTaxRate),

@@ -39,31 +39,31 @@
 
 ### Task 1: Price maps + profit buy/sell formula
 
-- [ ] Add `buyPriceMap` / `sellPriceMap` from `LatestPrices` (`buyMax` / `sellMin`).
-- [ ] Change profit calculation to accept `{ buy, sell }` maps (keep thin wrapper for old flat map if Growth needs it: treat flat as both buy and sell = marketPrice).
-- [ ] Extend `ProfitPpBreakdown` with `buyPrice`, `sellPrice` (output item live sides used).
-- [ ] Update formula string to mention sell − buy inputs.
-- [ ] Tests green; commit `feat(economy): Profit/PP from buy/sell order book prices`
+- [x] Add `buyPriceMap` / `sellPriceMap` from `LatestPrices` (`buyMax` / `sellMin`).
+- [x] Change profit calculation to accept `{ buy, sell }` maps (keep thin wrapper for old flat map if Growth needs it: treat flat as both buy and sell = marketPrice).
+- [x] Extend `ProfitPpBreakdown` with `buyPrice`, `sellPrice` (output item live sides used).
+- [x] Update formula string to mention sell − buy inputs.
+- [x] Tests green; commit `feat(economy): Profit/PP from buy/sell order book prices`
 
 ### Task 2: Advisor uses buy/sell
 
-- [ ] `buildAdvisor` builds buy/sell maps; passes into opportunities + company profitBreakdown.
-- [ ] Tests seed buyMax/sellMin; assert opportunity fields + G/PP.
-- [ ] Commit `feat(economy): advisor opportunities expose buy/sell prices`
+- [x] `buildAdvisor` builds buy/sell maps; passes into opportunities + company profitBreakdown.
+- [x] Tests seed buyMax/sellMin; assert opportunity fields + G/PP.
+- [x] Commit `feat(economy): advisor opportunities expose buy/sell prices`
 
 ### Task 3: Session price board + client recompute
 
-- [ ] `ItemPriceBoardProvider` with overrides map; `useItemPriceBoard`.
-- [ ] Pure `effectiveBookPrices(live, overrides)` and `recomputeOpportunity` / company profit helper (can live under `sessionPrices/` or reuse economy with maps).
-- [ ] Tests for merge + recompute; commit `feat(companies): session item buy/sell price board`
+- [x] `ItemPriceBoardProvider` with overrides map; `useItemPriceBoard`.
+- [x] Pure `effectiveBookPrices(live, overrides)` and `recomputeOpportunity` / company profit helper (can live under `sessionPrices/` or reuse economy with maps).
+- [x] Tests for merge + recompute; commit `feat(companies): session item buy/sell price board`
 
 ### Task 4: Table + modal + derive wiring
 
-- [ ] Table: Buy, Sell columns; remove Formula; row opens modal; dirty styling + title with live price.
-- [ ] Modal: live vs edit, apply/reset, show formula.
-- [ ] `deriveCompanyCard` + summary Profit/PP use effective sell/buy for that company’s item.
-- [ ] Wrap Companies page with provider.
-- [ ] Inventory one-liner; commit `feat(companies): opportunities modal and session price overrides`
+- [x] Table: Buy, Sell columns; remove Formula; row opens modal; dirty styling + title with live price.
+- [x] Modal: live vs edit, apply/reset, show formula.
+- [x] `deriveCompanyCard` + summary Profit/PP use effective sell/buy for that company’s item.
+- [x] Wrap Companies page with provider.
+- [x] Inventory one-liner; commit `feat(companies): opportunities modal and session price overrides`
 
 ## Spec coverage
 

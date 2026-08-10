@@ -76,6 +76,43 @@ function emptyState(workers: SimWorker[] = []): CompanySimState {
 }
 
 describe("deriveCompanyCard", () => {
+  it("uses session book prices for Profit/PP across companies of the same item", () => {
+    const a = row({
+      company: { id: "a", itemCode: "steel" },
+      currentProfitPerPp: 0.05,
+      profitBreakdown: profitBreakdown({
+        itemCode: "steel",
+        sellPrice: 1,
+        buyPrice: 0.8,
+        inputCost: 0.5,
+        profitPerPp: 0.05,
+        consumedPp: 10,
+      }),
+    });
+    const b = row({
+      company: { id: "b", itemCode: "steel" },
+      currentProfitPerPp: 0.05,
+      profitBreakdown: profitBreakdown({
+        itemCode: "steel",
+        sellPrice: 1,
+        buyPrice: 0.8,
+        inputCost: 0.5,
+        profitPerPp: 0.05,
+        consumedPp: 10,
+      }),
+    });
+    const book = {
+      buy: { iron: 0.09, steel: 0.8 },
+      sell: { iron: 0.06, steel: 1 },
+    };
+
+    const cardA = deriveCompanyCard(a, emptyState(), OWNER, book);
+    const cardB = deriveCompanyCard(b, emptyState(), OWNER, book);
+
+    expect(cardA.profitPerPp).toBeCloseTo(0.01, 8);
+    expect(cardB.profitPerPp).toBeCloseTo(0.01, 8);
+  });
+
   it("excludes enrichmentError workers from totals until dirty", () => {
     const company = row({ company: { id: "a" } });
     const errorWorker = simWorker({

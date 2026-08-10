@@ -62,7 +62,7 @@ Event-driven Geo (`enqueueGeoRefresh` from battles/laws/etc.) is **documented as
 | Resource | What | Who refreshes | Cadence | Upstream today | Storage | Main consumers |
 | --- | --- | --- | --- | --- | --- | --- |
 | Selected player | `userId` + username | Shell selection (no WarEra cron) | Session / explicit Load | Search/lite via client default | Shell state; recent list in localStorage | All user tools |
-| Company pack | Companies + advisor inputs for a player | Shell Load/Refresh (`refresh=1` busts pack) | Server TTL ~600s | Mix: companies/regions via default; some company helpers forced api2 | `company_packs` + TQ memory | Companies, Growth |
+| Company pack | Companies + advisor inputs for a player (opportunities include live `buyPrice`/`sellPrice`) | Shell Load/Refresh (`refresh=1` busts pack) | Server TTL ~600s | Mix: companies/regions via default; some company helpers forced api2 | `company_packs` + TQ memory; Companies page may apply session-only buy/sell overrides (not persisted) | Companies, Growth |
 | User aggregate | Skills / job / income-oriented payload | `GET /api/user` on demand | Aligned with pack / Load | Prefer gateway + fallbacks | Server TTL patterns + TQ | Skills optimizer, income views |
 | Workers / wages | Work offers / worker rows + lite skills/username | Advisor on Companies Load/Refresh: `worker.getWorkers` then batched `user.getUserLite` for unique worker ids | On Load / tool need | Prefer gateway | Ephemeral / pack-adjacent — not a long Global history | Companies (sim + badges); wage helpers |
 

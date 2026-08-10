@@ -26,7 +26,8 @@ import { SimWorkerModal, type SimWorkerDraft } from "./SimWorkerModal";
 import type { DerivedCompanyCard } from "./sim/derive";
 import { CompanySimProvider, useCompanySim, type OwnerDefaults } from "./sim/CompanySimProvider";
 import type { SimWorker } from "./sim/types";
-import type { CompanyAdvisorRow } from "./types";
+import { ItemPriceBoardProvider, useItemPriceBoard } from "./sessionPrices/ItemPriceBoardProvider";
+import type { AdvisorResponse, CompanyAdvisorRow } from "./types";
 import { WorkerRowActions } from "./WorkerRowActions";
 
 function draftFromWorker(worker: SimWorker): SimWorkerDraft {
@@ -772,39 +773,78 @@ export function CompaniesPage() {
 
       {companiesQuery.isFetching ? <p className="text-muted-foreground">Loading advisor…</p> : null}
 
-      <div className="mt-3 grid grid-cols-1 gap-5 lg:grid-cols-[1.2fr_0.8fr]">
-        <section>
-          <h2 className="mt-0 mb-2 text-[1.05rem] font-semibold">Companies</h2>
-          {!player ? (
-            <p className="text-muted-foreground">Load a player in the header.</p>
-          ) : !advisor && !companiesQuery.isFetching ? (
-            <p className="text-muted-foreground">{queryError ?? "Use Load in the header."}</p>
-          ) : null}
-          {advisor?.companies.length === 0 ? (
-            <p className="text-muted-foreground">No companies found for this user.</p>
-          ) : null}
-          {advisor && player ? (
-            <CompanySimProvider
-              key={player.userId}
-              companies={advisor.companies}
-              ownerDefaults={ownerDefaults}
-              liveRevision={companiesQuery.dataUpdatedAt}
-            >
-              <CompaniesList companies={advisor.companies} ownerDefaults={ownerDefaults} />
-            </CompanySimProvider>
-          ) : null}
-        </section>
+      <ItemPriceBoardProvider
+        key={player?.userId ?? "none"}
+        liveOpportunities={advisor?.opportunities ?? []}
+      >
+        <CompaniesWorkspace
+          playerLoaded={player != null}
+          advisor={advisor}
+          ownerDefaults={ownerDefaults}
+          liveRevision={companiesQuery.dataUpdatedAt}
+          queryError={queryError}
+          isFetching={companiesQuery.isFetching}
+          playerUserId={player?.userId ?? null}
+        />
+      </ItemPriceBoardProvider>
+    </div>
+  );
+}
 
-        <section>
-          <h2 className="mt-0 mb-2 text-[1.05rem] font-semibold">Market opportunities</h2>
-          <p className="mb-2 text-sm text-muted-foreground">
-            Ranked by Profit/PP = (market price − input cost) / consumed PP. ~G/day uses AE{" "}
-            {advisor?.opportunities[0]?.referenceAeLevel ?? 6} × each item’s best known region
-            bonus.
-          </p>
-          <MarketOpportunitiesTable opportunities={advisor?.opportunities ?? []} />
-        </section>
-      </div>
+function CompaniesWorkspace({
+  playerLoaded,
+  advisor,
+  ownerDefaults,
+  liveRevision,
+  queryError,
+  isFetching,
+  playerUserId,
+}: {
+  playerLoaded: boolean;
+  advisor: AdvisorResponse | null;
+  ownerDefaults: OwnerDefaults;
+  liveRevision: number;
+  queryError: string | null;
+  isFetching: boolean;
+  playerUserId: string | null;
+}) {
+  const board = useItemPriceBoard();
+  const referenceAe = advisor?.opportunities[0]?.referenceAeLevel ?? 6;
+
+  return (
+    <div className="mt-3 grid grid-cols-1 gap-5 lg:grid-cols-[1.2fr_0.8fr]">
+      <section>
+        <h2 className="mt-0 mb-2 text-[1.05rem] font-semibold">Companies</h2>
+        {!playerLoaded ? (
+          <p className="text-muted-foreground">Load a player in the header.</p>
+        ) : !advisor && !isFetching ? (
+          <p className="text-muted-foreground">{queryError ?? "Use Load in the header."}</p>
+        ) : null}
+        {advisor?.companies.length === 0 ? (
+          <p className="text-muted-foreground">No companies found for this user.</p>
+        ) : null}
+        {advisor && playerLoaded && playerUserId ? (
+          <CompanySimProvider
+            key={playerUserId}
+            companies={advisor.companies}
+            ownerDefaults={ownerDefaults}
+            liveRevision={liveRevision}
+            bookPrices={board.effectiveBook}
+          >
+            <CompaniesList companies={advisor.companies} ownerDefaults={ownerDefaults} />
+          </CompanySimProvider>
+        ) : null}
+      </section>
+
+      <section>
+        <h2 className="mt-0 mb-2 text-[1.05rem] font-semibold">Market opportunities</h2>
+        <p className="mb-2 text-sm text-muted-foreground">
+          Ranked by Profit/PP = (sell − Σ buy inputs) / consumed PP. Click a row to set session
+          buy/sell for that item (shared across companies). ~G/day uses AE {referenceAe} × each
+          item’s best known region bonus.
+        </p>
+        <MarketOpportunitiesTable />
+      </section>
     </div>
   );
 }

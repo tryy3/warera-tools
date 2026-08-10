@@ -7,6 +7,7 @@ import {
   type Dispatch,
   type ReactNode,
 } from "react";
+import type { BookPrices } from "../../../../economy/profit";
 import { webLogger } from "../../../logger";
 import type { CompanyAdvisorRow } from "../types";
 import { deriveCompanyCard, derivePortfolioNet, type DerivedCompanyCard } from "./derive";
@@ -75,12 +76,15 @@ export function CompanySimProvider({
   companies,
   ownerDefaults,
   liveRevision,
+  bookPrices,
   children,
 }: {
   companies: CompanyAdvisorRow[];
   ownerDefaults: OwnerDefaults;
   /** Bumps when advisor pack is replaced (refresh / new fetch). */
   liveRevision: string | number;
+  /** Session-effective buy/sell book for Profit/PP. */
+  bookPrices?: BookPrices;
   children: ReactNode;
 }) {
   const [state, dispatch] = useReducer(companySimReducer, companies, (initialCompanies) =>
@@ -105,7 +109,7 @@ export function CompanySimProvider({
     logSimWorkerFieldSources(state, "hydrate");
   }, [state]);
 
-  const cards = companies.map((row) => deriveCompanyCard(row, state, ownerDefaults));
+  const cards = companies.map((row) => deriveCompanyCard(row, state, ownerDefaults, bookPrices));
   const portfolioNet = derivePortfolioNet(cards);
 
   return (

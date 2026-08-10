@@ -143,10 +143,10 @@ export function CompanyCardSummary({
             Profit/PP
           </dt>
           <dd className="mt-0.5 mb-0">
-            {row.currentProfitPerPp != null && Number.isFinite(row.currentProfitPerPp) ? (
+            {Number.isFinite(summary.profitPerPp) ? (
               <span className="inline-flex items-center gap-1.5">
                 <GoldIcon />
-                {formatDisplayNumber(row.currentProfitPerPp, 4)}
+                {formatDisplayNumber(summary.profitPerPp, 4)}
               </span>
             ) : (
               "—"
