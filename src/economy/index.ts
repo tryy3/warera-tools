@@ -9,6 +9,7 @@ export {
 } from "./recipes";
 export {
   aeDailyValue,
+  bookPricesFromMarket,
   calculateProfitPerPp,
   enrichMarketOpportunities,
   explainAeDaily,
@@ -17,6 +18,7 @@ export {
   transferCostGold,
   OPPORTUNITY_REFERENCE_AE,
   type AeDailyBreakdown,
+  type BookPrices,
   type MarketOpportunity,
   type OpportunityRegionHint,
   type ProfitPpBreakdown,

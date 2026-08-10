@@ -1,9 +1,20 @@
 import { formatDisplayNumber } from "../lib/formatDisplayNumber";
 import { getRecipe, listProducibleRecipes, type Recipe } from "./recipes";
 
+/** Order-book prices: Buy = best bid, Sell = best ask (Market UI). */
+export type BookPrices = {
+  buy: Record<string, number>;
+  sell: Record<string, number>;
+};
+
 export type ProfitPpBreakdown = {
   itemCode: string;
+  /** @deprecated Prefer sellPrice; kept as output sell for older readers. */
   marketPrice: number;
+  /** Output item top buy (best bid), if known. */
+  buyPrice: number | null;
+  /** Output item top sell (best ask) used as revenue. */
+  sellPrice: number;
   inputCost: number;
   unitProfit: number;
   consumedPp: number;
@@ -13,47 +24,75 @@ export type ProfitPpBreakdown = {
   formula: string;
 };
 
+export function bookPricesFromMarket(market: Record<string, number>): BookPrices {
+  return { buy: market, sell: market };
+}
+
+function isBookPrices(prices: Record<string, number> | BookPrices): prices is BookPrices {
+  return (
+    prices != null &&
+    typeof prices === "object" &&
+    "buy" in prices &&
+    "sell" in prices &&
+    typeof (prices as BookPrices).buy === "object" &&
+    typeof (prices as BookPrices).sell === "object"
+  );
+}
+
+function asBook(prices: Record<string, number> | BookPrices): BookPrices {
+  return isBookPrices(prices) ? prices : bookPricesFromMarket(prices);
+}
+
 export function calculateProfitPerPp(
   itemCode: string,
-  prices: Record<string, number>,
+  prices: Record<string, number> | BookPrices,
 ): ProfitPpBreakdown | null {
   const recipe = getRecipe(itemCode);
   if (!recipe) return null;
-  return profitForRecipe(recipe, prices);
+  return profitForRecipe(recipe, asBook(prices));
 }
 
-function formatInputs(recipe: Recipe, prices: Record<string, number>): string {
-  if (recipe.inputs.length === 0) return "0 G raw";
+function formatInputs(recipe: Recipe, buy: Record<string, number>): string {
+  if (recipe.inputs.length === 0) return "0 G buy";
   return recipe.inputs
     .map((input) => {
-      const p = prices[input.itemCode];
+      const p = buy[input.itemCode];
       const priceLabel = p != null && Number.isFinite(p) ? `${formatDisplayNumber(p)} G` : "? G";
       return `${input.quantity} ${input.itemCode} × ${priceLabel}`;
     })
     .join(" + ");
 }
 
-function profitForRecipe(recipe: Recipe, prices: Record<string, number>): ProfitPpBreakdown {
-  const marketPrice = prices[recipe.itemCode];
+/**
+ * Listing / optimistic: revenue = sell(output), costs = buy(inputs).
+ */
+function profitForRecipe(recipe: Recipe, book: BookPrices): ProfitPpBreakdown {
+  const sellPrice = book.sell[recipe.itemCode];
+  const buyPrice =
+    book.buy[recipe.itemCode] != null && Number.isFinite(book.buy[recipe.itemCode]!)
+      ? book.buy[recipe.itemCode]!
+      : null;
   const missingInputs: string[] = [];
-  const inputsLabel = formatInputs(recipe, prices);
+  const inputsLabel = formatInputs(recipe, book.buy);
 
-  if (marketPrice == null || !Number.isFinite(marketPrice)) {
+  if (sellPrice == null || !Number.isFinite(sellPrice)) {
     return {
       itemCode: recipe.itemCode,
       marketPrice: Number.NaN,
+      buyPrice,
+      sellPrice: Number.NaN,
       inputCost: Number.NaN,
       unitProfit: Number.NaN,
       consumedPp: recipe.consumedPp,
       profitPerPp: null,
       missingInputs: [recipe.itemCode, ...recipe.inputs.map((i) => i.itemCode)],
-      formula: `(? G − [${inputsLabel}]) / ${recipe.consumedPp} PP`,
+      formula: `(? G sell − [${inputsLabel}]) / ${recipe.consumedPp} PP`,
     };
   }
 
   let inputCost = 0;
   for (const input of recipe.inputs) {
-    const p = prices[input.itemCode];
+    const p = book.buy[input.itemCode];
     if (p == null || !Number.isFinite(p)) {
       missingInputs.push(input.itemCode);
       continue;
@@ -64,33 +103,40 @@ function profitForRecipe(recipe: Recipe, prices: Record<string, number>): Profit
   if (missingInputs.length > 0) {
     return {
       itemCode: recipe.itemCode,
-      marketPrice,
+      marketPrice: sellPrice,
+      buyPrice,
+      sellPrice,
       inputCost,
       unitProfit: Number.NaN,
       consumedPp: recipe.consumedPp,
       profitPerPp: null,
       missingInputs,
-      formula: `(${formatDisplayNumber(marketPrice)} G − [${inputsLabel}]) / ${recipe.consumedPp} PP`,
+      formula: `(${formatDisplayNumber(sellPrice)} G sell − [${inputsLabel}]) / ${recipe.consumedPp} PP`,
     };
   }
 
-  const unitProfit = marketPrice - inputCost;
+  const unitProfit = sellPrice - inputCost;
   const profitPerPp = recipe.consumedPp > 0 ? unitProfit / recipe.consumedPp : null;
   return {
     itemCode: recipe.itemCode,
-    marketPrice,
+    marketPrice: sellPrice,
+    buyPrice,
+    sellPrice,
     inputCost,
     unitProfit,
     consumedPp: recipe.consumedPp,
     profitPerPp,
     missingInputs,
-    formula: `(${formatDisplayNumber(marketPrice)} G − ${formatDisplayNumber(inputCost)} G raw) / ${recipe.consumedPp} PP`,
+    formula: `(${formatDisplayNumber(sellPrice)} G sell − ${formatDisplayNumber(inputCost)} G buy) / ${recipe.consumedPp} PP`,
   };
 }
 
-export function listMarketOpportunities(prices: Record<string, number>): ProfitPpBreakdown[] {
+export function listMarketOpportunities(
+  prices: Record<string, number> | BookPrices,
+): ProfitPpBreakdown[] {
+  const book = asBook(prices);
   return listProducibleRecipes()
-    .map((r) => profitForRecipe(r, prices))
+    .map((r) => profitForRecipe(r, book))
     .filter((b) => b.profitPerPp != null)
     .toSorted((a, b) => (b.profitPerPp ?? 0) - (a.profitPerPp ?? 0));
 }

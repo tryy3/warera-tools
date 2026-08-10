@@ -1,6 +1,8 @@
 export type Opportunity = {
   itemCode: string;
   marketPrice: number;
+  buyPrice: number | null;
+  sellPrice: number;
   inputCost: number;
   unitProfit: number;
   consumedPp: number;
@@ -27,6 +29,8 @@ export type AeDailyBreakdown = {
 export type ProfitPpBreakdown = {
   itemCode: string;
   marketPrice: number;
+  buyPrice: number | null;
+  sellPrice: number;
   inputCost: number;
   unitProfit: number;
   consumedPp: number;

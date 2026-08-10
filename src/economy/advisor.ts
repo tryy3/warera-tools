@@ -11,7 +11,7 @@ import {
   type ProfitPpBreakdown,
 } from "../economy";
 import type { CompanyPackEntry } from "../db/company-packs";
-import { getLatestPrices, marketPriceMap } from "../db/prices";
+import { buyPriceMap, getLatestPrices, sellPriceMap } from "../db/prices";
 import {
   getRecommendedRegionsByItemCodes,
   upsertRecommendedRegion,
@@ -275,9 +275,13 @@ export async function buildAdvisor(options: {
     await runPricePoll({ db, warera, logger });
     latest = await getLatestPrices(db);
   }
-  const prices = latest ? marketPriceMap(latest) : {};
-  const opportunitiesBase = listMarketOpportunities(prices);
-  const concretePrice = prices.concrete ?? 0;
+  const bookPrices = {
+    buy: latest ? buyPriceMap(latest) : {},
+    sell: latest ? sellPriceMap(latest) : {},
+  };
+  const opportunitiesBase = listMarketOpportunities(bookPrices);
+  // Transfer cost: buy concrete at top buy (stock/bid side).
+  const concretePrice = bookPrices.buy.concrete ?? bookPrices.sell.concrete ?? 0;
 
   cacheStats.recommendedHit = recommendedByItem.size;
   cacheStats.recommendedMiss = Math.max(0, recipeCodes.length - recommendedByItem.size);
@@ -408,7 +412,7 @@ export async function buildAdvisor(options: {
 
     const currentBonus = company.productionBonus ?? 0;
     const profitBreakdown = company.itemCode
-      ? calculateProfitPerPp(company.itemCode, prices)
+      ? calculateProfitPerPp(company.itemCode, bookPrices)
       : null;
     const currentPp = profitBreakdown?.profitPerPp ?? null;
     const aeBreakdown =
@@ -418,7 +422,7 @@ export async function buildAdvisor(options: {
     let bestSwitch: SwitchRecommendation | null = null;
 
     for (const recipe of listProducibleRecipes()) {
-      const breakdown = calculateProfitPerPp(recipe.itemCode, prices);
+      const breakdown = calculateProfitPerPp(recipe.itemCode, bookPrices);
       if (breakdown?.profitPerPp == null) continue;
 
       const region = await bestRegion(recipe.itemCode);

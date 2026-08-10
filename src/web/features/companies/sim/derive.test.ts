@@ -12,6 +12,8 @@ function profitBreakdown(
 ): ProfitPpBreakdown {
   return {
     marketPrice: partial.marketPrice ?? 2,
+    buyPrice: partial.buyPrice ?? 1.9,
+    sellPrice: partial.sellPrice ?? partial.marketPrice ?? 2,
     inputCost: partial.inputCost ?? 0.8,
     unitProfit: partial.unitProfit ?? 1.2,
     consumedPp: partial.consumedPp ?? 10,

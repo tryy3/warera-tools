@@ -154,3 +154,25 @@ export function marketPriceMap(latest: LatestPrices): Record<string, number> {
   }
   return out;
 }
+
+/** Top buy (best bid) — Market UI "Buy". */
+export function buyPriceMap(latest: LatestPrices): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const item of latest.items) {
+    if (item.buyMax != null && Number.isFinite(item.buyMax)) {
+      out[item.itemCode] = item.buyMax;
+    }
+  }
+  return out;
+}
+
+/** Top sell (best ask) — Market UI "Sell". */
+export function sellPriceMap(latest: LatestPrices): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const item of latest.items) {
+    if (item.sellMin != null && Number.isFinite(item.sellMin)) {
+      out[item.itemCode] = item.sellMin;
+    }
+  }
+  return out;
+}

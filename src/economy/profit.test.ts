@@ -12,29 +12,41 @@ import {
 } from "./profit";
 
 describe("calculateProfitPerPp", () => {
-  it("nets input costs for steel", () => {
+  it("nets input costs for steel (flat market map = buy and sell)", () => {
     const prices = { steel: 1.62, iron: 0.08 };
     const result = calculateProfitPerPp("steel", prices);
     expect(result).not.toBeNull();
+    expect(result!.sellPrice).toBeCloseTo(1.62);
     expect(result!.inputCost).toBeCloseTo(0.8);
     expect(result!.unitProfit).toBeCloseTo(0.82);
     expect(result!.profitPerPp).toBeCloseTo(0.082);
   });
 
-  it("raw lead is just price / 1 PP", () => {
+  it("uses sell(output) and buy(inputs) from book prices", () => {
+    const result = calculateProfitPerPp("steel", {
+      buy: { steel: 1.5, iron: 0.084 },
+      sell: { steel: 1.62, iron: 0.086 },
+    });
+    expect(result!.sellPrice).toBeCloseTo(1.62);
+    expect(result!.buyPrice).toBeCloseTo(1.5);
+    expect(result!.inputCost).toBeCloseTo(0.84);
+    expect(result!.profitPerPp).toBeCloseTo((1.62 - 0.84) / 10);
+  });
+
+  it("raw lead is sell price / 1 PP", () => {
     const result = calculateProfitPerPp("lead", { lead: 0.086 });
     expect(result!.profitPerPp).toBeCloseTo(0.086);
   });
 
   it("embeds rounded numbers in profit formula", () => {
     const result = calculateProfitPerPp("lead", { lead: 0.08560533885010638 });
-    expect(result!.formula).toBe("(0.0856 G − 0 G raw) / 1 PP");
+    expect(result!.formula).toBe("(0.0856 G sell − 0 G buy) / 1 PP");
   });
 
-  it("rounds marketPrice in missing-inputs formula", () => {
+  it("rounds sell price in missing-inputs formula", () => {
     const result = calculateProfitPerPp("steel", { steel: 1.623465789 });
     expect(result!.missingInputs).toContain("iron");
-    expect(result!.formula).toBe("(1.6235 G − [10 iron × ? G]) / 10 PP");
+    expect(result!.formula).toBe("(1.6235 G sell − [10 iron × ? G]) / 10 PP");
     expect(result!.formula).not.toContain("1.623465789");
   });
 });
@@ -103,22 +115,26 @@ describe("enrichMarketOpportunities", () => {
   const steak: ProfitPpBreakdown = {
     itemCode: "steak",
     marketPrice: 3.7432,
+    buyPrice: 3.7,
+    sellPrice: 3.7432,
     inputCost: 1.545,
     unitProfit: 2.1982,
     consumedPp: 20,
     profitPerPp: 0.1099,
     missingInputs: [],
-    formula: "(3.7432 G − 1.545 G raw) / 20 PP",
+    formula: "(3.7432 G sell − 1.545 G buy) / 20 PP",
   };
   const concrete: ProfitPpBreakdown = {
     itemCode: "concrete",
     marketPrice: 1.6374,
+    buyPrice: 1.6,
+    sellPrice: 1.6374,
     inputCost: 0.7933,
     unitProfit: 0.8441,
     consumedPp: 10,
     profitPerPp: 0.0844,
     missingInputs: [],
-    formula: "(1.6374 G − 0.7933 G raw) / 10 PP",
+    formula: "(1.6374 G sell − 0.7933 G buy) / 10 PP",
   };
 
   it("attaches AE6 rough daily from best-region bonus and keeps G/PP order", () => {

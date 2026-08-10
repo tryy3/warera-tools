@@ -77,49 +77,23 @@ async function seedPrices(db: Db): Promise<void> {
     status: "success",
     itemCount: 3,
   });
+  const snap = (itemCode: string, price: number) => ({
+    itemCode,
+    marketPrice: price,
+    buyMin: price,
+    buyMax: price,
+    buyAvg: price,
+    sellMin: price,
+    sellMax: price,
+    sellAvg: price,
+  });
   await insertPriceSnapshots(db, pollId, [
-    {
-      itemCode: "iron",
-      marketPrice: 1,
-      buyMin: null,
-      buyMax: null,
-      buyAvg: null,
-      sellMin: null,
-      sellMax: null,
-      sellAvg: null,
-    },
-    {
-      itemCode: "steel",
-      marketPrice: 20,
-      buyMin: null,
-      buyMax: null,
-      buyAvg: null,
-      sellMin: null,
-      sellMax: null,
-      sellAvg: null,
-    },
-    {
-      itemCode: "concrete",
-      marketPrice: 5,
-      buyMin: null,
-      buyMax: null,
-      buyAvg: null,
-      sellMin: null,
-      sellMax: null,
-      sellAvg: null,
-    },
+    snap("iron", 1),
+    snap("steel", 20),
+    snap("concrete", 5),
     ...listProducibleRecipes()
       .filter((r) => !["iron", "steel", "concrete"].includes(r.itemCode))
-      .map((r) => ({
-        itemCode: r.itemCode,
-        marketPrice: 2,
-        buyMin: null,
-        buyMax: null,
-        buyAvg: null,
-        sellMin: null,
-        sellMax: null,
-        sellAvg: null,
-      })),
+      .map((r) => snap(r.itemCode, 2)),
   ]);
 }
 
