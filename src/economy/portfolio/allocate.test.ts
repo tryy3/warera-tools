@@ -46,4 +46,68 @@ describe("allocatePortfolio", () => {
     expect(steel.markToMarketProfit).toBeCloseTo(50 * 1.0 - 20 - 500 * 0.05);
     expect(iron.markToMarketProfit).toBeCloseTo(300 * 0.06 - 10);
   });
+
+  it("waterfalls two iron companies into one steel in card order", () => {
+    const companies: PortfolioCompanyInput[] = [
+      co({ companyId: "iron-a", itemCode: "iron", unitsOut: 100, wageCostPerDay: 1, inputDemand: {} }),
+      co({ companyId: "iron-b", itemCode: "iron", unitsOut: 100, wageCostPerDay: 1, inputDemand: {} }),
+      co({
+        companyId: "steel-1",
+        itemCode: "steel",
+        unitsOut: 25, // needs 250 iron
+        wageCostPerDay: 5,
+        inputDemand: { iron: 250 },
+      }),
+    ];
+    const r = allocatePortfolio(companies, book);
+    expect(r.byCompanyId["iron-a"]!.transferredOut).toBeCloseTo(100);
+    expect(r.byCompanyId["iron-a"]!.soldOut).toBeCloseTo(0);
+    expect(r.byCompanyId["iron-b"]!.transferredOut).toBeCloseTo(100);
+    expect(r.byCompanyId["iron-b"]!.soldOut).toBeCloseTo(0);
+    expect(r.byCompanyId["steel-1"]!.marketBoughtByInput.iron).toBeCloseTo(50);
+  });
+
+  it("sells surplus iron at sell price", () => {
+    const companies: PortfolioCompanyInput[] = [
+      co({ companyId: "iron-1", itemCode: "iron", unitsOut: 400, wageCostPerDay: 10, inputDemand: {} }),
+      co({
+        companyId: "steel-1",
+        itemCode: "steel",
+        unitsOut: 10, // needs 100 iron
+        wageCostPerDay: 5,
+        inputDemand: { iron: 100 },
+      }),
+    ];
+    const r = allocatePortfolio(companies, book);
+    expect(r.byCompanyId["iron-1"]!.transferredOut).toBeCloseTo(100);
+    expect(r.byCompanyId["iron-1"]!.soldOut).toBeCloseTo(300);
+    expect(r.byCompanyId["iron-1"]!.sellRevenueActual).toBeCloseTo(300 * 0.06);
+    expect(r.byCompanyId["iron-1"]!.actualProfit).toBeCloseTo(300 * 0.06 - 10);
+  });
+
+  it("matches mark-to-market when there are no consumers", () => {
+    const companies: PortfolioCompanyInput[] = [
+      co({ companyId: "iron-1", itemCode: "iron", unitsOut: 100, wageCostPerDay: 4, inputDemand: {} }),
+    ];
+    const r = allocatePortfolio(companies, book);
+    const iron = r.byCompanyId["iron-1"]!;
+    expect(iron.soldOut).toBeCloseTo(100);
+    expect(iron.actualProfit).toBeCloseTo(iron.markToMarketProfit);
+  });
+
+  it("uses session buy override for shortfall cash", () => {
+    const companies: PortfolioCompanyInput[] = [
+      co({ companyId: "iron-1", itemCode: "iron", unitsOut: 0, wageCostPerDay: 0, inputDemand: {} }),
+      co({
+        companyId: "steel-1",
+        itemCode: "steel",
+        unitsOut: 10,
+        wageCostPerDay: 0,
+        inputDemand: { iron: 100 },
+      }),
+    ];
+    const overridden = { buy: { ...book.buy, iron: 0.09 }, sell: book.sell };
+    const r = allocatePortfolio(companies, overridden);
+    expect(r.byCompanyId["steel-1"]!.marketBuyCash).toBeCloseTo(100 * 0.09);
+  });
 });
