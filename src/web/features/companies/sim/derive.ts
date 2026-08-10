@@ -83,10 +83,16 @@ function inputDemandFor(itemCode: string | null, unitsOut: number): Record<strin
   return demand;
 }
 
-function finiteSellPrice(book: BookPrices, itemCode: string | null): number {
+/** Enrichment sell price; NaN when allocator would not know sell revenue (soldOut > 0, price missing). */
+function sellPriceForEnrichment(
+  book: BookPrices,
+  itemCode: string | null,
+  soldOut: number,
+): number {
   if (itemCode == null) return 0;
   const price = book.sell[itemCode];
-  return price !== undefined && Number.isFinite(price) ? price : 0;
+  if (price !== undefined && Number.isFinite(price)) return price;
+  return soldOut > 0 ? NaN : 0;
 }
 
 export function deriveCompanyCard(
@@ -180,7 +186,7 @@ export function applyPortfolioAllocation(
     const itemCode = row.company.itemCode;
     const unitsOut = card.day.unitsProduced ?? 0;
     const companyAlloc = allocation.byCompanyId[card.companyId] ?? null;
-    const sellPrice = finiteSellPrice(prices, itemCode);
+    const sellPrice = sellPriceForEnrichment(prices, itemCode, companyAlloc?.soldOut ?? 0);
 
     const producerRows =
       companyAlloc == null

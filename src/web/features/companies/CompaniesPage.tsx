@@ -140,10 +140,19 @@ function portfolioProfitTone(value: number): string {
   return "text-muted-foreground";
 }
 
+function PortfolioGoldPerDay({ value, digits = 3 }: { value: number; digits?: number }) {
+  if (!Number.isFinite(value)) return "—";
+  const sign = value > 0 ? "+" : "";
+  return (
+    <>
+      {sign}
+      {formatDisplayNumber(value, digits)}/day
+    </>
+  );
+}
+
 function PortfolioNetBanner() {
   const { portfolioActual, portfolioMarkToMarket } = useCompanySim();
-  const actualSign = portfolioActual > 0 ? "+" : "";
-  const soldSign = portfolioMarkToMarket > 0 ? "+" : "";
   return (
     <p className="mb-2 flex flex-wrap items-baseline gap-x-3 gap-y-1 text-sm">
       <span className="tracking-wide text-muted-foreground uppercase">Portfolio</span>
@@ -153,8 +162,7 @@ function PortfolioNetBanner() {
       >
         Actual
         <GoldIcon />
-        {actualSign}
-        {formatDisplayNumber(portfolioActual, 3)}/day
+        <PortfolioGoldPerDay value={portfolioActual} />
       </span>
       <span
         className="inline-flex items-center gap-1.5 text-muted-foreground"
@@ -162,8 +170,7 @@ function PortfolioNetBanner() {
       >
         If sold
         <GoldIcon />
-        {soldSign}
-        {formatDisplayNumber(portfolioMarkToMarket, 3)}/day
+        <PortfolioGoldPerDay value={portfolioMarkToMarket} />
       </span>
     </p>
   );
