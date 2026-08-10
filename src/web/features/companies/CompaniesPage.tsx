@@ -152,15 +152,29 @@ function GoldAmountInline({
   value,
   digits = 3,
   className,
+  variant = "signed",
 }: {
   value: number | null | undefined;
   digits?: number;
   className?: string;
+  /** `cost` always shows as −amount (red). `signed` uses +/− and green/red by sign. */
+  variant?: "signed" | "cost";
 }) {
   if (value == null || !Number.isFinite(value)) return "—";
+
+  if (variant === "cost") {
+    return (
+      <span className={`inline-flex items-center gap-1 text-destructive ${className ?? ""}`}>
+        <GoldIcon />−{formatDisplayNumber(Math.abs(value), digits)}
+      </span>
+    );
+  }
+
+  const tone =
+    value > 0 ? "text-success" : value < 0 ? "text-destructive" : "text-muted-foreground";
   const sign = value > 0 ? "+" : "";
   return (
-    <span className={`inline-flex items-center gap-1 ${className ?? ""}`}>
+    <span className={`inline-flex items-center gap-1 ${tone} ${className ?? ""}`}>
       <GoldIcon />
       {sign}
       {formatDisplayNumber(value, digits)}
@@ -262,11 +276,7 @@ function WorkerListItem({
             Daily cost
           </dt>
           <dd className="mt-0.5 mb-0">
-            <GoldAmountInline
-              value={day?.current.ownerCostPerDay}
-              digits={3}
-              className="text-destructive"
-            />
+            <GoldAmountInline value={day?.current.ownerCostPerDay} digits={3} variant="cost" />
           </dd>
         </div>
         <div>
@@ -274,11 +284,7 @@ function WorkerListItem({
             Profit now
           </dt>
           <dd className="mt-0.5 mb-0">
-            <GoldAmountInline
-              value={day?.current.contributionPerDay}
-              digits={3}
-              className="text-success"
-            />
+            <GoldAmountInline value={day?.current.contributionPerDay} digits={3} />
           </dd>
         </div>
         <div>
@@ -286,11 +292,7 @@ function WorkerListItem({
             Profit @10%
           </dt>
           <dd className="mt-0.5 mb-0">
-            <GoldAmountInline
-              value={day?.atMaxFidelity.contributionPerDay}
-              digits={3}
-              className="text-success"
-            />
+            <GoldAmountInline value={day?.atMaxFidelity.contributionPerDay} digits={3} />
           </dd>
         </div>
       </dl>
