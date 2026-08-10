@@ -2,7 +2,12 @@ import { describe, expect, it } from "vite-plus/test";
 import { companyDay } from "../../../../economy/workers/company-day";
 import { wagePair } from "../../../../economy/workers/wages";
 import type { CompanyAdvisorRow, ProfitPpBreakdown } from "../types";
-import { deriveCompanyCard, derivePortfolioNet } from "./derive";
+import {
+  applyPortfolioAllocation,
+  deriveCompanyCard,
+  derivePortfolioCards,
+  derivePortfolioNet,
+} from "./derive";
 import type { CompanySimState, SimWorker } from "./types";
 
 const OWNER = { entrepreneurshipLevel: 4, productionSkillLevel: 6 };
@@ -358,16 +363,130 @@ describe("deriveCompanyCard", () => {
 });
 
 describe("derivePortfolioNet", () => {
-  it("sums netPerDay across derived cards", () => {
+  it("sums actualProfit across derived cards", () => {
     const rowA = row({ company: { id: "a" } });
     const rowB = row({ company: { id: "b" } });
     const state = emptyState([simWorker({ id: "w1", assignment: "a", wagePerPp: 0.04 })]);
+    const book = {
+      buy: { grain: 0.1, bread: 0.8 },
+      sell: { grain: 0.12, bread: 1 },
+    };
 
-    const cards = [deriveCompanyCard(rowA, state, OWNER), deriveCompanyCard(rowB, state, OWNER)];
+    const { cards, portfolioActual } = derivePortfolioCards(
+      [rowA, rowB],
+      state,
+      OWNER,
+      book,
+    );
 
     expect(derivePortfolioNet(cards)).toBeCloseTo(
-      cards[0]!.day.netPerDay + cards[1]!.day.netPerDay,
+      cards[0]!.actualProfit + cards[1]!.actualProfit,
       6,
     );
+    expect(derivePortfolioNet(cards)).toBeCloseTo(portfolioActual, 6);
+  });
+});
+
+describe("derivePortfolioCards / applyPortfolioAllocation", () => {
+  it("waterfalls iron into steel in companies array order", () => {
+    // aeLevel=5, bonus=0 → 120 PP/day; iron consumedPp=1 → 120 units
+    const ironRow = row({
+      company: { id: "iron-1", itemCode: "iron", aeLevel: 5, productionBonus: 0 },
+      profitBreakdown: profitBreakdown({
+        itemCode: "iron",
+        inputCost: 0,
+        consumedPp: 1,
+        profitPerPp: 0.05,
+        sellPrice: 0.06,
+        buyPrice: 0.05,
+      }),
+      currentProfitPerPp: 0.05,
+    });
+    // aeLevel=1, bonus=0 → 24 PP/day; steel consumedPp=10 → 2.4 units → 24 iron demand
+    const steelRow = row({
+      company: { id: "steel-1", itemCode: "steel", aeLevel: 1, productionBonus: 0 },
+      profitBreakdown: profitBreakdown({
+        itemCode: "steel",
+        inputCost: 0.5,
+        consumedPp: 10,
+        profitPerPp: 0.05,
+        sellPrice: 1,
+        buyPrice: 0.8,
+      }),
+      currentProfitPerPp: 0.05,
+    });
+    const book = {
+      buy: { iron: 0.05, steel: 0.8 },
+      sell: { iron: 0.06, steel: 1 },
+    };
+
+    const { cards, portfolioActual, portfolioMarkToMarket } = derivePortfolioCards(
+      [ironRow, steelRow],
+      emptyState(),
+      OWNER,
+      book,
+    );
+
+    const iron = cards[0]!;
+    const steel = cards[1]!;
+
+    expect(iron.day.unitsProduced).toBeCloseTo(120, 6);
+    expect(steel.day.unitsProduced).toBeCloseTo(2.4, 6);
+
+    expect(iron.allocation!.transferredOut).toBeCloseTo(24, 6);
+    expect(iron.allocation!.soldOut).toBeCloseTo(96, 6);
+    expect(steel.allocation!.marketBoughtByInput.iron ?? 0).toBeCloseTo(0, 6);
+    expect(steel.allocation!.marketBuyCash).toBeCloseTo(0, 6);
+
+    expect(iron.actualProfit).toBeCloseTo(96 * 0.06, 6);
+    expect(steel.actualProfit).toBeCloseTo(2.4 * 1, 6);
+    expect(portfolioActual).toBeCloseTo(iron.actualProfit + steel.actualProfit, 6);
+    expect(portfolioMarkToMarket).toBeCloseTo(
+      iron.markToMarketProfit + steel.markToMarketProfit,
+      6,
+    );
+
+    expect(iron.producerRows.some((r) => r.kind === "ae")).toBe(true);
+    expect(iron.producerRows.some((r) => r.kind === "selfWork")).toBe(false);
+  });
+
+  it("markets steel iron shortfall when supply is insufficient", () => {
+    // iron: 24 units/day
+    const ironRow = row({
+      company: { id: "iron-1", itemCode: "iron", aeLevel: 1, productionBonus: 0 },
+      profitBreakdown: profitBreakdown({
+        itemCode: "iron",
+        inputCost: 0,
+        consumedPp: 1,
+        profitPerPp: 0.05,
+      }),
+      currentProfitPerPp: 0.05,
+    });
+    // steel: 4.8 units → 48 iron demand
+    const steelRow = row({
+      company: { id: "steel-1", itemCode: "steel", aeLevel: 2, productionBonus: 0 },
+      profitBreakdown: profitBreakdown({
+        itemCode: "steel",
+        inputCost: 0.5,
+        consumedPp: 10,
+        profitPerPp: 0.05,
+      }),
+      currentProfitPerPp: 0.05,
+    });
+    const book = {
+      buy: { iron: 0.05, steel: 0.8 },
+      sell: { iron: 0.06, steel: 1 },
+    };
+
+    const base = [
+      deriveCompanyCard(ironRow, emptyState(), OWNER, book),
+      deriveCompanyCard(steelRow, emptyState(), OWNER, book),
+    ];
+    const { cards } = applyPortfolioAllocation(base, [ironRow, steelRow], book);
+
+    expect(cards[0]!.allocation!.soldOut).toBeCloseTo(0, 6);
+    expect(cards[0]!.allocation!.transferredOut).toBeCloseTo(24, 6);
+    expect(cards[1]!.allocation!.marketBoughtByInput.iron).toBeCloseTo(24, 6);
+    expect(cards[1]!.allocation!.marketBuyCash).toBeCloseTo(24 * 0.05, 6);
   });
 });

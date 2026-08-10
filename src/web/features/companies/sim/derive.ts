@@ -1,4 +1,11 @@
+import {
+  allocatePortfolio,
+  enrichProducerRows,
+  type CompanyAllocation,
+  type EnrichedProducerRow,
+} from "../../../../economy/portfolio";
 import type { BookPrices } from "../../../../economy/profit";
+import { getRecipe } from "../../../../economy/recipes";
 import {
   companyDay,
   type CompanyDayResult,
@@ -21,12 +28,18 @@ export type DerivedCompanyCard = {
   day: CompanyDayResult;
   offerWage: WagePair | null;
   maxWage: WagePair;
+  allocation: CompanyAllocation | null;
+  producerRows: EnrichedProducerRow[];
+  actualProfit: number;
+  markToMarketProfit: number;
 };
 
 type OwnerDefaults = {
   entrepreneurshipLevel: number;
   productionSkillLevel: number;
 };
+
+const EMPTY_BOOK: BookPrices = { buy: {}, sell: {} };
 
 function assignedWorkers(state: CompanySimState, companyId: string): SimWorker[] {
   return state.workers.filter((w) => w.assignment === companyId);
@@ -50,6 +63,30 @@ function resolveInputCostPerUnit(row: CompanyAdvisorRow): number {
   const breakdown = row.profitBreakdown;
   if (breakdown == null) return 0;
   return Number.isFinite(breakdown.inputCost) ? breakdown.inputCost : 0;
+}
+
+function unitsFromPp(itemCode: string | null, pp: number): number {
+  if (itemCode == null) return 0;
+  const recipe = getRecipe(itemCode);
+  if (recipe == null || recipe.consumedPp <= 0) return 0;
+  return pp / recipe.consumedPp;
+}
+
+function inputDemandFor(itemCode: string | null, unitsOut: number): Record<string, number> {
+  if (itemCode == null || !(unitsOut > 0)) return {};
+  const recipe = getRecipe(itemCode);
+  if (recipe == null) return {};
+  const demand: Record<string, number> = {};
+  for (const input of recipe.inputs) {
+    demand[input.itemCode] = (demand[input.itemCode] ?? 0) + unitsOut * input.quantity;
+  }
+  return demand;
+}
+
+function finiteSellPrice(book: BookPrices, itemCode: string | null): number {
+  if (itemCode == null) return 0;
+  const price = book.sell[itemCode];
+  return price !== undefined && Number.isFinite(price) ? price : 0;
 }
 
 export function deriveCompanyCard(
@@ -105,13 +142,99 @@ export function deriveCompanyCard(
     day,
     offerWage: offerWagePerPp != null ? wagePair(offerWagePerPp, incomeTaxRate) : null,
     maxWage: wagePair(day.maxGrossWagePerPp, incomeTaxRate),
+    allocation: null,
+    producerRows: [],
+    actualProfit: 0,
+    markToMarketProfit: 0,
   };
+}
+
+/** Attach portfolio allocation + enriched producer rows (companies array order). */
+export function applyPortfolioAllocation(
+  cards: DerivedCompanyCard[],
+  companies: CompanyAdvisorRow[],
+  book?: BookPrices,
+): {
+  cards: DerivedCompanyCard[];
+  portfolioActual: number;
+  portfolioMarkToMarket: number;
+} {
+  const prices = book ?? EMPTY_BOOK;
+  const inputs = cards.map((card, i) => {
+    const row = companies[i]!;
+    const itemCode = row.company.itemCode;
+    const unitsOut = card.day.unitsProduced ?? 0;
+    return {
+      companyId: card.companyId,
+      itemCode,
+      unitsOut,
+      wageCostPerDay: card.day.workerWageCostPerDay,
+      inputDemand: inputDemandFor(itemCode, unitsOut),
+    };
+  });
+
+  const allocation = allocatePortfolio(inputs, prices);
+
+  const nextCards = cards.map((card, i) => {
+    const row = companies[i]!;
+    const itemCode = row.company.itemCode;
+    const unitsOut = card.day.unitsProduced ?? 0;
+    const companyAlloc = allocation.byCompanyId[card.companyId] ?? null;
+    const sellPrice = finiteSellPrice(prices, itemCode);
+
+    const producerRows =
+      companyAlloc == null
+        ? []
+        : enrichProducerRows({
+            unitsOut,
+            sellPrice,
+            allocation: companyAlloc,
+            ae: {
+              id: "ae",
+              rowUnits: unitsFromPp(itemCode, card.day.aeDailyPp),
+              wageCost: 0,
+            },
+            workers: card.day.workers.map((w) => ({
+              id: w.id,
+              rowUnits: unitsFromPp(itemCode, w.current.effectivePpPerDay),
+              wageCost: w.current.ownerCostPerDay,
+            })),
+          });
+
+    return {
+      ...card,
+      allocation: companyAlloc,
+      producerRows,
+      actualProfit: companyAlloc?.actualProfit ?? 0,
+      markToMarketProfit: companyAlloc?.markToMarketProfit ?? 0,
+    };
+  });
+
+  return {
+    cards: nextCards,
+    portfolioActual: allocation.portfolio.actualProfit,
+    portfolioMarkToMarket: allocation.portfolio.markToMarketProfit,
+  };
+}
+
+export function derivePortfolioCards(
+  companies: CompanyAdvisorRow[],
+  state: CompanySimState,
+  ownerDefaults: OwnerDefaults,
+  book?: BookPrices,
+): {
+  cards: DerivedCompanyCard[];
+  portfolioActual: number;
+  portfolioMarkToMarket: number;
+} {
+  const cards = companies.map((row) => deriveCompanyCard(row, state, ownerDefaults, book));
+  return applyPortfolioAllocation(cards, companies, book);
 }
 
 export function derivePortfolioNet(cards: DerivedCompanyCard[]): number {
   let total = 0;
   for (const card of cards) {
-    total += card.day.netPerDay;
+    total += card.actualProfit;
   }
   return total;
 }

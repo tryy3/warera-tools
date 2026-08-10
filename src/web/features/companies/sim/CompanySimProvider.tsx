@@ -10,7 +10,7 @@ import {
 import type { BookPrices } from "../../../../economy/profit";
 import { webLogger } from "../../../logger";
 import type { CompanyAdvisorRow } from "../types";
-import { deriveCompanyCard, derivePortfolioNet, type DerivedCompanyCard } from "./derive";
+import { derivePortfolioCards, type DerivedCompanyCard } from "./derive";
 import { toHydratePayload } from "./hydrate";
 import { companySimReducer, initialCompanySimState } from "./reducer";
 import type { CompanySimAction, CompanySimState, SimWorker } from "./types";
@@ -59,6 +59,11 @@ export type CompanySimContextValue = {
   state: CompanySimState;
   dispatch: Dispatch<CompanySimAction>;
   cards: DerivedCompanyCard[];
+  /** Portfolio actual profit (internal transfers valued at transfer, not market). */
+  portfolioActual: number;
+  /** Portfolio mark-to-market profit (all outputs/inputs at book prices). */
+  portfolioMarkToMarket: number;
+  /** Alias of `portfolioActual` for backward compatibility. */
   portfolioNet: number;
 };
 
@@ -109,11 +114,18 @@ export function CompanySimProvider({
     logSimWorkerFieldSources(state, "hydrate");
   }, [state]);
 
-  const cards = companies.map((row) => deriveCompanyCard(row, state, ownerDefaults, bookPrices));
-  const portfolioNet = derivePortfolioNet(cards);
+  const { cards, portfolioActual, portfolioMarkToMarket } = derivePortfolioCards(
+    companies,
+    state,
+    ownerDefaults,
+    bookPrices,
+  );
+  const portfolioNet = portfolioActual;
 
   return (
-    <CompanySimContext value={{ state, dispatch, cards, portfolioNet }}>
+    <CompanySimContext
+      value={{ state, dispatch, cards, portfolioActual, portfolioMarkToMarket, portfolioNet }}
+    >
       {children}
     </CompanySimContext>
   );
