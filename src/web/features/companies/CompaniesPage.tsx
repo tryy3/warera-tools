@@ -151,14 +151,16 @@ function PortfolioNetBanner() {
 function GoldAmountInline({
   value,
   digits = 3,
+  className,
 }: {
   value: number | null | undefined;
   digits?: number;
+  className?: string;
 }) {
   if (value == null || !Number.isFinite(value)) return "—";
   const sign = value > 0 ? "+" : "";
   return (
-    <span className="inline-flex items-center gap-1">
+    <span className={`inline-flex items-center gap-1 ${className ?? ""}`}>
       <GoldIcon />
       {sign}
       {formatDisplayNumber(value, digits)}
@@ -246,35 +248,49 @@ function WorkerListItem({
       <dl className="m-0 mt-1.5 grid grid-cols-[repeat(auto-fill,minmax(6.5rem,1fr))] gap-x-3 gap-y-1 text-sm">
         <div>
           <dt className="m-0 text-[0.7em] tracking-wide text-muted-foreground uppercase">Wage</dt>
-          <dd className="mt-0.5 mb-0 inline-flex items-center gap-1 text-foreground">
+          <dd className="mt-0.5 mb-0 inline-flex items-center gap-1 text-amber-200">
             <GoldIcon />
-            {formatNum(wage.gross, 4)}
+            <span title="Gross (excl. tax)">{formatNum(wage.gross, 4)}</span>
             <span className="text-muted-foreground">|</span>
-            {formatNum(wage.net, 4)}
+            <span className="text-amber-200/55" title="Net (after tax)">
+              {formatNum(wage.net, 4)}
+            </span>
           </dd>
         </div>
         <div>
           <dt className="m-0 text-[0.7em] tracking-wide text-muted-foreground uppercase">
             Daily cost
           </dt>
-          <dd className="mt-0.5 mb-0 text-foreground">
-            <GoldAmountInline value={day?.current.ownerCostPerDay} digits={3} />
+          <dd className="mt-0.5 mb-0">
+            <GoldAmountInline
+              value={day?.current.ownerCostPerDay}
+              digits={3}
+              className="text-destructive"
+            />
           </dd>
         </div>
         <div>
           <dt className="m-0 text-[0.7em] tracking-wide text-muted-foreground uppercase">
-            Contrib now
+            Profit now
           </dt>
-          <dd className="mt-0.5 mb-0 text-foreground">
-            <GoldAmountInline value={day?.current.contributionPerDay} digits={3} />
+          <dd className="mt-0.5 mb-0">
+            <GoldAmountInline
+              value={day?.current.contributionPerDay}
+              digits={3}
+              className="text-success"
+            />
           </dd>
         </div>
         <div>
           <dt className="m-0 text-[0.7em] tracking-wide text-muted-foreground uppercase">
-            Contrib @10%
+            Profit @10%
           </dt>
-          <dd className="mt-0.5 mb-0 text-foreground">
-            <GoldAmountInline value={day?.atMaxFidelity.contributionPerDay} digits={3} />
+          <dd className="mt-0.5 mb-0">
+            <GoldAmountInline
+              value={day?.atMaxFidelity.contributionPerDay}
+              digits={3}
+              className="text-success"
+            />
           </dd>
         </div>
       </dl>

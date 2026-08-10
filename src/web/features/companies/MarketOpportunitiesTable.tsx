@@ -61,21 +61,21 @@ function PriceCell({
   value,
   live,
   dirty,
+  tone,
 }: {
   value: number | null | undefined;
   live: number | null | undefined;
   dirty: boolean;
+  tone: "buy" | "sell";
 }) {
   const title =
     dirty && live != null && Number.isFinite(live)
       ? `Live: ${formatDisplayNumber(live, 4)} G`
       : undefined;
+  const color = dirty ? "text-amber-200" : tone === "buy" ? "text-success" : "text-destructive";
   return (
-    <span className={dirty ? "font-mono text-amber-200" : "font-mono"} title={title}>
+    <span className={`font-mono ${color}`} title={title}>
       <GoldAmount value={value} />
-      {dirty ? (
-        <span className="ml-1 text-[0.7em] tracking-wide text-amber-200/80 uppercase">custom</span>
-      ) : null}
     </span>
   );
 }
@@ -141,6 +141,7 @@ export function MarketOpportunitiesTable() {
               value={row.original.buyPrice}
               live={live}
               dirty={board.isDirty(code, "buy")}
+              tone="buy"
             />
           );
         },
@@ -174,6 +175,7 @@ export function MarketOpportunitiesTable() {
               value={row.original.sellPrice}
               live={live}
               dirty={board.isDirty(code, "sell")}
+              tone="sell"
             />
           );
         },

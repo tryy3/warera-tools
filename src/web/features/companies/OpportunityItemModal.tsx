@@ -29,6 +29,8 @@ export function OpportunityItemModal({ open, opportunity, onClose }: Opportunity
   const board = useItemPriceBoard();
   const itemCode = opportunity?.itemCode;
   const live = itemCode ? board.liveOpportunity(itemCode) : undefined;
+  const buyDirty = itemCode != null && board.isDirty(itemCode, "buy");
+  const sellDirty = itemCode != null && board.isDirty(itemCode, "sell");
 
   const [buyDraft, setBuyDraft] = useState("");
   const [sellDraft, setSellDraft] = useState("");
@@ -103,7 +105,7 @@ export function OpportunityItemModal({ open, opportunity, onClose }: Opportunity
               <dt className="m-0 text-[0.75em] tracking-wide text-muted-foreground uppercase">
                 Live buy
               </dt>
-              <dd className="mt-0.5 mb-0 font-mono">
+              <dd className="mt-0.5 mb-0 font-mono text-success">
                 {live?.buyPrice != null ? (
                   <span className="inline-flex items-center gap-1.5">
                     <GoldIcon />
@@ -118,7 +120,7 @@ export function OpportunityItemModal({ open, opportunity, onClose }: Opportunity
               <dt className="m-0 text-[0.75em] tracking-wide text-muted-foreground uppercase">
                 Live sell
               </dt>
-              <dd className="mt-0.5 mb-0 font-mono">
+              <dd className="mt-0.5 mb-0 font-mono text-destructive">
                 {live?.sellPrice != null ? (
                   <span className="inline-flex items-center gap-1.5">
                     <GoldIcon />
@@ -163,27 +165,41 @@ export function OpportunityItemModal({ open, opportunity, onClose }: Opportunity
 
           <div className="grid grid-cols-2 gap-3">
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor={`${formId}-buy`}>Buy (session)</Label>
+              <Label
+                htmlFor={`${formId}-buy`}
+                className={buyDirty ? "text-amber-200" : "text-success"}
+              >
+                Buy (session)
+              </Label>
               <Input
                 id={`${formId}-buy`}
-                className="bg-secondary dark:bg-secondary font-mono"
+                className={`bg-secondary dark:bg-secondary font-mono ${
+                  buyDirty ? "text-amber-200" : "text-success"
+                }`}
                 type="number"
                 inputMode="decimal"
                 min={0}
-                step="any"
+                step={0.001}
                 value={buyDraft}
                 onChange={(e) => setBuyDraft(e.target.value)}
               />
             </div>
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor={`${formId}-sell`}>Sell (session)</Label>
+              <Label
+                htmlFor={`${formId}-sell`}
+                className={sellDirty ? "text-amber-200" : "text-destructive"}
+              >
+                Sell (session)
+              </Label>
               <Input
                 id={`${formId}-sell`}
-                className="bg-secondary dark:bg-secondary font-mono"
+                className={`bg-secondary dark:bg-secondary font-mono ${
+                  sellDirty ? "text-amber-200" : "text-destructive"
+                }`}
                 type="number"
                 inputMode="decimal"
                 min={0}
-                step="any"
+                step={0.001}
                 value={sellDraft}
                 onChange={(e) => setSellDraft(e.target.value)}
               />

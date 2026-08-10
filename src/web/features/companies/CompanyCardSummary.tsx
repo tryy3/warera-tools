@@ -28,11 +28,13 @@ function WageGrossNet({
     return "—";
   }
   return (
-    <span className="inline-flex items-center gap-1.5">
+    <span className="inline-flex items-center gap-1.5 text-amber-200">
       <GoldIcon />
-      {formatDisplayNumber(gross, digits)}
+      <span title="Gross (excl. tax)">{formatDisplayNumber(gross, digits)}</span>
       <span className="text-muted-foreground">|</span>
-      {formatDisplayNumber(net, digits)}
+      <span className="text-amber-200/55" title="Net (after tax)">
+        {formatDisplayNumber(net, digits)}
+      </span>
     </span>
   );
 }
