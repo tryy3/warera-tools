@@ -1,7 +1,7 @@
 # Companies — portfolio material allocation & recommended sell
 
 **Date:** 2026-08-10  
-**Status:** Approved for implementation  
+**Status:** Implemented  
 **Surface:** Companies page (company cards, worker/AE rows, portfolio summary)  
 **Related:** [Company worker simulation](./2026-08-04-company-worker-simulation-design.md), [Session buy/sell prices](./2026-08-10-companies-session-buy-sell-prices-design.md), [Company economy advisor](./2026-07-31-company-economy-advisor-design.md)
 
