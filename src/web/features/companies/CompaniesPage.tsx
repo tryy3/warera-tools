@@ -133,16 +133,36 @@ function GoldAmount({
   );
 }
 
+function portfolioProfitTone(value: number): string {
+  if (value > 0) return "text-success";
+  if (value < 0) return "text-destructive";
+  return "text-muted-foreground";
+}
+
 function PortfolioNetBanner() {
-  const { portfolioNet } = useCompanySim();
-  const sign = portfolioNet > 0 ? "+" : "";
+  const { portfolioActual, portfolioMarkToMarket } = useCompanySim();
+  const actualSign = portfolioActual > 0 ? "+" : "";
+  const soldSign = portfolioMarkToMarket > 0 ? "+" : "";
   return (
-    <p className="mb-2 flex flex-wrap items-center gap-1.5 text-sm">
-      <span className="tracking-wide text-muted-foreground uppercase">Portfolio net</span>
-      <span className="inline-flex items-center gap-1.5 font-medium text-success">
+    <p className="mb-2 flex flex-wrap items-baseline gap-x-3 gap-y-1 text-sm">
+      <span className="tracking-wide text-muted-foreground uppercase">Portfolio</span>
+      <span
+        className={`inline-flex items-center gap-1.5 font-medium ${portfolioProfitTone(portfolioActual)}`}
+        title="Actual = after using own production as inputs"
+      >
+        Actual
         <GoldIcon />
-        {sign}
-        {formatDisplayNumber(portfolioNet, 3)}/day
+        {actualSign}
+        {formatDisplayNumber(portfolioActual, 3)}/day
+      </span>
+      <span
+        className="inline-flex items-center gap-1.5 text-muted-foreground"
+        title="If sold = all sold / all bought on market"
+      >
+        If sold
+        <GoldIcon />
+        {soldSign}
+        {formatDisplayNumber(portfolioMarkToMarket, 3)}/day
       </span>
     </p>
   );

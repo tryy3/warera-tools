@@ -51,6 +51,12 @@ function GoldPerDay({ value, digits = 3 }: { value: number; digits?: number }) {
   );
 }
 
+function profitTone(value: number): string {
+  if (value > 0) return "text-success";
+  if (value < 0) return "text-destructive";
+  return "text-muted-foreground";
+}
+
 export function CompanyCardSummary({
   row,
   summary,
@@ -104,9 +110,20 @@ export function CompanyCardSummary({
             <span>Bonus {bonusPct != null ? `${formatNum(bonusPct, 1)}%` : "—"}</span>
           </p>
         </div>
-        <Badge variant="outline" className="shrink-0 border-success/45 font-normal text-success">
-          <GoldPerDay value={summary.day.netPerDay} />
-        </Badge>
+        <div className="flex shrink-0 flex-col items-end gap-0.5 text-right text-[0.85em] leading-snug">
+          <span
+            className={`inline-flex items-center gap-1 font-medium ${profitTone(summary.actualProfit)}`}
+            title="Actual = after using own production as inputs"
+          >
+            Actual <GoldPerDay value={summary.actualProfit} />
+          </span>
+          <span
+            className="inline-flex items-center gap-1 text-muted-foreground"
+            title="If sold = all sold / all bought on market"
+          >
+            If sold <GoldPerDay value={summary.markToMarketProfit} />
+          </span>
+        </div>
       </div>
 
       <dl className="m-0 mt-2.5 grid grid-cols-[repeat(auto-fill,minmax(7.5rem,1fr))] gap-x-3.5 gap-y-1.5">
