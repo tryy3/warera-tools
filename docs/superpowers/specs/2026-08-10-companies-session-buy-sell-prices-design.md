@@ -1,7 +1,7 @@
 # Companies — session buy/sell prices (Market opportunities)
 
 **Date:** 2026-08-10  
-**Status:** Draft — pending review  
+**Status:** Approved — implementing  
 **Surface:** Companies page (opportunities table + company cards)  
 **Related:** [Market opportunities AE daily](./2026-08-04-market-opportunities-ae-daily-design.md), [Company worker simulation](./2026-08-04-company-worker-simulation-design.md), Market item cards (`buyMax` / `sellMin`)
 
