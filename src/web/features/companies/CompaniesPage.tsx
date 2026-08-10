@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { formatDisplayNumber } from "@/lib/formatDisplayNumber";
 import { skillValueFromLevel } from "@/skills/values";
+import type { EnrichedProducerRow } from "../../../economy/portfolio";
 import { wagePair } from "../../../economy/workers";
 import { api } from "../../api";
 import { FlagIcon } from "../../components/FlagIcon";
@@ -206,10 +207,59 @@ function workersForCompany(workers: SimWorker[], companyId: string): SimWorker[]
   return workers.filter((w) => w.assignment === companyId);
 }
 
+function AeListItem({ aeLevel, enriched }: { aeLevel: number; enriched: EnrichedProducerRow }) {
+  return (
+    <li className="rounded border border-border/70 bg-black/20 px-2.5 py-2">
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="font-medium text-foreground">AE {aeLevel}</span>
+            <Badge
+              variant="outline"
+              className="border-muted-foreground/40 font-normal text-muted-foreground"
+            >
+              Idle
+            </Badge>
+          </div>
+        </div>
+      </div>
+      <dl className="m-0 mt-1.5 grid grid-cols-[repeat(auto-fill,minmax(6.5rem,1fr))] gap-x-3 gap-y-1 text-sm">
+        <div>
+          <dt className="m-0 text-[0.7em] tracking-wide text-muted-foreground uppercase">
+            Daily cost
+          </dt>
+          <dd className="mt-0.5 mb-0">
+            <GoldAmountInline value={enriched.dailyCost} digits={3} variant="cost" />
+          </dd>
+        </div>
+        <div>
+          <dt className="m-0 text-[0.7em] tracking-wide text-muted-foreground uppercase">
+            Profit now
+          </dt>
+          <dd className="mt-0.5 mb-0">
+            <GoldAmountInline value={enriched.profitNow} digits={3} />
+          </dd>
+        </div>
+        {enriched.recommendedSell != null ? (
+          <div>
+            <dt className="m-0 text-[0.7em] tracking-wide text-muted-foreground uppercase">
+              Rec. sell
+            </dt>
+            <dd className="mt-0.5 mb-0">
+              <GoldAmount value={enriched.recommendedSell} digits={4} />
+            </dd>
+          </div>
+        ) : null}
+      </dl>
+    </li>
+  );
+}
+
 function WorkerListItem({
   worker,
   incomeTaxRate,
   day,
+  enriched,
   assigned,
   onEdit,
   onToggleActive,
@@ -218,12 +268,16 @@ function WorkerListItem({
   worker: SimWorker;
   incomeTaxRate: number;
   day?: DerivedCompanyCard["day"]["workers"][number];
+  enriched?: EnrichedProducerRow | null;
   assigned: boolean;
   onEdit: () => void;
   onToggleActive: () => void;
   onMove: () => void;
 }) {
   const wage = wagePair(worker.wagePerPp, incomeTaxRate);
+  const dailyCost = enriched?.dailyCost ?? day?.current.ownerCostPerDay;
+  const profitNow = enriched?.profitNow ?? day?.current.contributionPerDay;
+  const recommendedSell = enriched?.recommendedSell ?? null;
   return (
     <li
       className={`rounded border border-border/70 bg-black/20 px-2.5 py-2 ${
@@ -296,7 +350,7 @@ function WorkerListItem({
             Daily cost
           </dt>
           <dd className="mt-0.5 mb-0">
-            <GoldAmountInline value={day?.current.ownerCostPerDay} digits={3} variant="cost" />
+            <GoldAmountInline value={dailyCost} digits={3} variant="cost" />
           </dd>
         </div>
         <div>
@@ -304,7 +358,7 @@ function WorkerListItem({
             Profit now
           </dt>
           <dd className="mt-0.5 mb-0">
-            <GoldAmountInline value={day?.current.contributionPerDay} digits={3} />
+            <GoldAmountInline value={profitNow} digits={3} />
           </dd>
         </div>
         <div>
@@ -315,6 +369,16 @@ function WorkerListItem({
             <GoldAmountInline value={day?.atMaxFidelity.contributionPerDay} digits={3} />
           </dd>
         </div>
+        {recommendedSell != null ? (
+          <div>
+            <dt className="m-0 text-[0.7em] tracking-wide text-muted-foreground uppercase">
+              Rec. sell
+            </dt>
+            <dd className="mt-0.5 mb-0">
+              <GoldAmount value={recommendedSell} digits={4} />
+            </dd>
+          </div>
+        ) : null}
       </dl>
     </li>
   );
@@ -333,6 +397,13 @@ function CompanyWorkersSection({
   const companyId = row.company.id;
   const workers = workersForCompany(state.workers, companyId);
   const dayById = new Map(summary.day.workers.map((w) => [w.id, w]));
+  const producerByWorkerId = new Map(
+    summary.producerRows.filter((r) => r.kind === "worker").map((r) => [r.id, r]),
+  );
+  const aeRow = summary.producerRows.find((r) => r.kind === "ae");
+  const aeLevel = state.overrides[companyId]?.aeLevel ?? row.company.aeLevel;
+  const showAe = aeRow != null && (aeLevel > 0 || aeRow.rowUnits > 0);
+  const showList = showAe || workers.length > 0;
 
   const [createOpen, setCreateOpen] = useState(false);
   const [editWorker, setEditWorker] = useState<SimWorker | null>(null);
@@ -383,16 +454,18 @@ function CompanyWorkersSection({
           </p>
         ) : null}
 
-        {workers.length === 0 ? (
+        {!showList ? (
           <p className="m-0 text-sm text-muted-foreground">No workers assigned.</p>
         ) : (
           <ul className="m-0 flex list-none flex-col gap-2 p-0">
+            {showAe && aeRow != null ? <AeListItem aeLevel={aeLevel} enriched={aeRow} /> : null}
             {workers.map((worker) => (
               <WorkerListItem
                 key={worker.id}
                 worker={worker}
                 incomeTaxRate={summary.incomeTaxRate}
                 day={dayById.get(worker.id)}
+                enriched={producerByWorkerId.get(worker.id)}
                 assigned
                 onEdit={() => setEditWorker(worker)}
                 onToggleActive={() =>
