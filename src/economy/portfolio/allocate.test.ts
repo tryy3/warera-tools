@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { allocatePortfolio } from "./allocate";
 import type { PortfolioCompanyInput } from "./types";
 
@@ -7,7 +7,9 @@ const book = {
   sell: { iron: 0.06, steel: 1.0 },
 };
 
-function co(partial: Partial<PortfolioCompanyInput> & Pick<PortfolioCompanyInput, "companyId" | "itemCode">): PortfolioCompanyInput {
+function co(
+  partial: Partial<PortfolioCompanyInput> & Pick<PortfolioCompanyInput, "companyId" | "itemCode">,
+): PortfolioCompanyInput {
   return {
     unitsOut: 0,
     wageCostPerDay: 0,
@@ -19,7 +21,13 @@ function co(partial: Partial<PortfolioCompanyInput> & Pick<PortfolioCompanyInput
 describe("allocatePortfolio", () => {
   it("gives steel free internal iron and markets the shortfall", () => {
     const companies: PortfolioCompanyInput[] = [
-      co({ companyId: "iron-1", itemCode: "iron", unitsOut: 300, wageCostPerDay: 10, inputDemand: {} }),
+      co({
+        companyId: "iron-1",
+        itemCode: "iron",
+        unitsOut: 300,
+        wageCostPerDay: 10,
+        inputDemand: {},
+      }),
       co({
         companyId: "steel-1",
         itemCode: "steel",
@@ -49,8 +57,20 @@ describe("allocatePortfolio", () => {
 
   it("waterfalls two iron companies into one steel in card order", () => {
     const companies: PortfolioCompanyInput[] = [
-      co({ companyId: "iron-a", itemCode: "iron", unitsOut: 100, wageCostPerDay: 1, inputDemand: {} }),
-      co({ companyId: "iron-b", itemCode: "iron", unitsOut: 100, wageCostPerDay: 1, inputDemand: {} }),
+      co({
+        companyId: "iron-a",
+        itemCode: "iron",
+        unitsOut: 100,
+        wageCostPerDay: 1,
+        inputDemand: {},
+      }),
+      co({
+        companyId: "iron-b",
+        itemCode: "iron",
+        unitsOut: 100,
+        wageCostPerDay: 1,
+        inputDemand: {},
+      }),
       co({
         companyId: "steel-1",
         itemCode: "steel",
@@ -69,7 +89,13 @@ describe("allocatePortfolio", () => {
 
   it("sells surplus iron at sell price", () => {
     const companies: PortfolioCompanyInput[] = [
-      co({ companyId: "iron-1", itemCode: "iron", unitsOut: 400, wageCostPerDay: 10, inputDemand: {} }),
+      co({
+        companyId: "iron-1",
+        itemCode: "iron",
+        unitsOut: 400,
+        wageCostPerDay: 10,
+        inputDemand: {},
+      }),
       co({
         companyId: "steel-1",
         itemCode: "steel",
@@ -87,7 +113,13 @@ describe("allocatePortfolio", () => {
 
   it("matches mark-to-market when there are no consumers", () => {
     const companies: PortfolioCompanyInput[] = [
-      co({ companyId: "iron-1", itemCode: "iron", unitsOut: 100, wageCostPerDay: 4, inputDemand: {} }),
+      co({
+        companyId: "iron-1",
+        itemCode: "iron",
+        unitsOut: 100,
+        wageCostPerDay: 4,
+        inputDemand: {},
+      }),
     ];
     const r = allocatePortfolio(companies, book);
     const iron = r.byCompanyId["iron-1"]!;
@@ -97,7 +129,13 @@ describe("allocatePortfolio", () => {
 
   it("uses session buy override for shortfall cash", () => {
     const companies: PortfolioCompanyInput[] = [
-      co({ companyId: "iron-1", itemCode: "iron", unitsOut: 0, wageCostPerDay: 0, inputDemand: {} }),
+      co({
+        companyId: "iron-1",
+        itemCode: "iron",
+        unitsOut: 0,
+        wageCostPerDay: 0,
+        inputDemand: {},
+      }),
       co({
         companyId: "steel-1",
         itemCode: "steel",

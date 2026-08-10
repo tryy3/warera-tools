@@ -372,12 +372,7 @@ describe("derivePortfolioNet", () => {
       sell: { grain: 0.12, bread: 1 },
     };
 
-    const { cards, portfolioActual } = derivePortfolioCards(
-      [rowA, rowB],
-      state,
-      OWNER,
-      book,
-    );
+    const { cards, portfolioActual } = derivePortfolioCards([rowA, rowB], state, OWNER, book);
 
     expect(derivePortfolioNet(cards)).toBeCloseTo(
       cards[0]!.actualProfit + cards[1]!.actualProfit,

@@ -1,9 +1,5 @@
 import type { BookPrices } from "../profit";
-import type {
-  CompanyAllocation,
-  PortfolioAllocation,
-  PortfolioCompanyInput,
-} from "./types";
+import type { CompanyAllocation, PortfolioAllocation, PortfolioCompanyInput } from "./types";
 
 function isValidPrice(price: number | undefined): price is number {
   return price !== undefined && Number.isFinite(price);
@@ -33,9 +29,7 @@ export function allocatePortfolio(
 
   for (const company of companies) {
     const remainingOut =
-      company.itemCode == null || !Number.isFinite(company.unitsOut)
-        ? 0
-        : company.unitsOut;
+      company.itemCode == null || !Number.isFinite(company.unitsOut) ? 0 : company.unitsOut;
 
     stateById.set(company.companyId, {
       remainingOut,
@@ -84,8 +78,7 @@ export function allocatePortfolio(
 
       if (need > 0) {
         const consumer = stateById.get(company.companyId)!;
-        consumer.marketBoughtByInput[item] =
-          (consumer.marketBoughtByInput[item] ?? 0) + need;
+        consumer.marketBoughtByInput[item] = (consumer.marketBoughtByInput[item] ?? 0) + need;
       }
     }
 
@@ -116,8 +109,7 @@ export function allocatePortfolio(
 
     let sellRevenueActual = 0;
     if (state.soldOut > 0) {
-      const sellPrice =
-        state.itemCode != null ? book.sell[state.itemCode] : undefined;
+      const sellPrice = state.itemCode != null ? book.sell[state.itemCode] : undefined;
       if (!isValidPrice(sellPrice)) {
         sellRevenueActual = NaN;
       } else {
@@ -125,8 +117,7 @@ export function allocatePortfolio(
       }
     }
 
-    const effectiveInputCostPerUnit =
-      state.unitsOut > 0 ? marketBuyCash / state.unitsOut : 0;
+    const effectiveInputCostPerUnit = state.unitsOut > 0 ? marketBuyCash / state.unitsOut : 0;
 
     const actualProfit =
       Number.isNaN(sellRevenueActual) || Number.isNaN(marketBuyCash)
@@ -174,17 +165,13 @@ export function allocatePortfolio(
     };
   }
 
-  const companyAllocations = companies.map(
-    (company) => byCompanyId[company.companyId]!,
-  );
+  const companyAllocations = companies.map((company) => byCompanyId[company.companyId]!);
 
   return {
     byCompanyId,
     portfolio: {
       actualProfit: sumProfits(companyAllocations.map((a) => a.actualProfit)),
-      markToMarketProfit: sumProfits(
-        companyAllocations.map((a) => a.markToMarketProfit),
-      ),
+      markToMarketProfit: sumProfits(companyAllocations.map((a) => a.markToMarketProfit)),
     },
   };
 }

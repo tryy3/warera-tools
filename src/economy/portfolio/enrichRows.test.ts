@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { enrichProducerRows, recommendedSell, RECOMMENDED_SELL_EPS } from "./enrichRows";
 import type { CompanyAllocation } from "./types";
 
