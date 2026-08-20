@@ -212,6 +212,70 @@ export const muMemberStatSnapshots = sqliteTable(
   (t) => [index("mu_member_stat_snapshots_mu_user_poll_idx").on(t.muId, t.userId, t.pollId)],
 );
 
+export const players = sqliteTable("players", {
+  id: text("id").primaryKey(),
+  username: text("username"),
+  muId: text("mu_id"),
+  workplaceCompanyId: text("workplace_company_id"),
+  payload: text("payload", { mode: "json" }).$type<Record<string, unknown> | null>(),
+  fetchedAt: integer("fetched_at", { mode: "timestamp_ms" }),
+});
+
+export const playerWatchReasons = sqliteTable(
+  "player_watch_reasons",
+  {
+    playerId: text("player_id").notNull(),
+    reason: text("reason").notNull(),
+    sourceId: text("source_id").notNull(),
+    lastTouchedAt: integer("last_touched_at", { mode: "timestamp_ms" }).notNull(),
+    createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.playerId, t.reason, t.sourceId] })],
+);
+
+export const muWatchReasons = sqliteTable(
+  "mu_watch_reasons",
+  {
+    muId: text("mu_id").notNull(),
+    reason: text("reason").notNull(),
+    sourceId: text("source_id").notNull(),
+    lastTouchedAt: integer("last_touched_at", { mode: "timestamp_ms" }).notNull(),
+    createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.muId, t.reason, t.sourceId] })],
+);
+
+export const companyWorkStats = sqliteTable(
+  "company_work_stats",
+  {
+    companyId: text("company_id").notNull(),
+    dailyDate: text("daily_date").notNull(),
+    automatedEngine: real("automated_engine"),
+    employeeProd: real("employee_prod"),
+    selfWork: real("self_work"),
+    total: real("total"),
+    wage: real("wage"),
+    payload: text("payload", { mode: "json" }).$type<Record<string, unknown> | null>(),
+    fetchedAt: integer("fetched_at", { mode: "timestamp_ms" }).notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.companyId, t.dailyDate] })],
+);
+
+export const workerWorkStats = sqliteTable(
+  "worker_work_stats",
+  {
+    companyId: text("company_id").notNull(),
+    workerId: text("worker_id").notNull(),
+    dailyDate: text("daily_date").notNull(),
+    employeeProd: real("employee_prod"),
+    total: real("total"),
+    wage: real("wage"),
+    payload: text("payload", { mode: "json" }).$type<Record<string, unknown> | null>(),
+    fetchedAt: integer("fetched_at", { mode: "timestamp_ms" }).notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.companyId, t.workerId, t.dailyDate] })],
+);
+
 export const itemMarketTransactions = sqliteTable(
   "item_market_transactions",
   {
