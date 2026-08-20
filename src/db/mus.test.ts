@@ -6,14 +6,9 @@ import { join } from "node:path";
 import { beforeEach, describe, expect, it } from "vite-plus/test";
 import type { Db } from "./client";
 import * as schema from "./schema";
-import {
-  ensureSeedMu,
-  listMuMembers,
-  listMusForSync,
-  replaceMuMembers,
-  upsertMuCurrent,
-} from "./mus";
+import { listMuMembers, listMusForSync, replaceMuMembers, upsertMuCurrent } from "./mus";
 import { SEED_MU_ID, type ParsedMu } from "../warera/mu";
+import { MANUAL_SOURCE_ID, WATCH_REASON_MANUAL, insertMuWatchReason } from "./watch-reasons";
 
 async function createDb(): Promise<Db> {
   const dir = mkdtempSync(join(tmpdir(), "mus-"));
@@ -43,6 +38,16 @@ async function createDb(): Promise<Db> {
       role TEXT,
       updated_at INTEGER NOT NULL,
       PRIMARY KEY (mu_id, user_id)
+    )
+  `);
+  await client.execute(`
+    CREATE TABLE mu_watch_reasons (
+      mu_id TEXT NOT NULL,
+      reason TEXT NOT NULL,
+      source_id TEXT NOT NULL,
+      last_touched_at INTEGER NOT NULL,
+      created_at INTEGER NOT NULL,
+      PRIMARY KEY (mu_id, reason, source_id)
     )
   `);
   return drizzle(client, { schema });
@@ -95,16 +100,26 @@ describe("mus db", () => {
     db = await createDb();
   });
 
-  it("seeds watchlist when empty", async () => {
+  it("lists ids from mu_watch_reasons, not mus rows", async () => {
+    // A mus row without a reason is not listed.
+    await db
+      .insert(schema.mus)
+      .values({ id: "orphan-mu", enqueuedAt: new Date("2026-08-03T00:00:00.000Z") })
+      .onConflictDoNothing();
     expect(await listMusForSync(db)).toEqual([]);
-    await ensureSeedMu(db, new Date("2026-08-03T00:00:00.000Z"));
-    expect(await listMusForSync(db)).toEqual([{ id: SEED_MU_ID }]);
-    await ensureSeedMu(db);
-    expect(await listMusForSync(db)).toHaveLength(1);
+
+    // A manual reason makes the id appear.
+    const at = new Date("2026-08-21T00:00:00.000Z");
+    await insertMuWatchReason(db, {
+      muId: SEED_MU_ID,
+      reason: WATCH_REASON_MANUAL,
+      sourceId: MANUAL_SOURCE_ID,
+      at,
+    });
+    expect(await listMusForSync(db)).toEqual([SEED_MU_ID]);
   });
 
   it("upserts current MU and replaces roster", async () => {
-    await ensureSeedMu(db);
     const t = new Date("2026-08-03T12:00:00.000Z");
     await upsertMuCurrent(db, sampleMu(), t);
     await replaceMuMembers(

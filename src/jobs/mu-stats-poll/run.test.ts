@@ -8,6 +8,7 @@ import { beforeEach, describe, expect, it, vi } from "vite-plus/test";
 import type { Db } from "../../db/client";
 import { listMuMembers } from "../../db/mus";
 import * as schema from "../../db/schema";
+import { MANUAL_SOURCE_ID, WATCH_REASON_MANUAL, insertMuWatchReason } from "../../db/watch-reasons";
 import { SEED_MU_ID } from "../../warera/mu";
 import { runMuStatsPoll } from "./run";
 
@@ -39,6 +40,36 @@ async function createDb(): Promise<Db> {
       role TEXT,
       updated_at INTEGER NOT NULL,
       PRIMARY KEY (mu_id, user_id)
+    )
+  `);
+  await client.execute(`
+    CREATE TABLE players (
+      id TEXT PRIMARY KEY NOT NULL,
+      username TEXT,
+      mu_id TEXT,
+      workplace_company_id TEXT,
+      payload TEXT,
+      fetched_at INTEGER
+    )
+  `);
+  await client.execute(`
+    CREATE TABLE player_watch_reasons (
+      player_id TEXT NOT NULL,
+      reason TEXT NOT NULL,
+      source_id TEXT NOT NULL,
+      last_touched_at INTEGER NOT NULL,
+      created_at INTEGER NOT NULL,
+      PRIMARY KEY (player_id, reason, source_id)
+    )
+  `);
+  await client.execute(`
+    CREATE TABLE mu_watch_reasons (
+      mu_id TEXT NOT NULL,
+      reason TEXT NOT NULL,
+      source_id TEXT NOT NULL,
+      last_touched_at INTEGER NOT NULL,
+      created_at INTEGER NOT NULL,
+      PRIMARY KEY (mu_id, reason, source_id)
     )
   `);
   await client.execute(`
@@ -98,6 +129,17 @@ async function createDb(): Promise<Db> {
   return drizzle(client, { schema });
 }
 
+const REASON_AT = new Date("2026-08-21T00:00:00.000Z");
+
+async function seedMuReason(db: Db, muId: string): Promise<void> {
+  await insertMuWatchReason(db, {
+    muId,
+    reason: WATCH_REASON_MANUAL,
+    sourceId: MANUAL_SOURCE_ID,
+    at: REASON_AT,
+  });
+}
+
 const muFixture = {
   _id: SEED_MU_ID,
   name: "Sweed Liberty",
@@ -139,8 +181,8 @@ describe("runMuStatsPoll", () => {
     db = await createDb();
   });
 
-  it("seeds watchlist, upserts current rows, and writes snapshots", async () => {
-    const warera = {
+  function makeWarera() {
+    return {
       request: vi.fn(async (path: string) => {
         if (path.includes("muMember.getByMu")) {
           return { result: { data: memberFixture } };
@@ -150,14 +192,42 @@ describe("runMuStatsPoll", () => {
         }
         throw new Error(`unexpected path ${path}`);
       }),
+      requestBatch: vi.fn(async () => []),
     };
-    const logger = {
+  }
+
+  function makeLogger() {
+    return {
       info: vi.fn(),
       warn: vi.fn(),
       error: vi.fn(),
       debug: vi.fn(),
       child: vi.fn(),
     };
+  }
+
+  it("writes no-op success poll when watchlist is empty", async () => {
+    const warera = makeWarera();
+    const logger = makeLogger();
+    const result = await runMuStatsPoll({
+      db,
+      warera: warera as never,
+      logger: logger as never,
+    });
+    expect(result.status).toBe("success");
+    expect(result.muCount).toBe(0);
+    expect(result.memberCount).toBe(0);
+    expect(warera.request).not.toHaveBeenCalled();
+    const polls = await db.select().from(schema.muPolls);
+    expect(polls).toHaveLength(1);
+    expect(polls[0]?.status).toBe("success");
+    expect(polls[0]?.muCount).toBe(0);
+  });
+
+  it("fetches MUs with a watch reason and writes snapshots", async () => {
+    await seedMuReason(db, SEED_MU_ID);
+    const warera = makeWarera();
+    const logger = makeLogger();
     const result = await runMuStatsPoll({
       db,
       warera: warera as never,
@@ -174,21 +244,41 @@ describe("runMuStatsPoll", () => {
     expect(polls[0]?.status).toBe("success");
   });
 
+  it("skips mus rows that have no watch reason", async () => {
+    await seedMuReason(db, SEED_MU_ID);
+    // An extra mus row without a reason must not be fetched.
+    await db
+      .insert(schema.mus)
+      .values({ id: "orphan-mu", enqueuedAt: REASON_AT })
+      .onConflictDoNothing();
+    const warera = makeWarera();
+    const logger = makeLogger();
+    const result = await runMuStatsPoll({
+      db,
+      warera: warera as never,
+      logger: logger as never,
+    });
+    expect(result.status).toBe("success");
+    expect(result.muCount).toBe(1);
+    const getByIdCalls = warera.request.mock.calls.filter((c) =>
+      String(c[0]).includes("mu.getById"),
+    );
+    expect(getByIdCalls).toHaveLength(1);
+    expect(String(getByIdCalls[0]?.[0])).toContain(SEED_MU_ID);
+    expect(String(getByIdCalls[0]?.[0])).not.toContain("orphan-mu");
+  });
+
   it("marks partial when member fetch fails but still writes MU snapshot", async () => {
+    await seedMuReason(db, SEED_MU_ID);
     const warera = {
       request: vi.fn(async (path: string) => {
         if (path.includes("muMember.getByMu")) throw new Error("members down");
         if (path.includes("mu.getById")) return { result: { data: muFixture } };
         throw new Error(`unexpected path ${path}`);
       }),
+      requestBatch: vi.fn(async () => []),
     };
-    const logger = {
-      info: vi.fn(),
-      warn: vi.fn(),
-      error: vi.fn(),
-      debug: vi.fn(),
-      child: vi.fn(),
-    };
+    const logger = makeLogger();
     const result = await runMuStatsPoll({
       db,
       warera: warera as never,

@@ -1,5 +1,5 @@
 import type { Db } from "../../db/client";
-import { ensureSeedMu, listMusForSync, replaceMuMembers, upsertMuCurrent } from "../../db/mus";
+import { listMusForSync, replaceMuMembers, upsertMuCurrent } from "../../db/mus";
 import {
   insertMuMemberStatSnapshots,
   insertMuPoll,
@@ -8,6 +8,7 @@ import {
   type MuStatSnapshotRow,
 } from "../../db/mu-stats";
 import type { Logger } from "../../logging/logger";
+import { syncFollowedPlayers } from "../sync-followed-players";
 import { deriveMemberRole, fetchMuById, fetchMuMembersByMu, type ParsedMu } from "../../warera/mu";
 import type { WareraRequester } from "../../warera/prices";
 
@@ -52,15 +53,27 @@ export async function runMuStatsPoll(options: {
   const { db, warera, logger } = options;
   const recordedAt = new Date();
 
-  await ensureSeedMu(db, recordedAt);
+  await syncFollowedPlayers({ db, warera, now: recordedAt });
   const watchlist = await listMusForSync(db);
+
+  if (watchlist.length === 0) {
+    const pollId = await insertMuPoll(db, {
+      recordedAt,
+      status: "success",
+      error: null,
+      muCount: 0,
+      memberCount: 0,
+    });
+    logger.info({ pollId, muCount: 0, memberCount: 0 }, "mu stats poll complete");
+    return { pollId, muCount: 0, memberCount: 0, status: "success" };
+  }
 
   const muRows: MuStatSnapshotRow[] = [];
   const memberRows: MuMemberStatSnapshotRow[] = [];
   const errors: string[] = [];
   let fullSuccesses = 0;
 
-  for (const { id: muId } of watchlist) {
+  for (const muId of watchlist) {
     try {
       const mu = await fetchMuById(warera, muId);
       await upsertMuCurrent(db, mu, recordedAt);

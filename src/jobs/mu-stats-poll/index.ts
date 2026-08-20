@@ -5,7 +5,7 @@ export const muStatsPollJob: JobDefinition = {
   id: "mu-stats-poll",
   name: "MU Stats Poll",
   description:
-    "Fetches mu.getById + muMember.getByMu for watchlist MUs; upserts current roster and appends stat snapshots",
+    "Fetches mu.getById + muMember.getByMu for MUs with a watch reason; upserts current roster and appends stat snapshots",
   defaultCron: "0 */30 * * * *",
   defaultEnabled: true,
   async run({ db, logger, warera }) {

@@ -1,17 +1,11 @@
 import { asc, eq } from "drizzle-orm";
 import type { Db } from "./client";
 import { muMembers, mus } from "./schema";
-import { SEED_MU_ID, type ParsedMu } from "../warera/mu";
+import { listDistinctWatchedMuIds } from "./watch-reasons";
+import type { ParsedMu } from "../warera/mu";
 
-export async function ensureSeedMu(db: Db, now = new Date()): Promise<void> {
-  const existing = await listMusForSync(db);
-  if (existing.length > 0) return;
-  await db.insert(mus).values({ id: SEED_MU_ID, enqueuedAt: now }).onConflictDoNothing();
-}
-
-export async function listMusForSync(db: Db): Promise<{ id: string }[]> {
-  const rows = await db.select({ id: mus.id }).from(mus);
-  return rows;
+export async function listMusForSync(db: Db): Promise<string[]> {
+  return listDistinctWatchedMuIds(db);
 }
 
 export async function upsertMuCurrent(db: Db, parsed: ParsedMu, fetchedAt: Date): Promise<void> {
