@@ -1,6 +1,6 @@
 # WarEra data inventory (as-is)
 
-**Last reviewed:** 2026-08-10  
+**Last reviewed:** 2026-08-20  
 **Status:** Living — update when cadence, ownership, or major consumers change  
 **Tier rules:** [Data tier caching strategy](../superpowers/specs/2026-08-02-data-tier-caching-strategy-design.md)
 
@@ -57,11 +57,15 @@ Browser (SPA)
 
 Event-driven Geo (`enqueueGeoRefresh` from battles/laws/etc.) is **documented as planned** in the data-tier design; not implemented. Quiet regions may stay unchanged for days; hot war regions change often — today’s sync does not differentiate.
 
+The MU watchlist is the set of distinct ids in `mu_watch_reasons` (seeded by `migrate manual` reason and reconciled from `follow_player` player reasons), **not** `mus` row presence.
+
 ### User
 
 | Resource | What | Who refreshes | Cadence | Upstream today | Storage | Main consumers |
 | --- | --- | --- | --- | --- | --- | --- |
 | Selected player | `userId` + username | Shell selection (no WarEra cron) | Session / explicit Load | Search/lite via client default | Shell state; recent list in localStorage | All user tools |
+| Followed players | Followed player ids + reasons; current `players` row (username, MU, workplace) | `sync-followed-players` (runs inside `mu-stats-poll` + `work-stats-poll`); Follow CRUD from shell | On poll; on add/remove | `user.getUserById` via client default batch | `player_watch_reasons` (reasons) + `players` (current) | MU follow reconcile, work-stats poll, follow UI |
+| Work daily stats | Employer totals (`work.getStatsByCompany`) + per-employee days (`work.getStatsByWorkerAndCompany`) for followed players’ factories | `work-stats-poll` | Hourly at `:10` | **Forced api2** POST + `X-API-Key` (not on gateway) | Upsert `company_work_stats` / `worker_work_stats` (latest per company+date / company+worker+date) | Work / income views (planned) |
 | Company pack | Companies + advisor inputs for a player (opportunities include live `buyPrice`/`sellPrice`) | Shell Load/Refresh (`refresh=1` busts pack) | Server TTL ~600s | Mix: companies/regions via default; some company helpers forced api2 | `company_packs` + TQ memory; Companies page may apply session-only buy/sell overrides (not persisted) | Companies, Growth |
 | User aggregate | Skills / job / income-oriented payload | `GET /api/user` on demand | Aligned with pack / Load | Prefer gateway + fallbacks | Server TTL patterns + TQ | Skills optimizer, income views |
 | Workers / wages | Work offers / worker rows + lite skills/username | Advisor on Companies Load/Refresh: `worker.getWorkers` then batched `user.getUserLite` for unique worker ids | On Load / tool need | Prefer gateway | Ephemeral / pack-adjacent — not a long Global history | Companies (sim + badges); wage helpers |

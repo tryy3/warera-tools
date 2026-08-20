@@ -8,6 +8,7 @@ import { muStatsPollJob } from "./mu-stats-poll";
 import { pricePollJob } from "./price-poll";
 import { recommendedRegionsPollJob } from "./recommended-regions-poll";
 import { regionSyncJob } from "./region-sync";
+import { workStatsPollJob } from "./work-stats-poll";
 import type { JobDefinition } from "./types";
 
 export function listJobDefinitions(): JobDefinition[] {
@@ -18,6 +19,7 @@ export function listJobDefinitions(): JobDefinition[] {
     recommendedRegionsPollJob,
     regionSyncJob,
     muStatsPollJob,
+    workStatsPollJob,
     itemMarketTxBackfillJob,
     itemMarketTxPollJob,
   ];

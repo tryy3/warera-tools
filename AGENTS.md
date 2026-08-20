@@ -71,13 +71,13 @@ Classify new persisted / fetched data before inventing a one-off cache. Full mod
 | Tier | Who refreshes | Examples |
 | --- | --- | --- |
 | **Global** | Croner jobs (+ rare manual poll) | Market prices / history, recommended regions by item; item-market sales history via `item-market-tx-backfill` + `item-market-tx-poll` (`transaction.getPaginatedTransactions`) |
-| **Geo** | Jobs over watchlist; cold miss live-fills | Regions, countries; **MU** via `mu-stats-poll` (30m) |
+| **Geo** | Jobs over watchlist; cold miss live-fills | Regions, countries; **MU** via `mu-stats-poll` (30m) over `mu_watch_reasons` distinct ids (not `mus` row presence) |
 | **User** | Shell Load/Refresh → server TTL | Selected player, `GET /api/user` (skills/job/companies/income), `company_packs` |
 
 Rules:
 
 1. Jobs own Global and Geo. Tool pages must not live-scrape WarEra for those when tables are warm.
-2. User data is demand-driven (no per-user cron). Shell player Load/Refresh is the control — keep it always visible.
+2. User data is demand-driven (no per-user cron). Shell player Load/Refresh is the control — keep it always visible. **Exception:** followed players are a bounded user watchlist that jobs may refresh (`sync-followed-players`, `work-stats-poll`); the shell-selected player stays demand-driven.
 3. Prefer shared TanStack Query keys for data reused across tools when live freshness is not critical (e.g. prices). Avoid loading heavy Geo dumps into the client unless a tool needs a narrow slice.
 4. Event-driven Geo (`enqueueGeoRefresh` from battles/laws/etc.) is planned; not implemented yet. Jobs remain the bulk WarEra callers.
 5. **Equipment Market** reads `item_market_transactions` via `/api/equipment`.
