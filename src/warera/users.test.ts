@@ -1,9 +1,11 @@
 import { describe, expect, it, vi } from "vite-plus/test";
+import type { WareraBatchItem } from "./trpc";
 import {
   fetchUserById,
+  fetchUserByIdBatch,
   fetchUserLite,
   fetchUserLiteBatch,
-  parseUserByIdCompany,
+  parseUserById,
   parseUserLiteSkills,
 } from "./users";
 
@@ -68,17 +70,88 @@ describe("parseUserLiteSkills", () => {
   });
 });
 
-describe("parseUserByIdCompany", () => {
-  it("reads company string id", () => {
-    expect(parseUserByIdCompany({ company: "co-1" })).toEqual({ companyId: "co-1" });
+describe("parseUserById", () => {
+  it("reads nested mu and username", () => {
+    expect(
+      parseUserById({
+        _id: "u1",
+        username: "Alice",
+        company: { _id: "co-2" },
+        mu: { _id: "mu-9" },
+      }),
+    ).toEqual({
+      userId: "u1",
+      username: "Alice",
+      companyId: "co-2",
+      muId: "mu-9",
+    });
   });
 
-  it("reads nested company object", () => {
-    expect(parseUserByIdCompany({ company: { _id: "co-2" } })).toEqual({ companyId: "co-2" });
+  it("reads direct company and mu string ids", () => {
+    expect(
+      parseUserById({
+        _id: "u1",
+        username: "Alice",
+        company: "co-1",
+        mu: "mu-1",
+      }),
+    ).toEqual({
+      userId: "u1",
+      username: "Alice",
+      companyId: "co-1",
+      muId: "mu-1",
+    });
   });
 
-  it("returns null company when missing", () => {
-    expect(parseUserByIdCompany({})).toEqual({ companyId: null });
+  it("probes muId / militaryUnit aliases", () => {
+    expect(parseUserById({ _id: "u1", username: "Alice", muId: "mu-2" })).toEqual({
+      userId: "u1",
+      username: "Alice",
+      companyId: null,
+      muId: "mu-2",
+    });
+    expect(parseUserById({ id: "u1", name: "Alice", militaryUnit: "mu-3" })).toEqual({
+      userId: "u1",
+      username: "Alice",
+      companyId: null,
+      muId: "mu-3",
+    });
+  });
+
+  it("reads nested mu via id/muId keys", () => {
+    expect(parseUserById({ _id: "u1", username: "Alice", mu: { id: "mu-7" } })).toEqual({
+      userId: "u1",
+      username: "Alice",
+      companyId: null,
+      muId: "mu-7",
+    });
+  });
+
+  it("falls back username to null when missing", () => {
+    expect(parseUserById({ _id: "u1" })).toEqual({
+      userId: "u1",
+      username: null,
+      companyId: null,
+      muId: null,
+    });
+  });
+
+  it("returns null mu and company when missing", () => {
+    expect(parseUserById({ _id: "u1", username: "Alice" })).toEqual({
+      userId: "u1",
+      username: "Alice",
+      companyId: null,
+      muId: null,
+    });
+  });
+
+  it("returns all-null for non-record input", () => {
+    expect(parseUserById(null)).toEqual({
+      userId: "unknown",
+      username: null,
+      companyId: null,
+      muId: null,
+    });
   });
 });
 
@@ -104,13 +177,25 @@ describe("fetchUserLite / fetchUserById", () => {
     expect(lite.skillLevels.energy).toBe(1);
   });
 
-  it("calls user.getUserById and unwraps company", async () => {
+  it("calls user.getUserById and unwraps mu/company/username", async () => {
     const request = vi.fn(async () => ({
-      result: { data: { _id: "user-1", company: "co-9" } },
+      result: {
+        data: {
+          _id: "user-1",
+          username: "Alice",
+          company: "co-9",
+          mu: { _id: "mu-3" },
+        },
+      },
     }));
     const row = await fetchUserById({ request } as never, "user-1");
     expect(request).toHaveBeenCalledWith(expect.stringContaining("user.getUserById"));
-    expect(row).toEqual({ companyId: "co-9" });
+    expect(row).toEqual({
+      userId: "user-1",
+      username: "Alice",
+      companyId: "co-9",
+      muId: "mu-3",
+    });
   });
 });
 
@@ -159,6 +244,66 @@ describe("fetchUserLiteBatch", () => {
 
   it("throws when requestBatch is missing", async () => {
     await expect(fetchUserLiteBatch({ request: vi.fn() } as never, ["u1"])).rejects.toThrow(
+      /requestBatch/,
+    );
+  });
+});
+
+describe("fetchUserByIdBatch", () => {
+  it("dedupes ids and maps ok / failed slots", async () => {
+    const requestBatch = vi.fn(async (_items: WareraBatchItem[]) => [
+      {
+        ok: true as const,
+        data: {
+          _id: "u1",
+          username: "Alice",
+          company: "co-1",
+          mu: { _id: "mu-2" },
+        },
+      },
+      { ok: false as const, error: { message: "NOT_FOUND" } },
+    ]);
+
+    const map = await fetchUserByIdBatch({ request: vi.fn(), requestBatch } as never, [
+      "u1",
+      "u2",
+      "u1",
+    ]);
+
+    expect(requestBatch).toHaveBeenCalledTimes(1);
+    const batchItems = requestBatch.mock.calls[0]![0];
+    expect(batchItems).toHaveLength(2);
+    expect(batchItems[0]).toMatchObject({
+      procedure: "user.getUserById",
+      input: { userId: "u1" },
+    });
+    expect(map.get("u1")).toEqual({
+      userId: "u1",
+      username: "Alice",
+      companyId: "co-1",
+      muId: "mu-2",
+    });
+    expect(map.get("u2")).toBeNull();
+  });
+
+  it("marks all ids null when requestBatch throws", async () => {
+    const requestBatch = vi.fn(async (_items: WareraBatchItem[]) => {
+      throw new Error("batch down");
+    });
+    const map = await fetchUserByIdBatch({ request: vi.fn(), requestBatch } as never, ["a", "b"]);
+    expect(map.get("a")).toBeNull();
+    expect(map.get("b")).toBeNull();
+  });
+
+  it("returns empty map for empty input without calling requestBatch", async () => {
+    const requestBatch = vi.fn(async () => []);
+    const map = await fetchUserByIdBatch({ request: vi.fn(), requestBatch } as never, []);
+    expect(map.size).toBe(0);
+    expect(requestBatch).not.toHaveBeenCalled();
+  });
+
+  it("throws when requestBatch is missing", async () => {
+    await expect(fetchUserByIdBatch({ request: vi.fn() } as never, ["u1"])).rejects.toThrow(
       /requestBatch/,
     );
   });

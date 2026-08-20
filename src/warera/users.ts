@@ -14,8 +14,11 @@ export type UserLiteSkills = {
   skillValues: Record<string, number>;
 };
 
-export type UserCompanyRef = {
+export type UserByIdRef = {
+  userId: string;
+  username: string | null;
   companyId: string | null;
+  muId: string | null;
 };
 
 function asRecord(value: unknown): Record<string, unknown> | null {
@@ -72,20 +75,51 @@ export function parseUserLiteSkills(raw: unknown): UserLiteSkills {
   };
 }
 
-export function parseUserByIdCompany(raw: unknown): UserCompanyRef {
-  const obj = asRecord(raw);
-  if (!obj) return { companyId: null };
+/**
+ * Parse a `user.getUserById` payload into a flat ref.
+ *
+ * Tolerant: missing fields become null (or "unknown" for userId). Never throws.
+ *
+ * Field aliases probed:
+ *   - userId: `_id` / `id` / `userId`
+ *   - username: `username` / `name`
+ *   - companyId: direct `companyId` / `company` string, or nested `company.{_id,id,companyId}`
+ *   - muId: direct `mu` / `muId` / `militaryUnit` string, or nested `mu.{_id,id,muId}`
+ */
+export function parseUserById(raw: unknown): UserByIdRef {
+  const obj = asRecord(raw) ?? {};
+  const userId = pickString(obj, ["_id", "id", "userId"]) ?? "unknown";
+  const username = pickString(obj, ["username", "name"]);
 
-  const direct = pickString(obj, ["companyId", "company"]);
-  if (direct) return { companyId: direct };
+  const companyId = pickNestedId(obj, ["companyId", "company"], ["company"]);
 
-  const nested = asRecord(obj.company);
-  if (nested) {
-    const id = pickString(nested, ["_id", "id", "companyId"]);
-    if (id) return { companyId: id };
+  const muId = pickNestedId(obj, ["mu", "muId", "militaryUnit"], ["mu", "militaryUnit"]);
+
+  return { userId, username, companyId, muId };
+}
+
+/**
+ * Pick an id that may appear either as a direct string field or as a nested
+ * object. `directKeys` are probed on `obj` for a string id; `nestedKeys` are
+ * probed on `obj` for a record whose `_id` / `id` / `<singular>Id` is read.
+ */
+function pickNestedId(
+  obj: Record<string, unknown>,
+  directKeys: string[],
+  nestedKeys: string[],
+): string | null {
+  const direct = pickString(obj, directKeys);
+  if (direct) return direct;
+
+  for (const key of nestedKeys) {
+    const nested = asRecord(obj[key]);
+    if (nested) {
+      const id = pickString(nested, ["_id", "id", ...directKeys]);
+      if (id) return id;
+    }
   }
 
-  return { companyId: null };
+  return null;
 }
 
 export async function fetchUserLite(
@@ -141,10 +175,52 @@ export async function fetchUserLiteBatch(
   return out;
 }
 
-export async function fetchUserById(
-  warera: WareraRequester,
-  userId: string,
-): Promise<UserCompanyRef> {
+export async function fetchUserById(warera: WareraRequester, userId: string): Promise<UserByIdRef> {
   const json = await warera.request<unknown>(wareraProcedurePath("user.getUserById", { userId }));
-  return parseUserByIdCompany(unwrapTrpcData(json));
+  return parseUserById(unwrapTrpcData(json));
+}
+
+/**
+ * Batch-fetch `user.getUserById` profiles. Dedupes ids. Failed / missing slots → null.
+ * Requires `warera.requestBatch` (production client always has it).
+ */
+export async function fetchUserByIdBatch(
+  warera: WareraRequester,
+  userIds: string[],
+): Promise<Map<string, UserByIdRef | null>> {
+  const unique = [...new Set(userIds.filter((id) => id.length > 0))];
+  const out = new Map<string, UserByIdRef | null>();
+  if (unique.length === 0) return out;
+
+  if (!warera.requestBatch) {
+    throw new Error("fetchUserByIdBatch requires warera.requestBatch");
+  }
+
+  try {
+    const slots = await warera.requestBatch(
+      unique.map((userId) => ({
+        procedure: "user.getUserById",
+        input: { userId },
+      })),
+    );
+    for (let i = 0; i < unique.length; i++) {
+      const userId = unique[i]!;
+      const slot = slots[i];
+      if (!slot?.ok) {
+        out.set(userId, null);
+        continue;
+      }
+      try {
+        out.set(userId, parseUserById(slot.data));
+      } catch {
+        out.set(userId, null);
+      }
+    }
+  } catch {
+    for (const userId of unique) {
+      out.set(userId, null);
+    }
+  }
+
+  return out;
 }

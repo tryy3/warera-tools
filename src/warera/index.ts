@@ -25,11 +25,12 @@ export {
 } from "./trpc";
 export {
   fetchUserById,
+  fetchUserByIdBatch,
   fetchUserLite,
   fetchUserLiteBatch,
-  parseUserByIdCompany,
+  parseUserById,
   parseUserLiteSkills,
-  type UserCompanyRef,
+  type UserByIdRef,
   type UserLiteSkills,
 } from "./users";
 export {
