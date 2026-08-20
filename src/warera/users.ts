@@ -78,16 +78,23 @@ export function parseUserLiteSkills(raw: unknown): UserLiteSkills {
 /**
  * Parse a `user.getUserById` payload into a flat ref.
  *
- * Throws when no valid id is present — callers must not persist/reconcile a
- * placeholder `"unknown"` id. Field aliases probed:
+ * When `requestedUserId` is provided and the payload omits an id, the request
+ * id is used (api2 often does not echo it). Throws when no id can be resolved
+ * and when payload id disagrees with `requestedUserId`. Field aliases probed:
  *   - userId: `_id` / `id` / `userId`
  *   - username: `username` / `name`
  *   - companyId: direct `companyId` / `company` string, or nested `company.{_id,id,companyId}`
  *   - muId: direct `mu` / `muId` / `militaryUnit` string, or nested `mu.{_id,id,muId}`
  */
-export function parseUserById(raw: unknown): UserByIdRef {
+export function parseUserById(raw: unknown, requestedUserId?: string): UserByIdRef {
   const obj = asRecord(raw) ?? {};
-  const userId = pickString(obj, ["_id", "id", "userId"]);
+  const payloadUserId = pickString(obj, ["_id", "id", "userId"]);
+  if (payloadUserId && requestedUserId && payloadUserId !== requestedUserId) {
+    throw new Error(
+      `user.getUserById id mismatch: requested ${requestedUserId}, got ${payloadUserId}`,
+    );
+  }
+  const userId = payloadUserId ?? requestedUserId;
   if (!userId) {
     throw new Error("user.getUserById response missing id");
   }
@@ -179,11 +186,7 @@ export async function fetchUserLiteBatch(
 
 export async function fetchUserById(warera: WareraRequester, userId: string): Promise<UserByIdRef> {
   const json = await warera.request<unknown>(wareraProcedurePath("user.getUserById", { userId }));
-  const ref = parseUserById(unwrapTrpcData(json));
-  if (ref.userId !== userId) {
-    throw new Error(`user.getUserById id mismatch: requested ${userId}, got ${ref.userId}`);
-  }
-  return ref;
+  return parseUserById(unwrapTrpcData(json), userId);
 }
 
 /**
@@ -217,12 +220,7 @@ export async function fetchUserByIdBatch(
         continue;
       }
       try {
-        const parsed = parseUserById(slot.data);
-        if (parsed.userId !== userId) {
-          out.set(userId, null);
-          continue;
-        }
-        out.set(userId, parsed);
+        out.set(userId, parseUserById(slot.data, userId));
       } catch {
         out.set(userId, null);
       }
