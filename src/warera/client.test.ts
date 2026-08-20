@@ -230,16 +230,18 @@ describe("createWareraClient", () => {
   });
 
   it("requestBatch sends one GET with batch=1 for multiple items", async () => {
-    const fetchMock = vi.fn().mockResolvedValue(
-      new Response(
-        JSON.stringify([
-          { result: { data: { username: "A" } } },
-          { result: { data: { username: "B" } } },
-          { error: { message: "nope" } },
-        ]),
-        { status: 207 },
-      ),
-    );
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(
+        new Response(
+          JSON.stringify([
+            { result: { data: { username: "A" } } },
+            { result: { data: { username: "B" } } },
+            { error: { message: "nope" } },
+          ]),
+          { status: 207 },
+        ),
+      );
     const client = createWareraClient({
       config: { ...baseConfig, wareraMaxRequestsPerMinute: 1 },
       logger: testLogger(),
@@ -299,5 +301,55 @@ describe("createWareraClient", () => {
     expect(headers.get("X-API-Key")).toBe("test-key");
     expect(headers.get("Authorization")).toBeNull();
     expect(headers.get("content-type")).toBe("application/json");
+  });
+
+  it("requestBatch POSTs one URL ending in ?batch=1 with indexed body and X-API-Key", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(
+        new Response(
+          JSON.stringify([
+            { result: { data: [{ dailyDate: "2026-08-19", total: 1 }] } },
+            { result: { data: [{ dailyDate: "2026-08-19", total: 2 }] } },
+          ]),
+          { status: 200 },
+        ),
+      );
+    const client = createWareraClient({
+      config: baseConfig,
+      logger: testLogger(),
+      fetchImpl: fetchMock,
+      sleep: async () => {},
+    });
+
+    const results = await client.requestBatch(
+      [
+        { procedure: "work.getStatsByCompany", input: { companyId: "c1", days: 14 } },
+        { procedure: "work.getStatsByCompany", input: { companyId: "c2", days: 14 } },
+      ],
+      {
+        method: "POST",
+        authStyle: "api-key",
+        baseUrl: "https://api2.warera.io/trpc",
+      },
+    );
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0]!;
+    expect(String(url)).toBe(
+      "https://api2.warera.io/trpc/work.getStatsByCompany,work.getStatsByCompany?batch=1",
+    );
+    expect(init.method).toBe("POST");
+    expect(JSON.parse(init.body as string)).toEqual({
+      "0": { companyId: "c1", days: 14 },
+      "1": { companyId: "c2", days: 14 },
+    });
+    const headers = new Headers(init.headers);
+    expect(headers.get("X-API-Key")).toBe("test-key");
+    expect(headers.get("content-type")).toBe("application/json");
+    expect(results).toEqual([
+      { ok: true, data: [{ dailyDate: "2026-08-19", total: 1 }] },
+      { ok: true, data: [{ dailyDate: "2026-08-19", total: 2 }] },
+    ]);
   });
 });

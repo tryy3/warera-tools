@@ -13,18 +13,35 @@ export type TrpcBatchSlotResult<T = unknown> =
   | { ok: true; data: T }
   | { ok: false; error: unknown };
 
+/** Build the indexed input record shared by GET (query) and POST (body) batches. */
+export function buildBatchInputRecord(items: WareraBatchItem[]): Record<string, unknown> {
+  if (items.length === 0) {
+    throw new Error("buildBatchInputRecord requires at least one item");
+  }
+  const inputRecord: Record<string, unknown> = {};
+  for (let i = 0; i < items.length; i++) {
+    inputRecord[String(i)] = items[i]!.input === undefined ? null : items[i]!.input;
+  }
+  return inputRecord;
+}
+
 /** Build a tRPC HTTP batch GET path (`batch=1` + indexed inputs). */
 export function wareraBatchPath(items: WareraBatchItem[]): string {
   if (items.length === 0) {
     throw new Error("wareraBatchPath requires at least one item");
   }
   const procedures = items.map((item) => item.procedure).join(",");
-  const inputRecord: Record<string, unknown> = {};
-  for (let i = 0; i < items.length; i++) {
-    inputRecord[String(i)] = items[i]!.input === undefined ? null : items[i]!.input;
-  }
-  const input = encodeURIComponent(JSON.stringify(inputRecord));
+  const input = encodeURIComponent(JSON.stringify(buildBatchInputRecord(items)));
   return `${procedures}?batch=1&input=${input}`;
+}
+
+/** Build a tRPC HTTP batch POST path (`batch=1`, no input query — inputs go in the body). */
+export function wareraBatchPostPath(items: WareraBatchItem[]): string {
+  if (items.length === 0) {
+    throw new Error("wareraBatchPostPath requires at least one item");
+  }
+  const procedures = items.map((item) => item.procedure).join(",");
+  return `${procedures}?batch=1`;
 }
 
 /** Parse a tRPC batch response array into per-index ok/error slots. */
@@ -48,12 +65,17 @@ export function parseTrpcBatchResponse(json: unknown): TrpcBatchSlotResult[] {
 }
 
 /**
- * Split batch items so each chunk's `wareraBatchPath` length stays ≤ maxUrlLength.
+ * Split batch items so each chunk's path length stays ≤ maxUrlLength.
  * A single oversized item is still emitted alone (caller/server may reject).
+ *
+ * `pathBuilder` defaults to the GET batch path (includes the input query). For
+ * POST batches, pass `wareraBatchPostPath` so chunking is measured against the
+ * shorter procedure-only URL (inputs travel in the body).
  */
 export function chunkBatchItemsByMaxUrlLength(
   items: WareraBatchItem[],
   maxUrlLength: number,
+  pathBuilder: (items: WareraBatchItem[]) => string = wareraBatchPath,
 ): WareraBatchItem[][] {
   if (items.length === 0) return [];
   const chunks: WareraBatchItem[][] = [];
@@ -61,7 +83,7 @@ export function chunkBatchItemsByMaxUrlLength(
 
   for (const item of items) {
     const candidate = [...current, item];
-    if (current.length > 0 && wareraBatchPath(candidate).length > maxUrlLength) {
+    if (current.length > 0 && pathBuilder(candidate).length > maxUrlLength) {
       chunks.push(current);
       current = [item];
     } else {

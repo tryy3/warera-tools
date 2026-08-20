@@ -2,9 +2,11 @@ import type { AppConfig } from "../config/env";
 import type { Logger } from "../logging/logger";
 import { createRateLimiter } from "./rate-limit";
 import {
+  buildBatchInputRecord,
   chunkBatchItemsByMaxUrlLength,
   parseTrpcBatchResponse,
   wareraBatchPath,
+  wareraBatchPostPath,
   type TrpcBatchSlotResult,
   type WareraBatchItem,
 } from "./trpc";
@@ -240,15 +242,26 @@ export function createWareraClient(options: CreateWareraClientOptions) {
     if (items.length === 0) return [];
 
     const { skipRateLimit, authStyle = "auto", baseUrl: baseUrlOverride } = init;
-    const chunks = chunkBatchItemsByMaxUrlLength(items, WARERA_MAX_BATCH_URL_LENGTH);
+    const method = (init.method ?? "GET").toUpperCase();
+    const isPost = method === "POST";
+
+    const chunks = isPost
+      ? chunkBatchItemsByMaxUrlLength(items, WARERA_MAX_BATCH_URL_LENGTH, wareraBatchPostPath)
+      : chunkBatchItemsByMaxUrlLength(items, WARERA_MAX_BATCH_URL_LENGTH);
     const out: TrpcBatchSlotResult[] = [];
 
     for (const chunk of chunks) {
-      const path = wareraBatchPath(chunk);
+      const path = isPost ? wareraBatchPostPath(chunk) : wareraBatchPath(chunk);
+      const fetchInit: RequestInit = isPost
+        ? {
+            body: JSON.stringify(buildBatchInputRecord(chunk)),
+            headers: { "content-type": "application/json" },
+          }
+        : {};
       const json = await executeRequest(
         path,
-        {},
-        "GET",
+        fetchInit,
+        method,
         authStyle,
         Boolean(skipRateLimit),
         baseUrlOverride,

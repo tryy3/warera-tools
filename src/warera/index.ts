@@ -17,6 +17,8 @@ export { fetchTopOrderAggregates, parseTopOrderAggregates } from "./top-orders";
 export {
   wareraProcedurePath,
   wareraBatchPath,
+  wareraBatchPostPath,
+  buildBatchInputRecord,
   parseTrpcBatchResponse,
   chunkBatchItemsByMaxUrlLength,
   unwrapTrpcData,
@@ -46,3 +48,11 @@ export {
   type ItemMarketTransaction,
   type ItemMarketTransactionsPage,
 } from "./transactions";
+export {
+  WORK_STATS_DAYS,
+  fetchWorkStatsBatch,
+  parseCompanyWorkDays,
+  parseWorkerWorkDays,
+  type CompanyWorkDay,
+  type WorkerWorkDay,
+} from "./work-stats";
