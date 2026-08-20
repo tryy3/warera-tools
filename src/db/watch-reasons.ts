@@ -1,5 +1,5 @@
 import { and, asc, eq } from "drizzle-orm";
-import type { Db } from "./client";
+import type { Db, DbOrTx } from "./client";
 import { muWatchReasons, playerWatchReasons } from "./schema";
 
 export const WATCH_REASON_MANUAL = "manual";
@@ -7,7 +7,7 @@ export const WATCH_REASON_FOLLOW_PLAYER = "follow_player";
 export const MANUAL_SOURCE_ID = "";
 
 export async function insertPlayerWatchReason(
-  db: Db,
+  db: DbOrTx,
   row: { playerId: string; reason: string; sourceId: string; at: Date },
 ): Promise<void> {
   await db
@@ -46,7 +46,7 @@ export async function listDistinctFollowedPlayerIds(db: Db): Promise<string[]> {
 }
 
 export async function insertMuWatchReason(
-  db: Db,
+  db: DbOrTx,
   row: { muId: string; reason: string; sourceId: string; at: Date },
 ): Promise<void> {
   await db
@@ -96,31 +96,36 @@ export async function listMuWatchReasons(
 }
 
 export async function reconcileFollowPlayerMu(
-  db: Db,
+  db: DbOrTx,
   input: { playerId: string; muId: string | null; at: Date },
 ): Promise<void> {
-  await db
-    .delete(muWatchReasons)
-    .where(
-      and(
-        eq(muWatchReasons.reason, WATCH_REASON_FOLLOW_PLAYER),
-        eq(muWatchReasons.sourceId, input.playerId),
-      ),
-    );
-  if (input.muId === null) return;
-  await db
-    .insert(muWatchReasons)
-    .values({
-      muId: input.muId,
-      reason: WATCH_REASON_FOLLOW_PLAYER,
-      sourceId: input.playerId,
-      lastTouchedAt: input.at,
-      createdAt: input.at,
-    })
-    .onConflictDoNothing();
+  await db.transaction(async (tx) => {
+    await tx
+      .delete(muWatchReasons)
+      .where(
+        and(
+          eq(muWatchReasons.reason, WATCH_REASON_FOLLOW_PLAYER),
+          eq(muWatchReasons.sourceId, input.playerId),
+        ),
+      );
+    if (input.muId === null) return;
+    await tx
+      .insert(muWatchReasons)
+      .values({
+        muId: input.muId,
+        reason: WATCH_REASON_FOLLOW_PLAYER,
+        sourceId: input.playerId,
+        lastTouchedAt: input.at,
+        createdAt: input.at,
+      })
+      .onConflictDoNothing();
+  });
 }
 
-export async function deleteFollowPlayerReasonsForSource(db: Db, playerId: string): Promise<void> {
+export async function deleteFollowPlayerReasonsForSource(
+  db: DbOrTx,
+  playerId: string,
+): Promise<void> {
   await db
     .delete(muWatchReasons)
     .where(

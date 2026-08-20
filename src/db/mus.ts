@@ -1,5 +1,5 @@
 import { asc, eq } from "drizzle-orm";
-import type { Db } from "./client";
+import type { Db, DbOrTx } from "./client";
 import { muMembers, mus } from "./schema";
 import { listDistinctWatchedMuIds } from "./watch-reasons";
 import type { ParsedMu } from "../warera/mu";
@@ -8,7 +8,11 @@ export async function listMusForSync(db: Db): Promise<string[]> {
   return listDistinctWatchedMuIds(db);
 }
 
-export async function upsertMuCurrent(db: Db, parsed: ParsedMu, fetchedAt: Date): Promise<void> {
+export async function upsertMuCurrent(
+  db: DbOrTx,
+  parsed: ParsedMu,
+  fetchedAt: Date,
+): Promise<void> {
   await db
     .insert(mus)
     .values({

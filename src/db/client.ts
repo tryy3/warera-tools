@@ -16,3 +16,9 @@ export function createDb(config: AppConfig, logger?: Logger) {
 }
 
 export type Db = ReturnType<typeof createDb>["db"];
+
+/** The transaction object passed to `db.transaction`. */
+export type DbTx = Parameters<Parameters<Db["transaction"]>[0]>[0];
+
+/** A real `Db` or an in-flight transaction tx; both expose the query builders. */
+export type DbOrTx = Db | DbTx;

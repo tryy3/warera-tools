@@ -44,18 +44,20 @@ export async function syncFollowedPlayers(options: {
       errors.push(`player ${playerId}: lookup failed`);
       continue;
     }
-    await upsertPlayerCurrent(db, {
-      id: ref.userId,
-      username: ref.username,
-      muId: ref.muId,
-      workplaceCompanyId: ref.companyId,
-      payload: null,
-      fetchedAt: now,
-    });
-    await reconcileFollowPlayerMu(db, {
-      playerId: ref.userId,
-      muId: ref.muId,
-      at: now,
+    await db.transaction(async (tx) => {
+      await upsertPlayerCurrent(tx, {
+        id: ref.userId,
+        username: ref.username,
+        muId: ref.muId,
+        workplaceCompanyId: ref.companyId,
+        payload: null,
+        fetchedAt: now,
+      });
+      await reconcileFollowPlayerMu(tx, {
+        playerId: ref.userId,
+        muId: ref.muId,
+        at: now,
+      });
     });
     playerCount += 1;
   }

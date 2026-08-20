@@ -8,7 +8,12 @@ import { beforeEach, describe, expect, it, vi } from "vite-plus/test";
 import type { Db } from "../../db/client";
 import { listMuMembers } from "../../db/mus";
 import * as schema from "../../db/schema";
-import { MANUAL_SOURCE_ID, WATCH_REASON_MANUAL, insertMuWatchReason } from "../../db/watch-reasons";
+import {
+  MANUAL_SOURCE_ID,
+  WATCH_REASON_MANUAL,
+  insertMuWatchReason,
+  insertPlayerWatchReason,
+} from "../../db/watch-reasons";
 import { SEED_MU_ID } from "../../warera/mu";
 import { runMuStatsPoll } from "./run";
 
@@ -293,5 +298,28 @@ describe("runMuStatsPoll", () => {
     expect(memberSnaps).toHaveLength(0);
     const muSnaps = await db.select().from(schema.muStatSnapshots);
     expect(muSnaps).toHaveLength(1);
+  });
+
+  it("captures syncFollowedPlayers errors and marks partial when MU fetch succeeds", async () => {
+    await seedMuReason(db, SEED_MU_ID);
+    // A followed player whose getUserById batch slot fails (requestBatch returns []).
+    await insertPlayerWatchReason(db, {
+      playerId: "p1",
+      reason: WATCH_REASON_MANUAL,
+      sourceId: MANUAL_SOURCE_ID,
+      at: REASON_AT,
+    });
+    const warera = makeWarera();
+    const logger = makeLogger();
+    const result = await runMuStatsPoll({
+      db,
+      warera: warera as never,
+      logger: logger as never,
+    });
+    expect(result.status).toBe("partial");
+    expect(result.muCount).toBe(1);
+    const polls = await db.select().from(schema.muPolls);
+    expect(polls[0]?.status).toBe("partial");
+    expect(polls[0]?.error).toContain("sync:");
   });
 });

@@ -10,6 +10,7 @@ import * as schema from "../../db/schema";
 import { companyWorkStats, workerWorkStats } from "../../db/schema";
 import { WATCH_REASON_FOLLOW_PLAYER, insertPlayerWatchReason } from "../../db/watch-reasons";
 import { runWorkStatsPoll } from "./run";
+import { workStatsPollJob } from "./index";
 
 async function createDb(): Promise<Db> {
   const dir = mkdtempSync(join(tmpdir(), "work-stats-poll-"));
@@ -375,5 +376,55 @@ describe("runWorkStatsPoll", () => {
     expect(result.workerDays).toBe(0);
     expect(await db.select().from(companyWorkStats)).toHaveLength(0);
     expect(await db.select().from(workerWorkStats)).toHaveLength(0);
+  });
+
+  it("reports per-target errors for null work-stat slots", async () => {
+    await seedFollowedPlayer(db, "u1");
+    // Whole batch fails → every company/worker slot is null → each pushes an error.
+    const warera = makeWarera({ failWorkStatsBatch: true });
+    const logger = makeLogger();
+    const result = await runWorkStatsPoll({
+      db,
+      warera: warera as never,
+      logger: logger as never,
+    });
+
+    expect(result.status).toBe("error");
+    // 1 company + 3 worker targets = 4 null-slot error strings.
+    expect(result.errors.length).toBe(4);
+    expect(result.errors.some((e) => e.includes("company owned-co"))).toBe(true);
+    expect(result.errors.some((e) => e.includes("worker owned-co/u1"))).toBe(true);
+    expect(result.errors.some((e) => e.includes("worker foreign-co/u1"))).toBe(true);
+  });
+
+  it("captures syncFollowedPlayers errors and marks partial when targets still succeed", async () => {
+    await seedFollowedPlayer(db, "u1");
+    // user lookup for u1 fails during sync, but work-stats batch still succeeds.
+    const warera = makeWarera({ failUserLookupFor: ["u1"] });
+    const logger = makeLogger();
+    const result = await runWorkStatsPoll({
+      db,
+      warera: warera as never,
+      logger: logger as never,
+    });
+
+    expect(result.status).toBe("partial");
+    expect(result.errors.some((e) => e.startsWith("sync:"))).toBe(true);
+    expect(result.companyDays).toBe(1);
+  });
+
+  it("job definition throws when runWorkStatsPoll returns status error", async () => {
+    await seedFollowedPlayer(db, "u1");
+    const warera = makeWarera({ failWorkStatsBatch: true });
+    const logger = makeLogger();
+    await expect(
+      workStatsPollJob.run({
+        db,
+        logger: logger as never,
+        warera: warera as never,
+        state: null,
+        setState: vi.fn(async () => {}),
+      }),
+    ).rejects.toThrow(/work stats poll failed: status=error/);
   });
 });

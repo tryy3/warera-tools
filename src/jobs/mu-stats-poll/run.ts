@@ -53,24 +53,28 @@ export async function runMuStatsPoll(options: {
   const { db, warera, logger } = options;
   const recordedAt = new Date();
 
-  await syncFollowedPlayers({ db, warera, now: recordedAt });
+  const syncResult = await syncFollowedPlayers({ db, warera, now: recordedAt });
+  const errors: string[] = [...syncResult.errors.map((e) => `sync: ${e}`)];
   const watchlist = await listMusForSync(db);
 
   if (watchlist.length === 0) {
+    const status = errors.length > 0 ? "partial" : "success";
     const pollId = await insertMuPoll(db, {
       recordedAt,
-      status: "success",
-      error: null,
+      status,
+      error: errors.length > 0 ? errors.join("; ").slice(0, 2000) : null,
       muCount: 0,
       memberCount: 0,
     });
-    logger.info({ pollId, muCount: 0, memberCount: 0 }, "mu stats poll complete");
-    return { pollId, muCount: 0, memberCount: 0, status: "success" };
+    logger.info(
+      { pollId, muCount: 0, memberCount: 0, status, errors: errors.length },
+      "mu stats poll complete",
+    );
+    return { pollId, muCount: 0, memberCount: 0, status };
   }
 
   const muRows: MuStatSnapshotRow[] = [];
   const memberRows: MuMemberStatSnapshotRow[] = [];
-  const errors: string[] = [];
   let fullSuccesses = 0;
 
   for (const muId of watchlist) {

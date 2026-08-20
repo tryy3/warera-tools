@@ -10,6 +10,12 @@ export const workStatsPollJob: JobDefinition = {
   defaultEnabled: true,
   async run({ db, logger, warera }) {
     const result = await runWorkStatsPoll({ db, warera, logger });
+    if (result.status === "error") {
+      const first = result.errors[0] ?? "all work stats targets failed";
+      throw new Error(
+        `work stats poll failed: status=error, players=${result.playerCount}, companies=${result.companyCount}, workers=${result.workerCount}, errors=${result.errors.length}, first="${first}"`,
+      );
+    }
     return `${result.playerCount} players, ${result.companyCount} companies, ${result.workerCount} workers (${result.status})`;
   },
 };

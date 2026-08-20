@@ -188,21 +188,23 @@ export function followRoutes(deps: FollowRouteDeps) {
     }
 
     const now = new Date();
-    await insertPlayerWatchReason(db, {
-      playerId: ref.userId,
-      reason: WATCH_REASON_MANUAL,
-      sourceId: MANUAL_SOURCE_ID,
-      at: now,
+    await db.transaction(async (tx) => {
+      await insertPlayerWatchReason(tx, {
+        playerId: ref.userId,
+        reason: WATCH_REASON_MANUAL,
+        sourceId: MANUAL_SOURCE_ID,
+        at: now,
+      });
+      await upsertPlayerCurrent(tx, {
+        id: ref.userId,
+        username: ref.username,
+        muId: ref.muId,
+        workplaceCompanyId: ref.companyId,
+        payload: null,
+        fetchedAt: now,
+      });
+      await reconcileFollowPlayerMu(tx, { playerId: ref.userId, muId: ref.muId, at: now });
     });
-    await upsertPlayerCurrent(db, {
-      id: ref.userId,
-      username: ref.username,
-      muId: ref.muId,
-      workplaceCompanyId: ref.companyId,
-      payload: null,
-      fetchedAt: now,
-    });
-    await reconcileFollowPlayerMu(db, { playerId: ref.userId, muId: ref.muId, at: now });
 
     const player = await buildPlayerView(db, ref.userId, {
       username: ref.username,
@@ -223,8 +225,10 @@ export function followRoutes(deps: FollowRouteDeps) {
       throw new HttpError(404, "not_found", `Player ${playerId} not followed`);
     }
 
-    await db.delete(playerWatchReasons).where(eq(playerWatchReasons.playerId, playerId));
-    await deleteFollowPlayerReasonsForSource(db, playerId);
+    await db.transaction(async (tx) => {
+      await tx.delete(playerWatchReasons).where(eq(playerWatchReasons.playerId, playerId));
+      await deleteFollowPlayerReasonsForSource(tx, playerId);
+    });
     return c.json({ ok: true });
   });
 
@@ -301,13 +305,15 @@ export function followRoutes(deps: FollowRouteDeps) {
     }
 
     const now = new Date();
-    await insertMuWatchReason(db, {
-      muId: parsed.id,
-      reason: WATCH_REASON_MANUAL,
-      sourceId: MANUAL_SOURCE_ID,
-      at: now,
+    await db.transaction(async (tx) => {
+      await insertMuWatchReason(tx, {
+        muId: parsed.id,
+        reason: WATCH_REASON_MANUAL,
+        sourceId: MANUAL_SOURCE_ID,
+        at: now,
+      });
+      await upsertMuCurrent(tx, parsed, now);
     });
-    await upsertMuCurrent(db, parsed, now);
 
     const mu = await buildMuView(db, parsed.id);
     return c.json({ mu });

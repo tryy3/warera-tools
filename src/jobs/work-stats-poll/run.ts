@@ -43,14 +43,18 @@ export async function runWorkStatsPoll(options: {
   companyDays: number;
   workerDays: number;
   status: "success" | "partial" | "error";
+  errors: string[];
 }> {
   const { db, warera, logger } = options;
   const recordedAt = new Date();
 
-  await syncFollowedPlayers({ db, warera, now: recordedAt });
+  const errors: string[] = [];
+  const syncResult = await syncFollowedPlayers({ db, warera, now: recordedAt });
+  for (const err of syncResult.errors) errors.push(`sync: ${err}`);
   const followedIds = await listDistinctFollowedPlayerIds(db);
 
   if (followedIds.length === 0) {
+    const status = errors.length > 0 ? "partial" : "success";
     logger.info(
       {
         player_count: 0,
@@ -58,8 +62,8 @@ export async function runWorkStatsPoll(options: {
         worker_count: 0,
         company_days: 0,
         worker_days: 0,
-        status: "success",
-        errors: 0,
+        status,
+        errors: errors.length,
       },
       "work stats poll complete (empty watchlist)",
     );
@@ -69,11 +73,11 @@ export async function runWorkStatsPoll(options: {
       workerCount: 0,
       companyDays: 0,
       workerDays: 0,
-      status: "success",
+      status,
+      errors,
     };
   }
 
-  const errors: string[] = [];
   const ownedCompanyIds = new Set<string>();
 
   for (const playerId of followedIds) {
@@ -134,14 +138,20 @@ export async function runWorkStatsPoll(options: {
 
   for (const companyId of companyIds) {
     const days = batch.companies.get(companyId);
-    if (!days) continue;
+    if (!days) {
+      errors.push(`work stats company ${companyId}: no data`);
+      continue;
+    }
     companyDays += await upsertCompanyWorkDays(db, companyId, days, recordedAt);
     successCount += 1;
   }
 
   for (const target of workerTargets) {
     const days = batch.workers.get(`${target.companyId}\t${target.workerId}`);
-    if (!days) continue;
+    if (!days) {
+      errors.push(`work stats worker ${target.companyId}/${target.workerId}: no data`);
+      continue;
+    }
     workerDays += await upsertWorkerWorkDays(db, target, days, recordedAt);
     successCount += 1;
   }
@@ -177,6 +187,7 @@ export async function runWorkStatsPoll(options: {
     companyDays,
     workerDays,
     status,
+    errors,
   };
 }
 

@@ -1,8 +1,8 @@
-import type { Db } from "./client";
+import type { DbOrTx } from "./client";
 import { players } from "./schema";
 
 export async function upsertPlayerCurrent(
-  db: Db,
+  db: DbOrTx,
   row: {
     id: string;
     username: string | null;

@@ -78,9 +78,8 @@ export function parseUserLiteSkills(raw: unknown): UserLiteSkills {
 /**
  * Parse a `user.getUserById` payload into a flat ref.
  *
- * Tolerant: missing fields become null (or "unknown" for userId). Never throws.
- *
- * Field aliases probed:
+ * Throws when no valid id is present — callers must not persist/reconcile a
+ * placeholder `"unknown"` id. Field aliases probed:
  *   - userId: `_id` / `id` / `userId`
  *   - username: `username` / `name`
  *   - companyId: direct `companyId` / `company` string, or nested `company.{_id,id,companyId}`
@@ -88,7 +87,10 @@ export function parseUserLiteSkills(raw: unknown): UserLiteSkills {
  */
 export function parseUserById(raw: unknown): UserByIdRef {
   const obj = asRecord(raw) ?? {};
-  const userId = pickString(obj, ["_id", "id", "userId"]) ?? "unknown";
+  const userId = pickString(obj, ["_id", "id", "userId"]);
+  if (!userId) {
+    throw new Error("user.getUserById response missing id");
+  }
   const username = pickString(obj, ["username", "name"]);
 
   const companyId = pickNestedId(obj, ["companyId", "company"], ["company"]);
@@ -177,7 +179,11 @@ export async function fetchUserLiteBatch(
 
 export async function fetchUserById(warera: WareraRequester, userId: string): Promise<UserByIdRef> {
   const json = await warera.request<unknown>(wareraProcedurePath("user.getUserById", { userId }));
-  return parseUserById(unwrapTrpcData(json));
+  const ref = parseUserById(unwrapTrpcData(json));
+  if (ref.userId !== userId) {
+    throw new Error(`user.getUserById id mismatch: requested ${userId}, got ${ref.userId}`);
+  }
+  return ref;
 }
 
 /**
@@ -211,7 +217,12 @@ export async function fetchUserByIdBatch(
         continue;
       }
       try {
-        out.set(userId, parseUserById(slot.data));
+        const parsed = parseUserById(slot.data);
+        if (parsed.userId !== userId) {
+          out.set(userId, null);
+          continue;
+        }
+        out.set(userId, parsed);
       } catch {
         out.set(userId, null);
       }

@@ -145,13 +145,14 @@ describe("parseUserById", () => {
     });
   });
 
-  it("returns all-null for non-record input", () => {
-    expect(parseUserById(null)).toEqual({
-      userId: "unknown",
-      username: null,
-      companyId: null,
-      muId: null,
-    });
+  it("throws for non-record input (no id)", () => {
+    expect(() => parseUserById(null)).toThrow(/missing id/);
+    expect(() => parseUserById({})).toThrow(/missing id/);
+    expect(() => parseUserById({ username: "Alice" })).toThrow(/missing id/);
+  });
+
+  it("throws when id field is present but empty", () => {
+    expect(() => parseUserById({ _id: "" })).toThrow(/missing id/);
   });
 });
 
@@ -196,6 +197,18 @@ describe("fetchUserLite / fetchUserById", () => {
       companyId: "co-9",
       muId: "mu-3",
     });
+  });
+
+  it("throws when returned id does not match requested id", async () => {
+    const request = vi.fn(async () => ({
+      result: { data: { _id: "someone-else", username: "Alice" } },
+    }));
+    await expect(fetchUserById({ request } as never, "user-1")).rejects.toThrow(/id mismatch/);
+  });
+
+  it("throws when response has no id", async () => {
+    const request = vi.fn(async () => ({ result: { data: { username: "Alice" } } }));
+    await expect(fetchUserById({ request } as never, "user-1")).rejects.toThrow(/missing id/);
   });
 });
 
@@ -293,6 +306,22 @@ describe("fetchUserByIdBatch", () => {
     const map = await fetchUserByIdBatch({ request: vi.fn(), requestBatch } as never, ["a", "b"]);
     expect(map.get("a")).toBeNull();
     expect(map.get("b")).toBeNull();
+  });
+
+  it("marks id null when slot returns a different id than requested", async () => {
+    const requestBatch = vi.fn(async (_items: WareraBatchItem[]) => [
+      { ok: true as const, data: { _id: "someone-else", username: "Alice" } },
+    ]);
+    const map = await fetchUserByIdBatch({ request: vi.fn(), requestBatch } as never, ["u1"]);
+    expect(map.get("u1")).toBeNull();
+  });
+
+  it("marks id null when slot data has no id", async () => {
+    const requestBatch = vi.fn(async (_items: WareraBatchItem[]) => [
+      { ok: true as const, data: { username: "Alice" } },
+    ]);
+    const map = await fetchUserByIdBatch({ request: vi.fn(), requestBatch } as never, ["u1"]);
+    expect(map.get("u1")).toBeNull();
   });
 
   it("returns empty map for empty input without calling requestBatch", async () => {
