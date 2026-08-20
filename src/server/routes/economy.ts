@@ -3,7 +3,7 @@ import type { Db } from "../../db/client";
 import { buildAdvisor } from "../../economy/advisor";
 import type { Logger } from "../../logging/logger";
 import type { WareraRequester } from "../../warera/prices";
-import { searchUsers } from "../../warera/search";
+import { searchMus, searchUsers } from "../../warera/search";
 import { HttpError } from "../errors";
 
 export type EconomyRouteDeps = {
@@ -11,6 +11,14 @@ export type EconomyRouteDeps = {
   warera: WareraRequester;
   logger: Logger;
 };
+
+type SearchType = "user" | "mu";
+
+function parseSearchType(raw: string | undefined): SearchType {
+  if (raw === undefined || raw === "") return "user";
+  if (raw === "user" || raw === "mu") return raw;
+  throw new HttpError(400, "invalid_query", `type must be 'user' or 'mu'`);
+}
 
 export function economyRoutes(deps: EconomyRouteDeps) {
   const { db, warera, logger } = deps;
@@ -21,7 +29,12 @@ export function economyRoutes(deps: EconomyRouteDeps) {
     if (q.length < 2) {
       throw new HttpError(400, "invalid_query", "q must be at least 2 characters");
     }
+    const type = parseSearchType(c.req.query("type"));
     try {
+      if (type === "mu") {
+        const mus = await searchMus(warera, q);
+        return c.json({ mus });
+      }
       const users = await searchUsers(warera, q);
       return c.json({ users });
     } catch (err) {
