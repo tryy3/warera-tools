@@ -15,6 +15,7 @@ import { Route as CalculatorRouteImport } from './routes/calculator'
 import { Route as CompaniesRouteImport } from './routes/companies'
 import { Route as CountriesRouteImport } from './routes/countries'
 import { Route as EquipmentRouteImport } from './routes/equipment'
+import { Route as FollowRouteImport } from './routes/follow'
 import { Route as GrowthRouteImport } from './routes/growth'
 import { Route as JobsRouteImport } from './routes/jobs'
 import { Route as MarketRouteImport } from './routes/market'
@@ -50,6 +51,11 @@ const CountriesRoute = CountriesRouteImport.update({
 const EquipmentRoute = EquipmentRouteImport.update({
   id: '/equipment',
   path: '/equipment',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const FollowRoute = FollowRouteImport.update({
+  id: '/follow',
+  path: '/follow',
   getParentRoute: () => rootRouteImport,
 } as any)
 const GrowthRoute = GrowthRouteImport.update({
@@ -90,6 +96,7 @@ export interface FileRoutesByFullPath {
   '/companies': typeof CompaniesRoute
   '/countries': typeof CountriesRoute
   '/equipment': typeof EquipmentRoute
+  '/follow': typeof FollowRoute
   '/growth': typeof GrowthRoute
   '/jobs': typeof JobsRoute
   '/market': typeof MarketRoute
@@ -104,6 +111,7 @@ export interface FileRoutesByTo {
   '/companies': typeof CompaniesRoute
   '/countries': typeof CountriesRoute
   '/equipment': typeof EquipmentRoute
+  '/follow': typeof FollowRoute
   '/growth': typeof GrowthRoute
   '/jobs': typeof JobsRoute
   '/market': typeof MarketRoute
@@ -119,6 +127,7 @@ export interface FileRoutesById {
   '/companies': typeof CompaniesRoute
   '/countries': typeof CountriesRoute
   '/equipment': typeof EquipmentRoute
+  '/follow': typeof FollowRoute
   '/growth': typeof GrowthRoute
   '/jobs': typeof JobsRoute
   '/market': typeof MarketRoute
@@ -135,6 +144,7 @@ export interface FileRouteTypes {
     | '/companies'
     | '/countries'
     | '/equipment'
+    | '/follow'
     | '/growth'
     | '/jobs'
     | '/market'
@@ -149,6 +159,7 @@ export interface FileRouteTypes {
     | '/companies'
     | '/countries'
     | '/equipment'
+    | '/follow'
     | '/growth'
     | '/jobs'
     | '/market'
@@ -163,6 +174,7 @@ export interface FileRouteTypes {
     | '/companies'
     | '/countries'
     | '/equipment'
+    | '/follow'
     | '/growth'
     | '/jobs'
     | '/market'
@@ -178,6 +190,7 @@ export interface RootRouteChildren {
   CompaniesRoute: typeof CompaniesRoute
   CountriesRoute: typeof CountriesRoute
   EquipmentRoute: typeof EquipmentRoute
+  FollowRoute: typeof FollowRoute
   GrowthRoute: typeof GrowthRoute
   JobsRoute: typeof JobsRoute
   MarketRoute: typeof MarketRoute
@@ -228,6 +241,13 @@ declare module '@tanstack/react-router' {
       path: '/equipment'
       fullPath: '/equipment'
       preLoaderRoute: typeof EquipmentRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/follow': {
+      id: '/follow'
+      path: '/follow'
+      fullPath: '/follow'
+      preLoaderRoute: typeof FollowRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/growth': {
@@ -282,6 +302,7 @@ const rootRouteChildren: RootRouteChildren = {
   CompaniesRoute: CompaniesRoute,
   CountriesRoute: CountriesRoute,
   EquipmentRoute: EquipmentRoute,
+  FollowRoute: FollowRoute,
   GrowthRoute: GrowthRoute,
   JobsRoute: JobsRoute,
   MarketRoute: MarketRoute,
