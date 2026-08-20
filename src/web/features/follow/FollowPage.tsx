@@ -146,9 +146,7 @@ export function FollowPage() {
             mu.muId === muId
               ? {
                   ...mu,
-                  reasons: mu.reasons.filter(
-                    (r) => !(r.reason === "manual" && r.sourceId === "manual"),
-                  ),
+                  reasons: mu.reasons.filter((r) => r.reason !== "manual"),
                 }
               : mu,
           )
@@ -293,7 +291,7 @@ export function FollowPage() {
                   )}
                 </TableCell>
                 <TableCell>
-                  {mu.reasons.some((r) => r.reason === "manual" && r.sourceId === "manual") ? (
+                  {mu.reasons.some((r) => r.reason === "manual") ? (
                     <Button
                       type="button"
                       variant="outline"
