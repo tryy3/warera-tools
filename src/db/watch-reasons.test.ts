@@ -1,0 +1,292 @@
+import { createClient } from "@libsql/client";
+import { drizzle } from "drizzle-orm/libsql";
+import { eq } from "drizzle-orm";
+import { mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { beforeEach, describe, expect, it } from "vite-plus/test";
+import type { Db } from "./client";
+import * as schema from "./schema";
+import { muWatchReasons, playerWatchReasons } from "./schema";
+import {
+  MANUAL_SOURCE_ID,
+  WATCH_REASON_FOLLOW_PLAYER,
+  WATCH_REASON_MANUAL,
+  deleteFollowPlayerReasonsForSource,
+  deleteMuWatchReason,
+  deletePlayerWatchReason,
+  insertMuWatchReason,
+  insertPlayerWatchReason,
+  listDistinctFollowedPlayerIds,
+  listDistinctWatchedMuIds,
+  listMuWatchReasons,
+  reconcileFollowPlayerMu,
+} from "./watch-reasons";
+
+async function createDb(): Promise<Db> {
+  const dir = mkdtempSync(join(tmpdir(), "watch-reasons-"));
+  const client = createClient({ url: `file:${join(dir, "test.db")}` });
+  await client.execute(`
+    CREATE TABLE player_watch_reasons (
+      player_id TEXT NOT NULL,
+      reason TEXT NOT NULL,
+      source_id TEXT NOT NULL,
+      last_touched_at INTEGER NOT NULL,
+      created_at INTEGER NOT NULL,
+      PRIMARY KEY (player_id, reason, source_id)
+    )
+  `);
+  await client.execute(`
+    CREATE TABLE mu_watch_reasons (
+      mu_id TEXT NOT NULL,
+      reason TEXT NOT NULL,
+      source_id TEXT NOT NULL,
+      last_touched_at INTEGER NOT NULL,
+      created_at INTEGER NOT NULL,
+      PRIMARY KEY (mu_id, reason, source_id)
+    )
+  `);
+  return drizzle(client, { schema });
+}
+
+async function countPlayerRows(db: Db): Promise<number> {
+  const rows = await db.select({ id: playerWatchReasons.playerId }).from(playerWatchReasons);
+  return rows.length;
+}
+
+async function countMuRows(db: Db): Promise<number> {
+  const rows = await db.select({ id: muWatchReasons.muId }).from(muWatchReasons);
+  return rows.length;
+}
+
+async function muRowsForMu(db: Db, muId: string) {
+  return db
+    .select({
+      muId: muWatchReasons.muId,
+      reason: muWatchReasons.reason,
+      sourceId: muWatchReasons.sourceId,
+    })
+    .from(muWatchReasons)
+    .where(eq(muWatchReasons.muId, muId))
+    .orderBy(muWatchReasons.sourceId, muWatchReasons.reason);
+}
+
+describe("watch-reasons db", () => {
+  let db: Db;
+  beforeEach(async () => {
+    db = await createDb();
+  });
+
+  it("lists distinct followed player ids sorted by id", async () => {
+    const at = new Date("2026-08-21T00:00:00.000Z");
+    await insertPlayerWatchReason(db, {
+      playerId: "playerB",
+      reason: WATCH_REASON_MANUAL,
+      sourceId: MANUAL_SOURCE_ID,
+      at,
+    });
+    await insertPlayerWatchReason(db, {
+      playerId: "playerA",
+      reason: WATCH_REASON_MANUAL,
+      sourceId: MANUAL_SOURCE_ID,
+      at,
+    });
+    expect(await listDistinctFollowedPlayerIds(db)).toEqual(["playerA", "playerB"]);
+  });
+
+  it("duplicate insert is idempotent", async () => {
+    const at = new Date("2026-08-21T00:00:00.000Z");
+    await insertPlayerWatchReason(db, {
+      playerId: "p1",
+      reason: WATCH_REASON_MANUAL,
+      sourceId: MANUAL_SOURCE_ID,
+      at,
+    });
+    await insertPlayerWatchReason(db, {
+      playerId: "p1",
+      reason: WATCH_REASON_MANUAL,
+      sourceId: MANUAL_SOURCE_ID,
+      at,
+    });
+    expect(await countPlayerRows(db)).toBe(1);
+  });
+
+  it("lists distinct watched MU ids", async () => {
+    const at = new Date("2026-08-21T00:00:00.000Z");
+    await insertMuWatchReason(db, {
+      muId: "mu1",
+      reason: WATCH_REASON_FOLLOW_PLAYER,
+      sourceId: "p1",
+      at,
+    });
+    await insertMuWatchReason(db, {
+      muId: "mu1",
+      reason: WATCH_REASON_FOLLOW_PLAYER,
+      sourceId: "p2",
+      at,
+    });
+    await insertMuWatchReason(db, {
+      muId: "mu2",
+      reason: WATCH_REASON_FOLLOW_PLAYER,
+      sourceId: "p1",
+      at,
+    });
+    expect(await listDistinctWatchedMuIds(db)).toEqual(["mu1", "mu2"]);
+  });
+
+  it("reconcileFollowPlayerMu moves player from MU-1 to MU-2 keeping manual rows", async () => {
+    const at = new Date("2026-08-21T00:00:00.000Z");
+    // Player p1 follows into mu1
+    await insertMuWatchReason(db, {
+      muId: "mu1",
+      reason: WATCH_REASON_FOLLOW_PLAYER,
+      sourceId: "p1",
+      at,
+    });
+    // A manual watch on mu1 from a different source stays
+    await insertMuWatchReason(db, {
+      muId: "mu1",
+      reason: WATCH_REASON_MANUAL,
+      sourceId: MANUAL_SOURCE_ID,
+      at,
+    });
+
+    // Move p1 to mu2
+    await reconcileFollowPlayerMu(db, { playerId: "p1", muId: "mu2", at });
+
+    const mu1Rows = await muRowsForMu(db, "mu1");
+    expect(mu1Rows).toEqual([
+      { muId: "mu1", reason: WATCH_REASON_MANUAL, sourceId: MANUAL_SOURCE_ID },
+    ]);
+    const mu2Rows = await muRowsForMu(db, "mu2");
+    expect(mu2Rows).toEqual([{ muId: "mu2", reason: WATCH_REASON_FOLLOW_PLAYER, sourceId: "p1" }]);
+  });
+
+  it("reconcileFollowPlayerMu with null muId deletes that source's follow rows only", async () => {
+    const at = new Date("2026-08-21T00:00:00.000Z");
+    await insertMuWatchReason(db, {
+      muId: "mu1",
+      reason: WATCH_REASON_FOLLOW_PLAYER,
+      sourceId: "p1",
+      at,
+    });
+    await insertMuWatchReason(db, {
+      muId: "mu1",
+      reason: WATCH_REASON_FOLLOW_PLAYER,
+      sourceId: "p2",
+      at,
+    });
+
+    await reconcileFollowPlayerMu(db, { playerId: "p1", muId: null, at });
+
+    const mu1Rows = await muRowsForMu(db, "mu1");
+    expect(mu1Rows).toEqual([{ muId: "mu1", reason: WATCH_REASON_FOLLOW_PLAYER, sourceId: "p2" }]);
+  });
+
+  it("deletePlayerWatchReason does not touch MU reasons", async () => {
+    const at = new Date("2026-08-21T00:00:00.000Z");
+    await insertPlayerWatchReason(db, {
+      playerId: "p1",
+      reason: WATCH_REASON_MANUAL,
+      sourceId: MANUAL_SOURCE_ID,
+      at,
+    });
+    await insertMuWatchReason(db, {
+      muId: "mu1",
+      reason: WATCH_REASON_MANUAL,
+      sourceId: MANUAL_SOURCE_ID,
+      at,
+    });
+
+    await deletePlayerWatchReason(db, {
+      playerId: "p1",
+      reason: WATCH_REASON_MANUAL,
+      sourceId: MANUAL_SOURCE_ID,
+    });
+
+    expect(await countPlayerRows(db)).toBe(0);
+    expect(await countMuRows(db)).toBe(1);
+  });
+
+  it("deleteMuWatchReason removes only the matching row", async () => {
+    const at = new Date("2026-08-21T00:00:00.000Z");
+    await insertMuWatchReason(db, {
+      muId: "mu1",
+      reason: WATCH_REASON_MANUAL,
+      sourceId: MANUAL_SOURCE_ID,
+      at,
+    });
+    await insertMuWatchReason(db, {
+      muId: "mu1",
+      reason: WATCH_REASON_FOLLOW_PLAYER,
+      sourceId: "p1",
+      at,
+    });
+
+    await deleteMuWatchReason(db, {
+      muId: "mu1",
+      reason: WATCH_REASON_MANUAL,
+      sourceId: MANUAL_SOURCE_ID,
+    });
+
+    const rows = await muRowsForMu(db, "mu1");
+    expect(rows).toEqual([{ muId: "mu1", reason: WATCH_REASON_FOLLOW_PLAYER, sourceId: "p1" }]);
+  });
+
+  it("listMuWatchReasons returns reasons for the MU", async () => {
+    const at = new Date("2026-08-21T00:00:00.000Z");
+    await insertMuWatchReason(db, {
+      muId: "mu1",
+      reason: WATCH_REASON_MANUAL,
+      sourceId: MANUAL_SOURCE_ID,
+      at,
+    });
+    await insertMuWatchReason(db, {
+      muId: "mu1",
+      reason: WATCH_REASON_FOLLOW_PLAYER,
+      sourceId: "p1",
+      at,
+    });
+    await insertMuWatchReason(db, {
+      muId: "mu2",
+      reason: WATCH_REASON_MANUAL,
+      sourceId: MANUAL_SOURCE_ID,
+      at,
+    });
+
+    const reasons = await listMuWatchReasons(db, "mu1");
+    expect(reasons).toHaveLength(2);
+    expect(reasons).toContainEqual({ reason: WATCH_REASON_MANUAL, sourceId: MANUAL_SOURCE_ID });
+    expect(reasons).toContainEqual({ reason: WATCH_REASON_FOLLOW_PLAYER, sourceId: "p1" });
+  });
+
+  it("deleteFollowPlayerReasonsForSource removes all follow_player rows for that source", async () => {
+    const at = new Date("2026-08-21T00:00:00.000Z");
+    await insertMuWatchReason(db, {
+      muId: "mu1",
+      reason: WATCH_REASON_FOLLOW_PLAYER,
+      sourceId: "p1",
+      at,
+    });
+    await insertMuWatchReason(db, {
+      muId: "mu2",
+      reason: WATCH_REASON_FOLLOW_PLAYER,
+      sourceId: "p1",
+      at,
+    });
+    await insertMuWatchReason(db, {
+      muId: "mu1",
+      reason: WATCH_REASON_MANUAL,
+      sourceId: MANUAL_SOURCE_ID,
+      at,
+    });
+
+    await deleteFollowPlayerReasonsForSource(db, "p1");
+
+    expect(await countMuRows(db)).toBe(1);
+    const rows = await muRowsForMu(db, "mu1");
+    expect(rows).toEqual([
+      { muId: "mu1", reason: WATCH_REASON_MANUAL, sourceId: MANUAL_SOURCE_ID },
+    ]);
+  });
+});
