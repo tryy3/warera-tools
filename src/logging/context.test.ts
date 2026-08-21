@@ -18,7 +18,32 @@ vi.mock("./sentry", () => ({
 }));
 
 import { isSentryInitialized } from "./sentry";
-import { registerServerTsLogger, withLogContext } from "./context";
+import { getLogContext, registerServerTsLogger, withLogContext } from "./context";
+
+describe("getLogContext", () => {
+  afterEach(() => {
+    registerServerTsLogger(null);
+  });
+
+  it("getLogContext returns {} outside a context", () => {
+    expect(getLogContext()).toEqual({});
+  });
+
+  it("getLogContext reads tslog context inside withLogContext", async () => {
+    const log = new TsLogger({ type: "hidden", minLevel: "INFO" });
+    registerServerTsLogger(log);
+    await withLogContext(
+      {
+        attributes: { job_id: "j1", job_run_id: 7 },
+        spanName: "j1",
+        spanOp: "job.run",
+      },
+      () => {
+        expect(getLogContext()).toMatchObject({ job_id: "j1", job_run_id: 7 });
+      },
+    );
+  });
+});
 
 describe("withLogContext", () => {
   afterEach(() => {

@@ -15,6 +15,12 @@ export function registerServerTsLogger(log: TsLogger<unknown> | null): void {
   rootTs = log;
 }
 
+export function getLogContext(): LogContextAttributes {
+  if (!rootTs) return {};
+  const ctx = rootTs.getContext() as LogContextAttributes | undefined;
+  return ctx ?? {};
+}
+
 function cleanAttributes(attrs: LogContextAttributes): Record<string, string | number | boolean> {
   const out: Record<string, string | number | boolean> = {};
   for (const [k, v] of Object.entries(attrs)) {
