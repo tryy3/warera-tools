@@ -57,7 +57,35 @@ describe("searchUsers", () => {
 });
 
 describe("searchMus", () => {
-  it("resolves muIds via mu.getById", async () => {
+  it("resolves muIds via batched mu.getById when requestBatch exists", async () => {
+    const request = vi.fn(async (path: string) => {
+      if (path.includes("search.searchAnything")) {
+        return searchAnythingResponse({ muIds: ["m1", "m2"] });
+      }
+      throw new Error(`unexpected call: ${path}`);
+    });
+    const requestBatch = vi.fn().mockResolvedValue([
+      { ok: true, data: { _id: "m1", name: "MU m1" } },
+      { ok: true, data: { _id: "m2", name: "MU m2" } },
+    ]);
+
+    const hits = await searchMus({ request, requestBatch } as never, "ab");
+    expect(hits).toEqual([
+      { muId: "m1", name: "MU m1" },
+      { muId: "m2", name: "MU m2" },
+    ]);
+    expect(requestBatch).toHaveBeenCalledTimes(1);
+    expect(requestBatch.mock.calls[0]![0]).toEqual([
+      { procedure: "mu.getById", input: { muId: "m1" } },
+      { procedure: "mu.getById", input: { muId: "m2" } },
+    ]);
+    expect(request).not.toHaveBeenCalledWith(
+      expect.stringContaining("mu.getById"),
+      expect.anything(),
+    );
+  });
+
+  it("falls back to sequential getById when requestBatch is missing", async () => {
     const request = vi.fn(async (path: string) => {
       if (path.includes("search.searchAnything")) {
         return searchAnythingResponse({ muIds: ["m1", "m2"] });
@@ -96,14 +124,14 @@ describe("searchMus", () => {
       if (path.includes("search.searchAnything")) {
         return searchAnythingResponse({ muIds: ["m1", "m2", "m3"] });
       }
-      if (path.includes("mu.getById")) {
-        const id = stringInput(path, "muId") || "m1";
-        return { result: { data: { _id: id, name: `MU ${id}` } } };
-      }
       throw new Error(`unexpected call: ${path}`);
     });
+    const requestBatch = vi.fn().mockResolvedValue([
+      { ok: true, data: { _id: "m1", name: "MU m1" } },
+      { ok: true, data: { _id: "m2", name: "MU m2" } },
+    ]);
 
-    const hits = await searchMus({ request } as never, "ab", 2);
+    const hits = await searchMus({ request, requestBatch } as never, "ab", 2);
     expect(hits).toHaveLength(2);
     expect(hits.map((h) => h.muId)).toEqual(["m1", "m2"]);
   });
@@ -129,14 +157,14 @@ describe("searchMus", () => {
       if (path.includes("search.searchAnything")) {
         return searchAnythingResponse({ muIds: ["m1", 123, null, "m2"] });
       }
-      if (path.includes("mu.getById")) {
-        const id = stringInput(path, "muId") || "m1";
-        return { result: { data: { _id: id, name: `MU ${id}` } } };
-      }
       throw new Error(`unexpected call: ${path}`);
     });
+    const requestBatch = vi.fn().mockResolvedValue([
+      { ok: true, data: { _id: "m1", name: "MU m1" } },
+      { ok: true, data: { _id: "m2", name: "MU m2" } },
+    ]);
 
-    const hits = await searchMus({ request } as never, "ab");
+    const hits = await searchMus({ request, requestBatch } as never, "ab");
     expect(hits.map((h) => h.muId)).toEqual(["m1", "m2"]);
   });
 });

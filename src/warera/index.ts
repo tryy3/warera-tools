@@ -1,3 +1,4 @@
+export { isWareraNotFoundError, isWareraGetRejectedError } from "./errors";
 export {
   createWareraClient,
   API2_TRPC_BASE,

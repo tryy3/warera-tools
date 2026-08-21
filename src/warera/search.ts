@@ -38,8 +38,8 @@ export async function searchUsers(
 
 /**
  * Resolve MU names for the follow add picker. Search only returns `muIds`,
- * so each id is hydrated via `mu.getById`. Collection uses stored ids; this
- * function must never be called from a job.
+ * so ids are hydrated via `mu.getById` (batched when `requestBatch` exists).
+ * Collection uses stored ids; this function must never be called from a job.
  */
 export async function searchMus(
   warera: WareraRequester,
@@ -53,6 +53,27 @@ export async function searchMus(
   const ids = Array.isArray(data.muIds)
     ? data.muIds.filter((id): id is string => typeof id === "string").slice(0, limit)
     : [];
+
+  if (ids.length === 0) return [];
+
+  if (warera.requestBatch) {
+    const slots = await warera.requestBatch(
+      ids.map((muId) => ({
+        procedure: "mu.getById",
+        input: { muId },
+      })),
+    );
+    return ids.map((muId, i) => {
+      const slot = slots[i];
+      if (!slot?.ok) return { muId, name: muId };
+      const mu = slot.data as { _id?: string; name?: string } | null;
+      if (mu == null || typeof mu !== "object") return { muId, name: muId };
+      return {
+        muId: typeof mu._id === "string" ? mu._id : muId,
+        name: typeof mu.name === "string" ? mu.name : muId,
+      };
+    });
+  }
 
   const hits: SearchMuHit[] = [];
   for (const muId of ids) {

@@ -4,7 +4,10 @@ import { muWatchReasons, playerWatchReasons } from "./schema";
 
 export const WATCH_REASON_MANUAL = "manual";
 export const WATCH_REASON_FOLLOW_PLAYER = "follow_player";
+/** Sentinel for reasons with no source player (PK column is NOT NULL). */
 export const MANUAL_SOURCE_ID = "";
+
+export type WatchReason = typeof WATCH_REASON_MANUAL | typeof WATCH_REASON_FOLLOW_PLAYER;
 
 export async function insertPlayerWatchReason(
   db: DbOrTx,
@@ -95,31 +98,33 @@ export async function listMuWatchReasons(
   return rows.map((r) => ({ reason: r.reason, sourceId: r.sourceId }));
 }
 
+/**
+ * Move this player's `follow_player` MU reason to `muId` (or clear it).
+ * Runs on the caller’s connection/`tx` — do not nest another transaction here.
+ */
 export async function reconcileFollowPlayerMu(
   db: DbOrTx,
   input: { playerId: string; muId: string | null; at: Date },
 ): Promise<void> {
-  await db.transaction(async (tx) => {
-    await tx
-      .delete(muWatchReasons)
-      .where(
-        and(
-          eq(muWatchReasons.reason, WATCH_REASON_FOLLOW_PLAYER),
-          eq(muWatchReasons.sourceId, input.playerId),
-        ),
-      );
-    if (input.muId === null) return;
-    await tx
-      .insert(muWatchReasons)
-      .values({
-        muId: input.muId,
-        reason: WATCH_REASON_FOLLOW_PLAYER,
-        sourceId: input.playerId,
-        lastTouchedAt: input.at,
-        createdAt: input.at,
-      })
-      .onConflictDoNothing();
-  });
+  await db
+    .delete(muWatchReasons)
+    .where(
+      and(
+        eq(muWatchReasons.reason, WATCH_REASON_FOLLOW_PLAYER),
+        eq(muWatchReasons.sourceId, input.playerId),
+      ),
+    );
+  if (input.muId === null) return;
+  await db
+    .insert(muWatchReasons)
+    .values({
+      muId: input.muId,
+      reason: WATCH_REASON_FOLLOW_PLAYER,
+      sourceId: input.playerId,
+      lastTouchedAt: input.at,
+      createdAt: input.at,
+    })
+    .onConflictDoNothing();
 }
 
 export async function deleteFollowPlayerReasonsForSource(

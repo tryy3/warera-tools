@@ -36,6 +36,8 @@ export async function runWorkStatsPoll(options: {
   db: Db;
   warera: WareraRequester;
   logger: Logger;
+  /** Required for api2 X-API-Key; defaults to `process.env.WARERA_API_KEY`. */
+  wareraApiKey?: string | undefined;
 }): Promise<{
   playerCount: number;
   companyCount: number;
@@ -46,6 +48,11 @@ export async function runWorkStatsPoll(options: {
   errors: string[];
 }> {
   const { db, warera, logger } = options;
+  const apiKey = options.wareraApiKey ?? process.env.WARERA_API_KEY;
+  if (apiKey == null || apiKey.trim() === "") {
+    throw new Error("WARERA_API_KEY is required for work-stats-poll (api2 X-API-Key auth)");
+  }
+
   const recordedAt = new Date();
 
   const errors: string[] = [];
@@ -126,10 +133,14 @@ export async function runWorkStatsPoll(options: {
   }
 
   const companyIds = [...ownedCompanyIds];
-  const batch = await fetchWorkStatsBatch(warera, {
-    companyIds,
-    workerTargets,
-  });
+  const batch = await fetchWorkStatsBatch(
+    warera,
+    {
+      companyIds,
+      workerTargets,
+    },
+    { logger },
+  );
 
   let companyDays = 0;
   let workerDays = 0;

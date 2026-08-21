@@ -53,7 +53,7 @@ Gateway does not currently expose that procedure — call api2 directly.
 
 Same pattern for `muMember.getByMu` (MU member stats poll): not on official OpenAPI; force api2 GET via `baseUrl: "https://api2.warera.io/trpc"`.
 
-Same pattern for `work.getStatsByCompany` and `work.getStatsByWorkerAndCompany` (followed-entity work-stats poll): not on official OpenAPI; force **api2 POST** + `X-API-Key` with an indexed JSON body (tRPC HTTP batch). See `src/warera/work-stats.ts`.
+Same pattern for `work.getStatsByCompany` and `work.getStatsByWorkerAndCompany` (followed-entity work-stats poll): not on official OpenAPI; force **api2** + `X-API-Key`. Prefer GET batch; fall back to POST JSON body when GET is rejected. See `src/warera/work-stats.ts`.
 
 Examples:
 
@@ -147,7 +147,7 @@ Official OpenAPI is **incomplete** relative to live api2. Community explorers su
 
 †† Not on official OpenAPI; live api2 read used by MU stats poll — call api2 directly.
 
-§ Not on official OpenAPI; force **api2 POST** + `X-API-Key` for followed-entity work-stats (daily company/worker production). tRPC HTTP batch: path `procA,procB?batch=1`, body `{"0":input0,"1":input1}`.
+§ Not on official OpenAPI; force **api2** + `X-API-Key` for followed-entity work-stats (daily company/worker production). Prefer GET tRPC batch; POST fallback with body `{"0":input0,"1":input1}` when GET is rejected.
 
 ††† On official OpenAPI; force **api2** + `authStyle: "api-key"` for item-market ingest — gateway has had DB failures on this procedure. Requires `WARERA_API_KEY`.
 

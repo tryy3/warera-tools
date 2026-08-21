@@ -111,7 +111,7 @@ describe("fetchWorkStatsBatch", () => {
     ).rejects.toThrow(/requestBatch/);
   });
 
-  it("POSTs work.getStats procedures to api2 with the right items and init", async () => {
+  it("GETs work.getStats procedures to api2 with the right items and init", async () => {
     const requestBatch = vi.fn().mockResolvedValue([
       { ok: true, data: [companyRow] },
       { ok: false, error: { message: "nope" } },
@@ -137,7 +137,7 @@ describe("fetchWorkStatsBatch", () => {
       },
     ]);
     expect(init).toMatchObject({
-      method: "POST",
+      method: "GET",
       authStyle: "api-key",
     });
     expect(typeof init.baseUrl).toBe("string");
@@ -152,14 +152,40 @@ describe("fetchWorkStatsBatch", () => {
     ]);
   });
 
-  it("returns null maps on whole-batch failure", async () => {
+  it("falls back to POST when GET batch is rejected", async () => {
+    const requestBatch = vi
+      .fn()
+      .mockRejectedValueOnce(new Error("WarEra request failed: 404 unknown method"))
+      .mockResolvedValueOnce([{ ok: true, data: [companyRow] }]);
+
+    const logger = { warn: vi.fn() };
+    const { companies } = await fetchWorkStatsBatch(
+      { request: vi.fn(), requestBatch },
+      { companyIds: ["c1"], workerTargets: [] },
+      { logger: logger as never },
+    );
+
+    expect(requestBatch).toHaveBeenCalledTimes(2);
+    expect(requestBatch.mock.calls[0]![1]).toMatchObject({ method: "GET" });
+    expect(requestBatch.mock.calls[1]![1]).toMatchObject({ method: "POST" });
+    expect(logger.warn).toHaveBeenCalled();
+    expect(companies.get("c1")).toEqual([expect.objectContaining({ dailyDate: "2026-08-19" })]);
+  });
+
+  it("returns null maps on whole-batch failure and logs when logger provided", async () => {
     const requestBatch = vi.fn().mockRejectedValue(new Error("network down"));
+    const logger = { warn: vi.fn() };
     const { companies, workers } = await fetchWorkStatsBatch(
       { request: vi.fn(), requestBatch },
       { companyIds: ["c1"], workerTargets: [{ companyId: "c1", workerId: "w1" }] },
+      { logger: logger as never },
     );
     expect(companies.get("c1")).toBeNull();
     expect(workers.get("c1\tw1")).toBeNull();
+    expect(logger.warn).toHaveBeenCalledWith(
+      expect.objectContaining({ err: "network down" }),
+      "work stats batch failed",
+    );
   });
 
   it("returns empty maps for no targets without calling requestBatch", async () => {

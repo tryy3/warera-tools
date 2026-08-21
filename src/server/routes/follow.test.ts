@@ -18,20 +18,10 @@ import {
   insertMuWatchReason,
   insertPlayerWatchReason,
 } from "../../db/watch-reasons";
-import type { Logger } from "../../logging/logger";
+import { unwrapTrpcData, wareraProcedurePath } from "../../warera/trpc";
+import type { WareraBatchItem } from "../../warera/trpc";
 import { errorPayload } from "../errors";
 import { followRoutes } from "./follow";
-
-const silentLogger = {
-  silly: () => {},
-  trace: () => {},
-  debug: () => {},
-  info: () => {},
-  warn: () => {},
-  error: () => {},
-  fatal: () => {},
-  child: () => silentLogger,
-} as unknown as Logger;
 
 async function createDb(): Promise<Db> {
   const dir = mkdtempSync(join(tmpdir(), "follow-route-"));
@@ -88,12 +78,32 @@ async function createDb(): Promise<Db> {
 }
 
 function appFor(db: Db, request: (path: string) => Promise<unknown>) {
+  const requestBatch = async (items: WareraBatchItem[]) => {
+    const out = [];
+    for (const item of items) {
+      try {
+        const path = wareraProcedurePath(
+          item.procedure,
+          (item.input ?? {}) as Record<string, unknown>,
+        );
+        const json = await request(path);
+        out.push({ ok: true as const, data: unwrapTrpcData(json) });
+      } catch (err) {
+        out.push({
+          ok: false as const,
+          error: { message: err instanceof Error ? err.message : String(err) },
+        });
+      }
+    }
+    return out;
+  };
+
   const app = new Hono();
   app.onError((err, c) => {
     const { status, body } = errorPayload(err);
     return c.json(body, status as ContentfulStatusCode);
   });
-  app.route("/", followRoutes({ db, warera: { request } as never, logger: silentLogger }));
+  app.route("/", followRoutes({ db, warera: { request, requestBatch } as never }));
   return app;
 }
 
@@ -353,7 +363,28 @@ describe("followRoutes — players", () => {
       expect(followRows[0].muId).toBe("mu1");
     });
 
-    it("502s when getUserById fails and leaves no reason behind", async () => {
+    it("404s when getUserById is not found and leaves no reason behind", async () => {
+      const request = vi.fn(async (path: string) => {
+        if (path.includes("user.getUserById")) {
+          throw new Error("WarEra request failed: 404 NOT_FOUND");
+        }
+        throw new Error(`unexpected warera call: ${path}`);
+      });
+
+      const res = await appFor(db, request).request("http://localhost/players", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ playerId: "p1" }),
+      });
+      expect(res.status).toBe(404);
+      const body = (await res.json()) as { error: { code: string } };
+      expect(body.error.code).toBe("not_found");
+
+      const rows = await db.select().from(schema.playerWatchReasons);
+      expect(rows).toHaveLength(0);
+    });
+
+    it("502s when getUserById fails for a non-404 reason and leaves no reason behind", async () => {
       const request = vi.fn(async (path: string) => {
         if (path.includes("user.getUserById")) {
           throw new Error("upstream down");
@@ -585,7 +616,7 @@ describe("followRoutes — mus", () => {
       expect(muRows[0].name).toBe("Sweed Liberty");
     });
 
-    it("does not leave a dangling manual reason when getById fails", async () => {
+    it("does not leave a dangling manual reason when getById fails with upstream error", async () => {
       const request = vi.fn(async (path: string) => {
         if (path.includes("mu.getById")) {
           throw new Error("upstream down");
@@ -606,6 +637,88 @@ describe("followRoutes — mus", () => {
       expect(muReasonRows).toHaveLength(0);
       const muRows = await db.select().from(schema.mus);
       expect(muRows).toHaveLength(0);
+    });
+
+    it("404s when getById is not found", async () => {
+      const request = vi.fn(async (path: string) => {
+        if (path.includes("mu.getById")) {
+          throw new Error("WarEra request failed: 404 NOT_FOUND");
+        }
+        throw new Error(`unexpected warera call: ${path}`);
+      });
+
+      const res = await appFor(db, request).request("http://localhost/mus", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ muId: "ghost" }),
+      });
+      expect(res.status).toBe(404);
+      const body = (await res.json()) as { error: { code: string } };
+      expect(body.error.code).toBe("not_found");
+      expect(await db.select().from(schema.muWatchReasons)).toHaveLength(0);
+    });
+
+    it("skips live fetch when mus row is already warm", async () => {
+      const at = new Date("2026-08-21T00:00:00.000Z");
+      await upsertMuCurrent(
+        db,
+        {
+          id: "mu1",
+          name: "Cached MU",
+          avatarUrl: null,
+          countryId: null,
+          regionId: null,
+          ownerUserId: null,
+          mercenaryReputation: null,
+          level: null,
+          createdAtGame: null,
+          memberUserIds: [],
+          roles: null,
+          activeUpgradeLevels: null,
+          payload: null,
+          stats: {
+            weeklyDamages: null,
+            weeklyDamagesRank: null,
+            weeklyDamagesTier: null,
+            bounty: null,
+            bountyRank: null,
+            bountyTier: null,
+            reputation: null,
+            reputationRank: null,
+            reputationTier: null,
+            damages: null,
+            damagesRank: null,
+            damagesTier: null,
+            terrain: null,
+            terrainRank: null,
+            terrainTier: null,
+            wealth: null,
+            wealthRank: null,
+            wealthTier: null,
+            levelingLevel: null,
+            levelingMonthlyDamages: null,
+          },
+        } satisfies ParsedMu,
+        at,
+      );
+
+      const request = vi.fn(async () => {
+        throw new Error("should not call warera when mus is warm");
+      });
+
+      const res = await appFor(db, request).request("http://localhost/mus", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ muId: "mu1" }),
+      });
+      expect(res.status).toBe(200);
+      expect(request).not.toHaveBeenCalled();
+      const body = (await res.json()) as { mu: { muId: string; name: string | null } };
+      expect(body.mu.muId).toBe("mu1");
+      expect(body.mu.name).toBe("Cached MU");
+      const reasons = await db.select().from(schema.muWatchReasons);
+      expect(reasons).toHaveLength(1);
+      expect(reasons[0]?.reason).toBe(WATCH_REASON_MANUAL);
     });
 
     it("is idempotent on duplicate POST", async () => {

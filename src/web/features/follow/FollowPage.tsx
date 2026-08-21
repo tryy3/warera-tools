@@ -19,12 +19,6 @@ import type {
   PlayerView,
 } from "./types";
 
-function reasonLabel(reason: string): string {
-  if (reason === "manual") return "manual";
-  if (reason === "follow_player") return "follow_player";
-  return reason;
-}
-
 export function FollowPage() {
   const [players, setPlayers] = useState<PlayerView[]>([]);
   const [mus, setMus] = useState<MuView[]>([]);
@@ -212,7 +206,7 @@ export function FollowPage() {
                   ) : (
                     <ul className="m-0 flex flex-col gap-0.5 p-0 text-sm">
                       {player.reasons.map((r, i) => (
-                        <li key={`${r.reason}-${r.sourceId}-${i}`}>{reasonLabel(r.reason)}</li>
+                        <li key={`${r.reason}-${r.sourceId}-${i}`}>{r.reason}</li>
                       ))}
                     </ul>
                   )}
@@ -283,7 +277,7 @@ export function FollowPage() {
                               </span>
                             </span>
                           ) : (
-                            reasonLabel(r.reason)
+                            r.reason
                           )}
                         </li>
                       ))}

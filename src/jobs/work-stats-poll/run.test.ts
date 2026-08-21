@@ -231,6 +231,7 @@ describe("runWorkStatsPoll", () => {
       db,
       warera: warera as never,
       logger: logger as never,
+      wareraApiKey: "test-key",
     });
     expect(result.status).toBe("success");
     expect(result.playerCount).toBe(0);
@@ -251,6 +252,7 @@ describe("runWorkStatsPoll", () => {
       db,
       warera: warera as never,
       logger: logger as never,
+      wareraApiKey: "test-key",
     });
 
     expect(result.status).toBe("success");
@@ -310,7 +312,12 @@ describe("runWorkStatsPoll", () => {
       companyWorkDays: [{ dailyDate: "2026-08-20", total: 100 }],
       workerWorkDays: [{ dailyDate: "2026-08-20", total: 50 }],
     });
-    await runWorkStatsPoll({ db, warera: warera1 as never, logger: logger as never });
+    await runWorkStatsPoll({
+      db,
+      warera: warera1 as never,
+      logger: logger as never,
+      wareraApiKey: "test-key",
+    });
 
     const warera2 = makeWarera({
       companyWorkDays: [{ dailyDate: "2026-08-20", total: 999 }],
@@ -320,6 +327,7 @@ describe("runWorkStatsPoll", () => {
       db,
       warera: warera2 as never,
       logger: logger as never,
+      wareraApiKey: "test-key",
     });
 
     expect(result.status).toBe("success");
@@ -350,6 +358,7 @@ describe("runWorkStatsPoll", () => {
       db,
       warera: warera as never,
       logger: logger as never,
+      wareraApiKey: "test-key",
     });
 
     expect(result.status).toBe("partial");
@@ -366,6 +375,7 @@ describe("runWorkStatsPoll", () => {
       db,
       warera: warera as never,
       logger: logger as never,
+      wareraApiKey: "test-key",
     });
 
     expect(result.status).toBe("error");
@@ -387,6 +397,7 @@ describe("runWorkStatsPoll", () => {
       db,
       warera: warera as never,
       logger: logger as never,
+      wareraApiKey: "test-key",
     });
 
     expect(result.status).toBe("error");
@@ -406,6 +417,7 @@ describe("runWorkStatsPoll", () => {
       db,
       warera: warera as never,
       logger: logger as never,
+      wareraApiKey: "test-key",
     });
 
     expect(result.status).toBe("partial");
@@ -413,18 +425,37 @@ describe("runWorkStatsPoll", () => {
     expect(result.companyDays).toBe(1);
   });
 
-  it("job definition throws when runWorkStatsPoll returns status error", async () => {
+  it("throws when WARERA_API_KEY is missing", async () => {
+    const warera = makeWarera();
+    const logger = makeLogger();
+    await expect(
+      runWorkStatsPoll({
+        db,
+        warera: warera as never,
+        logger: logger as never,
+        wareraApiKey: "",
+      }),
+    ).rejects.toThrow(/WARERA_API_KEY is required/);
+  });
+
+  it("job definition returns status string like MU poll (does not throw on error)", async () => {
     await seedFollowedPlayer(db, "u1");
     const warera = makeWarera({ failWorkStatsBatch: true });
     const logger = makeLogger();
-    await expect(
-      workStatsPollJob.run({
+    const prev = process.env.WARERA_API_KEY;
+    process.env.WARERA_API_KEY = "test-key";
+    try {
+      const message = await workStatsPollJob.run({
         db,
         logger: logger as never,
         warera: warera as never,
         state: null,
         setState: vi.fn(async () => {}),
-      }),
-    ).rejects.toThrow(/work stats poll failed: status=error/);
+      });
+      expect(message).toMatch(/\(error\)$/);
+    } finally {
+      if (prev === undefined) delete process.env.WARERA_API_KEY;
+      else process.env.WARERA_API_KEY = prev;
+    }
   });
 });

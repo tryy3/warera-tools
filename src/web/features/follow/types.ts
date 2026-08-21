@@ -1,5 +1,6 @@
 export type WatchReason = "manual" | "follow_player";
 
+// Keep in sync with `WATCH_REASON_*` in `src/db/watch-reasons.ts`.
 export type PlayerReason = {
   reason: WatchReason;
   sourceId: string;
