@@ -1,6 +1,6 @@
 # WarEra access & caching vision
 
-**Date:** 2026-08-06  
+**Date:** 2026-08-06 (observability / metrics direction expanded 2026-08-22)  
 **Status:** Directional architecture (not an implementation plan)  
 **Based on:** [inventory.md](./inventory.md)  
 **Tier rules:** [Data tier caching strategy](../superpowers/specs/2026-08-02-data-tier-caching-strategy-design.md)
@@ -10,7 +10,7 @@
 1. **Move off the community gateway** as the default path — talk to **api2** only for normal operation, without stampeding rate limits.
 2. **Understand and tune freshness** — inventory current cadence vs needed freshness; raise TTLs / slow jobs where safe.
 3. **Standardize caching** across server and browser (including localStorage where it helps UX) so tools don’t invent one-off stores.
-4. Keep **domain math** and **observability** coherent enough that we don’t fork formulas or fly blind on api2 pressure.
+4. Keep **domain math** and **observability** coherent enough that we don’t fork formulas or fly blind on api2 pressure (errors via Logs/Issues; usage via a decoupled metrics module → Sentry Metrics first).
 5. **Prefer the stack we already have** — deepen existing libraries before inventing parallel mechanisms or adding new deps (see below).
 
 This doc is architectural direction. Exact cron strings, class names, and rollout PRs belong in later implementation plans.
@@ -35,6 +35,7 @@ When implementing pieces of this vision (caching, prefetch, queues, DB helpers, 
 | **Other TanStack** (Router, Charts, Table, …) | Features we already depend on but underuse; sibling libs only when a real gap appears |
 | **Hono** | Middleware, context helpers, caching/validation patterns, or other server primitives that fit the access facade / API layer |
 | **Turso / libSQL / Drizzle** | Extra or experimental features (replication, embedded replicas, batch SQL, etc.) when they improve L1/L2 without a new store |
+| **Sentry** (already in use) | Issues + Logs + spans for failures/correlation; **Metrics** (`Sentry.metrics.*`) as first metrics backend behind our `src/metrics/` facade — not call-site imports of the SDK for counters |
 
 The access facade itself is intentionally **custom** (WarEra egress policy). Client cache UX and generic server plumbing should still ask: “Does Query / Hono / Turso already solve most of this?”
 
@@ -138,25 +139,72 @@ Standardize *where* data lives. Layers complement the facade; they do not replac
 
 ## Observability (directional)
 
-Leaving the gateway means **we** must see volume, pressure, and failures.
+Leaving the gateway means **we** must see volume, pressure, and failures — and, over time, whether new jobs/tools quietly raise api2 load.
 
-- Facade logs structured fields: `warera_procedure`, `call_class`, `outcome` (`ok` | `error` | `dedup_join` | `batched` | `rate_limited_wait`), latency, header-derived budget when present.
-- Correlate with existing `request_id` / `job_id` / `job_run_id`.
-- Sentry: Issues for errors; Logs (+ later simple counters) for requests/min, wait time, 429s, dedup hits.
-- Success bar: we can answer “how hard are we hitting api2?” without guessing.
+### Split: errors vs usage
 
-**Non-goal:** Full custom metrics product / dashboard app in this vision.
+| Concern | Tooling |
+| --- | --- |
+| Something broke / why this run failed | Issues + structured Logs + existing spans (`request_id` / `job_id` / `job_run_id`) |
+| How often / how fast / batch effectiveness / cache hit rate | **Metrics** (aggregates) — not reconstructed from log search |
+
+Short term: metrics are a **tuning aid** (understand hit rate, prove batching/TTL changes). Long term: the same signals stay for **ongoing observability** as we add functionality.
+
+### Decoupled metrics module
+
+Prefer a thin internal API over call sites talking to Sentry (or any vendor) directly — so a later Prometheus/Grafana (or other) backend is a backend swap, not a refactor across the app.
+
+| Piece | Direction |
+| --- | --- |
+| Location | `src/metrics/` (sibling to `src/logging/` — logs stay logs) |
+| Call-site API | `count` / `distribution` / optional `gauge` + low-cardinality attributes |
+| Backends | `Noop` (no DSN / tests); **`SentryMetricsBackend`** first (`Sentry.metrics.*`, SDK already ≥ 10.25); later optional Prometheus (or similar) behind the **same** interface |
+| Wiring | Set active backend once at process boot next to `initSentry` |
+| Failure mode | Fail-open — metrics must not break WarEra or cache paths |
+
+**Conventions:** dotted stable names (`warera.upstream.call`, `cache.l1.lookup`); attributes only for bounded enums (`procedure`, `call_class`, `outcome`, `cache_kind`, `result`) — never user/player ids, request ids, or free-form URLs.
+
+### What to instrument (v1 scope)
+
+**WarEra facade (primary):** upstream pressure and efficiency.
+
+| Signal | Shape (illustrative) | Why |
+| --- | --- | --- |
+| Upstream call | `count` + attrs: procedure, call_class, outcome | Volume by endpoint / class |
+| Latency | `distribution` (ms) | p50/p95 response time |
+| Batch size | `distribution` (count) | Are we coalescing or flushing singles? |
+| Dedup join | `count` | In-flight reuse working? |
+| Rate-limit wait / 429 path | `count` (+ wait time distribution if useful) | Budget pressure |
+
+**L1 server cache (secondary):** are we saving trips?
+
+| Signal | Shape (illustrative) | Why |
+| --- | --- | --- |
+| Lookup | `count` + attrs: cache_kind, result (`hit` \| `miss` \| `stale` \| `bypass`) | Hit rate by resource family |
+
+Facade structured **logs** remain: procedure, call_class, outcome, latency, header-derived budget when present — correlated with existing ids. Metrics answer aggregates; logs/spans answer “this run.”
+
+### Operator surface
+
+- **Sentry Metrics + a few saved dashboards/queries** as the day-to-day view (Issues/Logs already in use).
+- No in-app metrics UI and no requirement to run Prometheus/Grafana now — keep trying that stack later via a new backend if/when it earns its keep.
+
+Success bar: we can answer “how hard are we hitting api2?” and “are caches / batching helping?” without guessing.
+
+**Non-goals:** full custom metrics product; OpenTelemetry Metrics SDK as the first abstraction (revisit only if a second backend truly needs it); high-cardinality tagging; instrumenting every SQL table or browser L3/L4 in v1.
 
 ## Suggested sequencing
 
 1. Keep **inventory** accurate (ongoing).
-2. **Facade skeleton** — single egress, call classes, header-aware governor, structured logs (gateway may still be allowed during transition).
-3. **Batching + in-flight dedup**.
-4. **api2-only cutover** — remove gateway default; keep allowlist discipline from the warera-api skill.
-5. **Cadence pass** — target freshness vs metrics → relax safe jobs/TTLs.
-6. **Cache matrix** — shared TQ keys; explore Query prefetch/persistence before bespoke LS; versioned LS only where Query doesn’t fit.
-7. Deepen **domain map** and **metric counters** as needed.
-8. Ongoing: when designing each slice, **check existing stack docs** (Query, Hono, Turso, …) for features we aren’t using yet.
+2. **Metrics module skeleton** — `src/metrics/` API + Noop + Sentry backend (can land before or with the facade; call sites stay thin).
+3. **Facade skeleton** — single egress, call classes, header-aware governor, structured logs + facade metrics (gateway may still be allowed during transition).
+4. **Batching + in-flight dedup** — emit batch-size / dedup metrics as those land.
+5. **L1 cache metrics** — hit/miss (etc.) at shared server-cache helpers as cadence work needs them.
+6. **api2-only cutover** — remove gateway default; keep allowlist discipline from the warera-api skill.
+7. **Cadence pass** — target freshness vs metrics → relax safe jobs/TTLs.
+8. **Cache matrix** — shared TQ keys; explore Query prefetch/persistence before bespoke LS; versioned LS only where Query doesn’t fit.
+9. Deepen **domain map**; expand metrics only when a new pressure question appears.
+10. Ongoing: when designing each slice, **check existing stack docs** (Query, Hono, Turso, …) for features we aren’t using yet.
 
 ## Non-goals
 
@@ -171,5 +219,5 @@ Leaving the gateway means **we** must see volume, pressure, and failures.
 
 - All WarEra HTTP goes through one in-process facade
 - Default upstream is api2; gateway is not required for normal operation
-- We can observe and stay under rate limits without community-gateway caching
+- We can observe and stay under rate limits without community-gateway caching — via facade + L1 metrics in Sentry (swap-ready backends), not log archaeology alone
 - Inventory + cache matrix make “where does this live / how fresh?” answerable the same way across tools

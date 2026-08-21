@@ -7,7 +7,7 @@ Living documentation for how this app talks to WarEra, classifies data, and (ove
 | Doc | Purpose |
 | --- | --- |
 | [inventory.md](./inventory.md) | **As-is** catalog: tiers, who refreshes, cadence, upstream, storage style, consumers |
-| [vision.md](./vision.md) | **Architectural direction**: access facade, cadence policy, cache matrix, domain lib, observability |
+| [vision.md](./vision.md) | **Architectural direction**: access facade, cadence policy, cache matrix, domain lib, observability (logs + decoupled metrics → Sentry first) |
 
 Split further under this folder when a chapter outgrows a single file (e.g. `caching.md`, `cadence.md`).
 

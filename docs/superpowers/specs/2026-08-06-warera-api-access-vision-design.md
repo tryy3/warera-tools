@@ -11,8 +11,8 @@ Track the approved architectural direction to:
 1. Replace dependence on the community WarEraStats **gateway** with an **in-process access facade** talking to **api2**, with batching, dedup, and rate-limit governance tuned to our workloads.
 2. Maintain a living **inventory** of WarEra-related data (tiers, cadence, storage, consumers) at a maintainable level of detail.
 3. Standardize **caching layers** (DB / optional process memory / TanStack Query / localStorage) and tune **fetch cadence** using inventory + metrics.
-4. Keep light directional guidance for a **domain library** map and **observability** (structured logs / Sentry).
-5. Prefer **deepening the existing stack** (TanStack Query/Router/etc., Hono, Turso/Drizzle) over new libraries or parallel home-grown systems; build custom when the behavior is simple or WarEra-specific.
+4. Keep light directional guidance for a **domain library** map and **observability**: structured logs / Issues / spans for failures; a **decoupled in-process metrics module** (Sentry Metrics backend first; Prometheus-class backend later without call-site churn) for WarEra egress + L1 cache usage.
+5. Prefer **deepening the existing stack** (TanStack Query/Router/etc., Hono, Turso/Drizzle, Sentry) over new libraries or parallel home-grown systems; build custom when the behavior is simple or WarEra-specific.
 
 ## Source of truth
 
