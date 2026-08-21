@@ -22,6 +22,7 @@ Track the approved architectural direction to:
 | Architecture vision | [docs/warera-api/vision.md](../../warera-api/vision.md) |
 | Tier rules (unchanged by this approval) | [2026-08-02-data-tier-caching-strategy-design.md](./2026-08-02-data-tier-caching-strategy-design.md) |
 | Allowlist / auth | `.agents/skills/warera-api/` |
+| Implementation spec (facade v1) | [2026-08-22-warera-access-facade-design.md](./2026-08-22-warera-access-facade-design.md) |
 
 Prefer editing the living docs under `docs/warera-api/` for substance. Update this tracking spec only when intent or status changes.
 
@@ -31,4 +32,4 @@ Implementation plans, code, cron value changes, and localStorage key schemas —
 
 ## Next step
 
-After living docs are reviewed: optional implementation plan via writing-plans (facade skeleton first per vision sequencing).
+Implementation plan for the approved facade spec via writing-plans. Cadence / browser cache matrix remain later vision chapters.

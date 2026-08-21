@@ -18,6 +18,7 @@ Split further under this folder when a chapter outgrows a single file (e.g. `cac
 | [AGENTS.md](../../AGENTS.md) | Short tier summary + project architecture |
 | [Data tier caching strategy](../superpowers/specs/2026-08-02-data-tier-caching-strategy-design.md) | Approved Global / Geo / User rules |
 | [Tracking spec](../superpowers/specs/2026-08-06-warera-api-access-vision-design.md) | Approved intent for this workstream |
+| [Access facade design](../superpowers/specs/2026-08-22-warera-access-facade-design.md) | Approved v1 implementation spec (api2-only facade, governor, batch/dedup, metrics) |
 | [`.agents/skills/warera-api/`](../../.agents/skills/warera-api/SKILL.md) | Allowlist, auth, gateway/api2 call preferences |
 | [`.agents/skills/warera-game-mechanics/`](../../.agents/skills/warera-game-mechanics/SKILL.md) | Economy formulas (not HTTP) |
 
