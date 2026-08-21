@@ -155,6 +155,38 @@ describe("createGovernor", () => {
     expect(second.waitMs).toBeGreaterThan(0);
   });
 
+  it("joins a 429 pause established during a local budget wait", async () => {
+    const sleeps: Array<{ ms: number; resolve: () => void }> = [];
+    const sleep = vi.fn(
+      (ms: number) =>
+        new Promise<void>((resolve) => {
+          sleeps.push({ ms, resolve });
+        }),
+    );
+    let t = 0;
+    const g = createGovernor({
+      maxPerMinute: 1,
+      now: () => t,
+      sleep,
+      jitter: () => 0,
+    });
+    await g.acquire();
+
+    const acquire = g.acquire();
+    await vi.waitFor(() => expect(sleep).toHaveBeenCalledTimes(1));
+    expect(sleeps[0]?.ms).toBe(60_001);
+
+    g.note429(new Headers({ "Retry-After": "120" }));
+    t = 60_001;
+    sleeps[0]?.resolve();
+    await vi.waitFor(() => expect(sleep).toHaveBeenCalledTimes(2));
+    expect(sleeps[1]?.ms).toBe(59_999);
+
+    t = 120_000;
+    sleeps[1]?.resolve();
+    await expect(acquire).resolves.toEqual({ reason: "http_429", waitMs: 120_000 });
+  });
+
   it("skipLocal does not consume the sliding window", async () => {
     const sleep = vi.fn(async (ms: number) => {
       t += ms;

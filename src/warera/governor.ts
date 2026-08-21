@@ -121,7 +121,7 @@ export function createGovernor(options: GovernorOptions) {
   async function acquire(
     opts: { skipLocal?: boolean } = {},
   ): Promise<{ waitMs: number; reason: RateLimitWaitReason | null }> {
-    const headerWait = await getHeaderPause();
+    const initialHeaderWait = await getHeaderPause();
     let acquiredLocalWaitMs = 0;
     const run = acquireChain.then(async () => {
       localWaitMs = 0;
@@ -130,10 +130,17 @@ export function createGovernor(options: GovernorOptions) {
     });
     acquireChain = run.catch(() => {});
     await run;
+    const postLocalHeaderWait = await getHeaderPause();
 
     return {
-      waitMs: (headerWait?.waitMs ?? 0) + acquiredLocalWaitMs,
-      reason: headerWait?.reason ?? (acquiredLocalWaitMs > 0 ? "local_budget" : null),
+      waitMs:
+        (initialHeaderWait?.waitMs ?? 0) +
+        acquiredLocalWaitMs +
+        (postLocalHeaderWait?.waitMs ?? 0),
+      reason:
+        postLocalHeaderWait?.reason ??
+        initialHeaderWait?.reason ??
+        (acquiredLocalWaitMs > 0 ? "local_budget" : null),
     };
   }
 
