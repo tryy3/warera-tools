@@ -51,7 +51,11 @@ export function createGovernor(options: GovernorOptions) {
   let remaining: number | null = null;
   let resetAt: number | null = null;
   let last429 = false;
-  let pausePromise: Promise<void> | null = null;
+  type HeaderPauseResult = {
+    waitMs: number;
+    reason: Exclude<RateLimitWaitReason, "local_budget">;
+  };
+  let pausePromise: Promise<HeaderPauseResult> | null = null;
   let acquireChain: Promise<void> = Promise.resolve();
 
   function recordHeaders(headers: Headers): void {
@@ -73,49 +77,64 @@ export function createGovernor(options: GovernorOptions) {
     }
   }
 
-  async function acquireUnserialized(
-    opts: { skipLocal?: boolean } = {},
-  ): Promise<{ waitMs: number; reason: RateLimitWaitReason | null }> {
-    let headerWaitMs = 0;
-    let headerReason: RateLimitWaitReason | null = null;
+  function getHeaderPause() {
+    if (pausePromise !== null) return pausePromise;
+    if (remaining === null || remaining > 0 || resetAt === null) return null;
 
-    if (remaining !== null && remaining <= 0 && resetAt !== null) {
-      headerReason = last429 ? "http_429" : "header_exhausted";
-      headerWaitMs = Math.max(0, resetAt + jitter() - now());
+    const reason: HeaderPauseResult["reason"] = last429 ? "http_429" : "header_exhausted";
+    const run = (async () => {
+      let waitMs = 0;
+      let observedResetAt: number | null = null;
+      let deadline = 0;
 
-      if (pausePromise === null) {
-        pausePromise = (async () => {
-          if (headerWaitMs > 0) await sleep(headerWaitMs);
-          if (remaining !== null && remaining <= 0) {
-            remaining = null;
-            resetAt = null;
-            last429 = false;
-          }
-        })().finally(() => {
-          pausePromise = null;
-        });
+      for (;;) {
+        if (remaining === null || remaining > 0 || resetAt === null) {
+          last429 = false;
+          return { waitMs, reason };
+        }
+        if (resetAt !== observedResetAt) {
+          observedResetAt = resetAt;
+          deadline = resetAt + jitter();
+        }
+
+        const nextWaitMs = Math.max(0, deadline - now());
+        if (nextWaitMs > 0) {
+          waitMs += nextWaitMs;
+          await sleep(nextWaitMs);
+          continue;
+        }
+
+        remaining = null;
+        resetAt = null;
+        last429 = false;
+        return { waitMs, reason };
       }
-      await pausePromise;
-    }
-
-    localWaitMs = 0;
-    if (!opts.skipLocal) await rateLimiter.acquire();
-
-    return {
-      waitMs: headerWaitMs + localWaitMs,
-      reason: headerReason ?? (localWaitMs > 0 ? "local_budget" : null),
-    };
+    })();
+    let sharedPause!: Promise<HeaderPauseResult>;
+    sharedPause = run.finally(() => {
+      if (pausePromise === sharedPause) pausePromise = null;
+    });
+    pausePromise = sharedPause;
+    return sharedPause;
   }
 
-  function acquire(
+  async function acquire(
     opts: { skipLocal?: boolean } = {},
   ): Promise<{ waitMs: number; reason: RateLimitWaitReason | null }> {
-    let result!: { waitMs: number; reason: RateLimitWaitReason | null };
+    const headerWait = await getHeaderPause();
+    let acquiredLocalWaitMs = 0;
     const run = acquireChain.then(async () => {
-      result = await acquireUnserialized(opts);
+      localWaitMs = 0;
+      if (!opts.skipLocal) await rateLimiter.acquire();
+      acquiredLocalWaitMs = localWaitMs;
     });
     acquireChain = run.catch(() => {});
-    return run.then(() => result);
+    await run;
+
+    return {
+      waitMs: (headerWait?.waitMs ?? 0) + acquiredLocalWaitMs,
+      reason: headerWait?.reason ?? (acquiredLocalWaitMs > 0 ? "local_budget" : null),
+    };
   }
 
   return { acquire, recordHeaders, note429 };

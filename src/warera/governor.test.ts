@@ -73,10 +73,14 @@ describe("createGovernor", () => {
     expect(a.waitMs).toBe(3000);
   });
 
-  it("only one sleep when two acquires hit remaining 0 together", async () => {
-    const sleep = vi.fn(async (ms: number) => {
-      t += ms;
-    });
+  it("keeps waiting when note429 extends an active header pause", async () => {
+    const sleeps: Array<{ ms: number; resolve: () => void }> = [];
+    const sleep = vi.fn(
+      (ms: number) =>
+        new Promise<void>((resolve) => {
+          sleeps.push({ ms, resolve });
+        }),
+    );
     let t = 0;
     const g = createGovernor({
       maxPerMinute: 1000,
@@ -85,9 +89,53 @@ describe("createGovernor", () => {
       jitter: () => 0,
     });
     g.recordHeaders(new Headers({ "ratelimit-remaining": "0", "ratelimit-reset": "1" }));
-    await Promise.all([g.acquire(), g.acquire()]);
+
+    const acquire = g.acquire();
+    await vi.waitFor(() => expect(sleep).toHaveBeenCalledTimes(1));
+    expect(sleeps[0]?.ms).toBe(1000);
+
+    t = 1000;
+    g.note429(new Headers({ "Retry-After": "3" }));
+    sleeps[0]?.resolve();
+    await vi.waitFor(() => expect(sleep).toHaveBeenCalledTimes(2));
+    expect(sleeps[1]?.ms).toBe(3000);
+
+    t = 4000;
+    sleeps[1]?.resolve();
+    const result = await acquire;
+    expect(result.reason).toBe("header_exhausted");
+    expect(result.waitMs).toBe(4000);
+  });
+
+  it("shares one reported header wait between concurrent acquires", async () => {
+    let resolveSleep!: () => void;
+    const sleep = vi.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveSleep = resolve;
+        }),
+    );
+    let t = 0;
+    const g = createGovernor({
+      maxPerMinute: 1000,
+      now: () => t,
+      sleep,
+      jitter: () => 0,
+    });
+    g.recordHeaders(new Headers({ "ratelimit-remaining": "0", "ratelimit-reset": "1" }));
+
+    const acquires = Promise.all([g.acquire(), g.acquire()]);
+    await vi.waitFor(() => expect(sleep).toHaveBeenCalledTimes(1));
+    t = 1000;
+    resolveSleep();
+    const results = await acquires;
+
     expect(sleep).toHaveBeenCalledTimes(1);
     expect(sleep).toHaveBeenCalledWith(1000);
+    expect(results).toEqual([
+      { reason: "header_exhausted", waitMs: 1000 },
+      { reason: "header_exhausted", waitMs: 1000 },
+    ]);
   });
 
   it("local budget still waits when maxPerMinute is 1", async () => {
