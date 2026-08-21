@@ -49,11 +49,11 @@ CREATE TABLE `worker_work_stats` (
 	`fetched_at` integer NOT NULL,
 	PRIMARY KEY(`company_id`, `worker_id`, `daily_date`)
 );
-
+--> statement-breakpoint
 INSERT INTO mu_watch_reasons (mu_id, reason, source_id, last_touched_at, created_at)
 SELECT id, 'manual', '', CAST(strftime('%s','now') AS INTEGER) * 1000, CAST(strftime('%s','now') AS INTEGER) * 1000
 FROM mus;
-
+--> statement-breakpoint
 INSERT INTO mu_watch_reasons (mu_id, reason, source_id, last_touched_at, created_at)
 SELECT '69e5dc36f7b095e977052f7b', 'manual', '', CAST(strftime('%s','now') AS INTEGER) * 1000, CAST(strftime('%s','now') AS INTEGER) * 1000
 WHERE NOT EXISTS (SELECT 1 FROM mu_watch_reasons LIMIT 1);
