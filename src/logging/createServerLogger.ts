@@ -3,6 +3,8 @@ import { fileTransport } from "tslog/transports/file";
 import type { AppConfig } from "../config/env";
 import { registerServerTsLogger } from "./context";
 import { MASK_KEYS, resolveMaskEnabled } from "./mask";
+import { setMetricsBackend } from "../metrics";
+import { createSentryMetricsBackend } from "../metrics/sentry";
 import { attachSentryTransports, initSentry } from "./sentry";
 import type { LogFn, Logger } from "./types";
 
@@ -56,6 +58,7 @@ export function createServerLogger(config: AppConfig): Logger {
 
   if (config.sentryDsn) {
     if (initSentry(config)) {
+      setMetricsBackend(createSentryMetricsBackend());
       attachSentryTransports(log, config);
       // Visible confirmation that DSN was loaded (also becomes a Sentry Log).
       log.info(
