@@ -74,6 +74,19 @@ describe("createWareraClient", () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
+  it("does not retry an HTTP 200 response with invalid JSON", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response("not json", { status: 200 }));
+    const client = createWareraClient({
+      config: baseConfig,
+      logger: testLogger(),
+      fetchImpl: fetchMock,
+      sleep: async () => {},
+    });
+
+    await expect(client.request("/v1/ping")).rejects.toThrow();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
   it("stops after 3 retries on repeated 503", async () => {
     const fetchMock = vi.fn().mockImplementation(() => new Response("down", { status: 503 }));
     const client = createWareraClient({
@@ -153,7 +166,7 @@ describe("createWareraClient", () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
-  it("skips rate limit when skipRateLimit is set", async () => {
+  it("skips local budget waits when skipRateLimit is set and headers are healthy", async () => {
     let t = 0;
     const sleep = vi.fn(async (ms: number) => {
       t += ms;
@@ -190,9 +203,29 @@ describe("createWareraClient", () => {
 
     await client.request("/v1/ping");
     expect(logger.debug).toHaveBeenCalledWith(
-      expect.objectContaining({ path: "/v1/ping", status: 200, durationMs: expect.any(Number) }),
+      expect.objectContaining({
+        path: "/v1/ping",
+        status: 200,
+        durationMs: expect.any(Number),
+        outcome: "ok",
+      }),
       expect.any(String),
     );
+  });
+
+  it("does not retry POST when another query value contains batch=1", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response("nope", { status: 503 }));
+    const client = createWareraClient({
+      config: baseConfig,
+      logger: testLogger(),
+      fetchImpl: fetchMock,
+      sleep: async () => {},
+    });
+
+    await expect(client.request("procedure?input=batch=1", { method: "POST" })).rejects.toThrow(
+      /503/,
+    );
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
   it("does not fall back to a second host on unknown method", async () => {
@@ -274,10 +307,7 @@ describe("createWareraClient", () => {
       fetchImpl: fetchMock,
       sleep: async () => {},
     });
-    const items = Array.from({ length: 51 }, (_, i) => ({
-      procedure: "user.getUserLite",
-      input: { userId: `u${i}` },
-    }));
+    const items = Array.from({ length: 51 }, () => ({ procedure: "a" }));
     const results = await client.requestBatch(items);
     expect(results).toHaveLength(51);
     expect(fetchMock).toHaveBeenCalledTimes(2);
@@ -285,7 +315,7 @@ describe("createWareraClient", () => {
     expect(firstUrl.split("?")[0].split("/").pop()!.split(",")).toHaveLength(50);
   });
 
-  it("retries GET after 429 once the governor waits", async () => {
+  it("skipRateLimit still waits after 429 and logs rate_limited", async () => {
     const fetchMock = vi
       .fn()
       .mockResolvedValueOnce(
@@ -296,16 +326,27 @@ describe("createWareraClient", () => {
       )
       .mockResolvedValueOnce(new Response(JSON.stringify({ ok: true }), { status: 200 }));
     const sleep = vi.fn(async () => {});
+    const logger = testLogger() as { debug: ReturnType<typeof vi.fn> };
     const client = createWareraClient({
       config: { ...baseConfig, wareraMaxRequestsPerMinute: 10_000 },
-      logger: testLogger(),
+      logger: logger as never,
       fetchImpl: fetchMock,
       sleep,
       now: () => 0,
     });
-    await expect(client.request("/v1/ping")).resolves.toEqual({ ok: true });
+    await expect(client.request("/v1/ping", { skipRateLimit: true })).resolves.toEqual({
+      ok: true,
+    });
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(sleep).toHaveBeenCalled();
+    expect(logger.debug).toHaveBeenCalledWith(
+      expect.objectContaining({
+        path: "/v1/ping",
+        status: 429,
+        outcome: "rate_limited",
+      }),
+      expect.any(String),
+    );
   });
 
   it("POSTs JSON with X-API-Key when authStyle is api-key", async () => {

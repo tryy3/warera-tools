@@ -17,7 +17,7 @@ const RETRYABLE_STATUSES = new Set([500, 502, 503, 504]);
 const MAX_RETRIES = 3;
 const BODY_SNIPPET_LEN = 200;
 /** Soft cap for tRPC batch GET URLs (split into multiple HTTP calls beyond this). */
-export const WARERA_MAX_BATCH_URL_LENGTH = 4096;
+export const WARERA_MAX_BATCH_URL_LENGTH = 2000;
 export const API2_TRPC_BASE = "https://api2.warera.io/trpc";
 
 export type { TrpcBatchSlotResult, WareraBatchItem };
@@ -64,17 +64,20 @@ export type CreateWareraClientOptions = {
 
 class WareraRequestError extends Error {
   readonly status: number | undefined;
-  readonly is429: boolean;
+  readonly outcome: "rate_limited" | "http_error";
 
-  constructor(message: string, status: number | undefined, is429: boolean) {
+  constructor(message: string, status: number | undefined, outcome: "rate_limited" | "http_error") {
     super(message);
     this.status = status;
-    this.is429 = is429;
+    this.outcome = outcome;
   }
 }
 
 function isBatchPost(method: string, path: string): boolean {
-  return method === "POST" && path.includes("batch=1");
+  if (method !== "POST") return false;
+  const queryIndex = path.indexOf("?");
+  if (queryIndex === -1) return false;
+  return new URLSearchParams(path.slice(queryIndex + 1)).get("batch") === "1";
 }
 
 function canRetry(
@@ -126,9 +129,19 @@ export function createWareraClient(options: CreateWareraClientOptions) {
     const response = await fetchImpl(url, { ...fetchInit, method, headers });
     governor.recordHeaders(response.headers);
     if (response.ok) {
+      let json: unknown;
+      try {
+        json = await response.json();
+      } catch {
+        throw new WareraRequestError(
+          `WarEra response JSON parse failed: HTTP ${response.status}`,
+          response.status,
+          "http_error",
+        );
+      }
       return {
         ok: true,
-        json: await response.json(),
+        json,
         status: response.status,
         headers: response.headers,
       };
@@ -139,7 +152,7 @@ export function createWareraClient(options: CreateWareraClientOptions) {
       throw new WareraRequestError(
         `WarEra request failed: 429 ${bodyText.slice(0, BODY_SNIPPET_LEN)}`.trim(),
         response.status,
-        true,
+        "rate_limited",
       );
     }
     return { ok: false, status: response.status, bodyText, headers: response.headers };
@@ -156,9 +169,7 @@ export function createWareraClient(options: CreateWareraClientOptions) {
     const baseUrl = baseUrlOverride ?? options.config.wareraApiBaseUrl;
 
     for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
-      if (!skipRateLimit) {
-        await governor.acquire();
-      }
+      await governor.acquire({ skipLocal: skipRateLimit });
 
       const started = now();
       try {
@@ -166,33 +177,32 @@ export function createWareraClient(options: CreateWareraClientOptions) {
         const durationMs = now() - started;
 
         if (response.ok) {
-          options.logger.debug({ path, status: response.status, durationMs }, "warera request");
+          options.logger.debug(
+            { path, status: response.status, durationMs, outcome: "ok" },
+            "warera request",
+          );
           return response.json;
         }
 
         const bodySnippet = response.bodyText.slice(0, BODY_SNIPPET_LEN);
-        options.logger.debug({ path, status: response.status, durationMs }, "warera request");
         throw new WareraRequestError(
           `WarEra request failed: ${response.status} ${bodySnippet}`.trim(),
           response.status,
-          false,
+          "http_error",
         );
       } catch (err) {
         const durationMs = now() - started;
         const requestError = err instanceof WareraRequestError ? err : null;
-        if (requestError === null || requestError.is429) {
-          options.logger.debug(
-            { path, status: requestError?.status, durationMs },
-            "warera request",
-          );
-        }
-        if (
-          attempt >= MAX_RETRIES ||
-          !canRetry(method, path, requestError?.status, requestError?.is429 ?? false)
-        ) {
+        const outcome = requestError?.outcome ?? "network_error";
+        options.logger.debug(
+          { path, status: requestError?.status, durationMs, outcome },
+          "warera request",
+        );
+        const is429 = outcome === "rate_limited";
+        if (attempt >= MAX_RETRIES || !canRetry(method, path, requestError?.status, is429)) {
           throw err;
         }
-        if (!requestError?.is429) {
+        if (!is429) {
           const backoffMs = Math.min(5000, 250 * 2 ** attempt) + Math.random() * 250;
           await sleep(backoffMs);
         }
