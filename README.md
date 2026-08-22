@@ -45,7 +45,7 @@ vp run dev             # preferred: API :8787 + Vite WebUI :5173
 - API listens on `http://127.0.0.1:8787`
 - WebUI at `http://127.0.0.1:5173` (Vite proxies `/api` → `:8787`)
 
-WebUI: **Calculator** (gear vs scrap), **Companies** (advisor Profit/PP + switch payback), **Growth**, **Market** (prices + history charts), **Countries**, and **Jobs**. Market prices are polled hourly into local history (`price-poll`) from `itemTrading.getPrices` + top orders; Calculator and Companies read that history. Select a player in the shell header to Load company data for Companies/Growth. Gateway usage needs `WARERA_API_KEY`.
+WebUI: **Calculator** (gear vs scrap), **Companies** (advisor Profit/PP + switch payback), **Growth**, **Market** (prices + history charts), **Countries**, and **Jobs**. Market prices are polled hourly into local history (`price-poll`) from `itemTrading.getPrices` + top orders; Calculator and Companies read that history. Select a player in the shell header to Load company data for Companies/Growth. Set `WARERA_API_KEY` for auth-required procedures.
 
 API-only: `pnpm dev:server`. WebUI-only: `pnpm dev:web`.
 
@@ -91,9 +91,10 @@ NODE_ENV=production pnpm start
 Allowed public surface is the official tRPC API (not undocumented in-game hosts):
 
 - Docs: https://api2.warera.io/docs/ · OpenAPI: https://api2.warera.io/openapi.json
-- Prefer gateway (caching / rate limits): `https://gateway.warerastats.io/trpc`
-- Fallback: `https://api2.warera.io/trpc`
+- Default: `https://api2.warera.io/trpc` (`WARERA_API_BASE_URL`)
+- Auth: `Authorization: Bearer` by default; some procedures use `X-API-Key` (`WARERA_API_KEY`)
+- In-process facade: local RPM + header-aware 429 pause, tRPC batch (max 50), in-flight dedup
 - Community response docs: https://majimawrks.github.io/warera-api-docs/#/
 - Broader live explorer (some auth-required procedures missing from official OpenAPI): https://warera.realmarijn.nl/api-explorer
 
-Default `WARERA_API_BASE_URL` is the gateway. Auth: `X-API-Key` on the gateway; `Authorization: Bearer` on api2 (`WARERA_API_KEY`). Prefer procedures listed in the official docs; explorer-only reads (e.g. `company.getRecommendedRegionIdsByItemCode`) are used only where designed. Agent notes: [`.agents/skills/warera-api/SKILL.md`](.agents/skills/warera-api/SKILL.md).
+Prefer procedures listed in the official docs; explorer-only reads (e.g. `company.getRecommendedRegionIdsByItemCode`) are used only where designed. Agent notes: [`.agents/skills/warera-api/SKILL.md`](.agents/skills/warera-api/SKILL.md).

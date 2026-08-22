@@ -1,6 +1,6 @@
 ---
 name: warera-api
-description: Use WarEra's allowed public tRPC API (api2 / gateway), endpoint allowlist, auth, rate limits, and project client preferences. Use when working with WarEra API calls, WARERA_API_*, src/warera/, tRPC procedures, gateway.warerastats.io, api2.warera.io, or when the user mentions the WarEra API, rate limits, or public vs in-game endpoints.
+description: Use WarEra's allowed public tRPC API (api2), endpoint allowlist, auth, rate limits, and project client preferences. Use when working with WarEra API calls, WARERA_API_*, src/warera/, tRPC procedures, api2.warera.io, or when the user mentions the WarEra API, rate limits, or public vs in-game endpoints.
 ---
 
 # WarEra API
@@ -23,16 +23,14 @@ Community docs (response shapes, examples — not the allowlist source of truth)
 
 ## Base URLs (project preference)
 
-tRPC base path includes `/trpc`:
+tRPC base path includes `/trpc`.
 
 | Priority | Base URL | When |
 | --- | --- | --- |
-| 1 (prefer) | `https://gateway.warerastats.io/trpc` | Reads / cached public data; same procedures, caching + batching |
-| 2 (fallback) | `https://api2.warera.io/trpc` | Gateway down, missing procedure on gateway, or write/auth needs that require official API |
+| 1 (default) | `https://api2.warera.io/trpc` | Normal operation |
+| experiment | any other `WARERA_API_BASE_URL` | Local experiments only — not a supported dual-path |
 
-Gateway overview: https://gateway.warerastats.io/
-
-Default `WARERA_API_BASE_URL` is `https://gateway.warerastats.io/trpc`. Do not use undocumented hosts such as `api5` for public integrations.
+Default `WARERA_API_BASE_URL` is `https://api2.warera.io/trpc`. Do not use undocumented hosts such as `api5` for public integrations.
 
 ## How to call
 
@@ -49,11 +47,9 @@ GET {base}/{namespace}.{method}?input=<url-encoded JSON>
 - Header **`X-API-Key`** (Bearer does **not** work for these)
 - JSON body, e.g. `{ "itemCode": "lead", "count": 1 }`
 
-Gateway does not currently expose that procedure — call api2 directly.
+Same pattern for `muMember.getByMu` (MU member stats poll): not on official OpenAPI; requires `X-API-Key`.
 
-Same pattern for `muMember.getByMu` (MU member stats poll): not on official OpenAPI; force api2 GET via `baseUrl: "https://api2.warera.io/trpc"`.
-
-Same pattern for `work.getStatsByCompany` and `work.getStatsByWorkerAndCompany` (followed-entity work-stats poll): not on official OpenAPI; force **api2** + `X-API-Key`. Prefer GET batch; fall back to POST JSON body when GET is rejected. See `src/warera/work-stats.ts`.
+Same pattern for `work.getStatsByCompany` and `work.getStatsByWorkerAndCompany` (followed-entity work-stats poll): not on official OpenAPI; requires **api2** + `X-API-Key`. Prefer GET batch; fall back to POST JSON body when GET is rejected. See `src/warera/work-stats.ts`.
 
 Examples:
 
@@ -64,10 +60,6 @@ curl -G 'https://api2.warera.io/trpc/country.getAllCountries'
 # With input (GET)
 curl -G 'https://api2.warera.io/trpc/user.getUserLite' \
   --data-urlencode 'input={"userId":"<id>"}'
-
-# Gateway (requires gateway API key)
-curl -G 'https://gateway.warerastats.io/trpc/country.getAllCountries' \
-  -H 'X-API-Key: <gateway-key>'
 
 # Recommended regions (api2 POST + X-API-Key)
 curl -sS -X POST 'https://api2.warera.io/trpc/company.getRecommendedRegionIdsByItemCode' \
@@ -82,34 +74,34 @@ Response shape is typically tRPC: `{ "result": { "data": ... } }` (or `{ "error"
 
 | Target | Header |
 | --- | --- |
-| `api2.warera.io` | Often `Authorization: Bearer <token>`; **some procedures require `X-API-Key` instead** (e.g. `company.getRecommendedRegionIdsByItemCode`) |
-| `gateway.warerastats.io` | `X-API-Key: <gateway-key>` (required; missing → 401) |
+| `api2.warera.io` | `Authorization: Bearer <token>` by default; **some procedures require `X-API-Key` instead** (recommended regions, work-stats, item-market txs) |
 
-Use env vars (`WARERA_API_KEY`). Never hardcode secrets.
+Use `WARERA_API_KEY`. Never hardcode secrets.
 
-`src/warera/client.ts` defaults: `X-API-Key` for gateway, Bearer for api2. Per-request `authStyle: "api-key"` forces `X-API-Key` (needed for the recommended-regions POST). Gateway misses (`unknown method`) fall back to api2 preserving method/body/authStyle.
+`src/warera/client.ts`: `auto` = Bearer on api2; `authStyle: "api-key"` forces `X-API-Key`. No gateway-miss fallback.
 
 ## Rate limits & caching
 
-- Prefer the **gateway** for repeated reads: caching, request dedup, ~400ms batching window, advertised ~200 req/min.
-- Keep this app's soft limiter (`WARERA_MAX_REQUESTS_PER_MINUTE`, default 120) under upstream caps; wait rather than stampede into 429s.
-- Gateway cache TTLs vary by procedure (often 2–10 min); some list endpoints are DB-backed on the gateway. Treat gateway data as slightly stale when freshness matters — fall back to api2 for live needs (e.g. battle live data).
+- Soft local limiter: `WARERA_MAX_REQUESTS_PER_MINUTE` (default 120), one HTTP call per slot.
+- api2 headers (observed): `ratelimit-limit` / `ratelimit-policy` (`500;w=60`) / `ratelimit-remaining` / `ratelimit-reset` (seconds). 429 pauses **all** in-flight sends until reset (`Retry-After` wins when present).
+- tRPC HTTP batches: max **50** procedures per request; GET URL-length chunk 2000 remains. Background singles coalesce ~400ms.
+- L1 freshness is our Turso tables / pack TTL — not a community gateway cache.
 
 ## Project client
 
-Use / extend `src/warera/` (`createWareraClient`, rate limiter, cache helpers). Do not add a parallel HTTP stack.
+Use / extend `src/warera/` (`createWareraClient` facade). Do not add a parallel HTTP stack.
 
 Preferences:
 
 1. Call only allowlisted procedures (see index below / OpenAPI).
-2. Prefer gateway base URL for cacheable GETs; fall back to api2.
-3. Log path, status, latency (existing client behavior).
-4. Retry only idempotent GETs on transient failures (existing client behavior).
+2. Default base is api2 `/trpc`.
+3. Log procedure, `call_class`, status, latency, outcome.
+4. Retry GET and read-only `batch=1` POST on 5xx/network (max 3) and 429 (reset wait). Do not retry other 4xx.
 5. For response field details, consult community docs; for “is this allowed?”, consult official OpenAPI.
 
 ## Endpoint index (allowlist snapshot)
 
-Refresh from https://api2.warera.io/openapi.json when in doubt. Gateway may support a subset — if a procedure 404s on gateway, retry on api2.
+Refresh from https://api2.warera.io/openapi.json when in doubt.
 
 Official OpenAPI is **incomplete** relative to live api2. Community explorers such as https://warera.realmarijn.nl/api-explorer document additional read procedures that work with an API key. This project may call those when explicitly needed (document the override in code/design). Prefer official OpenAPI first.
 
@@ -158,7 +150,6 @@ For parameters and schemas: official OpenAPI. For observed response shapes: comm
 When adding or changing WarEra API usage:
 
 - [ ] Procedure appears in official OpenAPI / docs
-- [ ] Base URL is gateway `/trpc` or api2 `/trpc` (not inventing hosts/paths)
+- [ ] Base URL is api2 `/trpc` (not inventing hosts/paths)
 - [ ] Correct auth header for the chosen host
 - [ ] Goes through `src/warera` client + rate limit
-- [ ] Stale-cache tradeoff considered if using gateway
