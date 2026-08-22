@@ -61,6 +61,9 @@ export function createGovernor(options: GovernorOptions) {
   function recordHeaders(headers: Headers): void {
     const parsed = parseRateLimitHeaders(headers);
     if (parsed.limit !== null && parsed.limit !== limit) limit = parsed.limit;
+    const hasActivePause =
+      remaining !== null && remaining <= 0 && resetAt !== null && resetAt > now();
+    if (hasActivePause && parsed.remaining !== null && parsed.remaining > 0) return;
     if (parsed.remaining !== null) remaining = parsed.remaining;
     if (parsed.resetSeconds !== null) resetAt = now() + parsed.resetSeconds * 1000;
   }

@@ -538,6 +538,79 @@ describe("createWareraClient", () => {
     ]);
   });
 
+  it("requestBatch joins duplicate slots onto one upstream slot", async () => {
+    const rec = createRecordingBackend();
+    setMetricsBackend(rec);
+    let resolveFetch!: (value: Response) => void;
+    const fetchMock = vi.fn(
+      (..._args: Parameters<typeof fetch>) =>
+        new Promise<Response>((resolve) => {
+          resolveFetch = resolve;
+        }),
+    );
+    const client = createWareraClient({
+      config: { ...baseConfig, wareraMaxRequestsPerMinute: 10_000 },
+      logger: testLogger(),
+      fetchImpl: fetchMock,
+      sleep: async () => {},
+    });
+    const item = { procedure: "user.getUserLite", input: { userId: "u1" } };
+
+    const batch = client.requestBatch([item, item]);
+
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    expect(fetchMock.mock.calls[0]![0]).toEqual(
+      expect.stringContaining("user.getUserLite?batch=1"),
+    );
+    resolveFetch(
+      new Response(JSON.stringify([{ result: { data: { username: "A" } } }]), {
+        status: 200,
+      }),
+    );
+
+    await expect(batch).resolves.toEqual([
+      { ok: true, data: { username: "A" } },
+      { ok: true, data: { username: "A" } },
+    ]);
+    expect(
+      rec.events.some(
+        (event) => event.type === "count" && event.name === "warera.upstream.dedup_join",
+      ),
+    ).toBe(true);
+  });
+
+  it("requestBatch joins a matching in-flight single", async () => {
+    let resolveFetch!: (value: Response) => void;
+    const fetchMock = vi.fn(
+      () =>
+        new Promise<Response>((resolve) => {
+          resolveFetch = resolve;
+        }),
+    );
+    const client = createWareraClient({
+      config: { ...baseConfig, wareraMaxRequestsPerMinute: 10_000 },
+      logger: testLogger(),
+      fetchImpl: fetchMock,
+      sleep: async () => {},
+    });
+    const path = "user.getUserLite?input=%7B%22userId%22%3A%22u1%22%7D";
+
+    const single = client.request(path);
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    const batch = client.requestBatch([{ procedure: "user.getUserLite", input: { userId: "u1" } }]);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    resolveFetch(
+      new Response(JSON.stringify({ result: { data: { username: "A" } } }), {
+        status: 200,
+      }),
+    );
+
+    await expect(single).resolves.toEqual({ result: { data: { username: "A" } } });
+    await expect(batch).resolves.toEqual([{ ok: true, data: { username: "A" } }]);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
   it("requestBatch of 51 items sends two HTTP calls (50 + 1)", async () => {
     const fetchMock = vi.fn().mockImplementation(async (url: string) => {
       const path = String(url).split("?")[0];
@@ -552,7 +625,10 @@ describe("createWareraClient", () => {
       fetchImpl: fetchMock,
       sleep: async () => {},
     });
-    const items = Array.from({ length: 51 }, () => ({ procedure: "a" }));
+    const items = Array.from({ length: 51 }, (_, index) => ({
+      procedure: "a",
+      input: { index },
+    }));
     const results = await client.requestBatch(items);
     expect(results).toHaveLength(51);
     expect(fetchMock).toHaveBeenCalledTimes(2);

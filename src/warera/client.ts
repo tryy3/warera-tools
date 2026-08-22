@@ -394,7 +394,7 @@ export function createWareraClient(options: CreateWareraClientOptions) {
             return;
           }
 
-          const slots = await requestBatch(
+          const slots = await executeBatchItems(
             group.map((queued) => queued.item),
             {
               ...first.fetchInit,
@@ -523,7 +523,7 @@ export function createWareraClient(options: CreateWareraClientOptions) {
     )) as T;
   }
 
-  async function requestBatch(
+  async function executeBatchItems(
     items: WareraBatchItem[],
     init: WareraRequestInit = {},
   ): Promise<TrpcBatchSlotResult[]> {
@@ -576,6 +576,78 @@ export function createWareraClient(options: CreateWareraClientOptions) {
     }
 
     return out;
+  }
+
+  async function requestBatch(
+    items: WareraBatchItem[],
+    init: WareraRequestInit = {},
+  ): Promise<TrpcBatchSlotResult[]> {
+    if (items.length === 0) return [];
+
+    const {
+      skipRateLimit: _skipRateLimit,
+      callClass: callClassOverride,
+      authStyle = "auto",
+      baseUrl: baseUrlOverride,
+      json: _json,
+      ...rest
+    } = init;
+    const method = (rest.method ?? "GET").toUpperCase();
+    const callClass = inferCallClass(callClassOverride);
+    const resolvedBaseUrl = baseUrlOverride ?? options.config.wareraApiBaseUrl;
+    const initGroupKey = requestInitGroupKey(rest);
+    type Leader = {
+      item: WareraBatchItem;
+      resolve: (value: unknown) => void;
+      reject: (reason: unknown) => void;
+    };
+    const leaders: Leader[] = [];
+
+    const slotPromises = items.map((item) => {
+      let resolve!: (value: unknown) => void;
+      let reject!: (reason: unknown) => void;
+      const deferred = new Promise<unknown>((resolvePromise, rejectPromise) => {
+        resolve = resolvePromise;
+        reject = rejectPromise;
+      });
+      const { joined, promise } = inFlightDedup.join(
+        `${dedupKey({
+          method,
+          procedure: item.procedure,
+          input: item.input,
+          authStyle,
+          baseUrl: resolvedBaseUrl,
+        })}\0${initGroupKey}`,
+        () => deferred,
+      );
+      if (joined) {
+        count("warera.upstream.dedup_join", 1, {
+          procedure: item.procedure,
+          call_class: callClass,
+        });
+      } else {
+        leaders.push({ item, resolve, reject });
+      }
+      return promise;
+    });
+
+    if (leaders.length > 0) {
+      try {
+        const leaderSlots = await executeBatchItems(
+          leaders.map((leader) => leader.item),
+          init,
+        );
+        for (let index = 0; index < leaders.length; index++) {
+          const leader = leaders[index]!;
+          const slot = leaderSlots[index];
+          leader.resolve(slot?.ok ? { result: { data: slot.data } } : { error: slot?.error });
+        }
+      } catch (error) {
+        for (const leader of leaders) leader.reject(error);
+      }
+    }
+
+    return parseTrpcBatchResponse(await Promise.all(slotPromises));
   }
 
   return { request, requestBatch };

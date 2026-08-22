@@ -73,6 +73,30 @@ describe("createGovernor", () => {
     expect(a.waitMs).toBe(3000);
   });
 
+  it("does not let a concurrent success clear an active 429 pause", async () => {
+    const sleep = vi.fn(async (ms: number) => {
+      t += ms;
+    });
+    let t = 0;
+    const g = createGovernor({
+      maxPerMinute: 1000,
+      now: () => t,
+      sleep,
+      jitter: () => 0,
+    });
+    g.note429(new Headers({ "Retry-After": "3" }));
+
+    g.recordHeaders(
+      new Headers({
+        "ratelimit-remaining": "499",
+        "ratelimit-reset": "60",
+      }),
+    );
+
+    await expect(g.acquire()).resolves.toEqual({ reason: "http_429", waitMs: 3000 });
+    expect(sleep).toHaveBeenCalledWith(3000);
+  });
+
   it("keeps waiting when note429 extends an active header pause", async () => {
     const sleeps: Array<{ ms: number; resolve: () => void }> = [];
     const sleep = vi.fn(
