@@ -13,7 +13,7 @@ function baseConfig(overrides: Partial<AppConfig> = {}): AppConfig {
     port: 8787,
     tursoDatabaseUrl: "file:test.db",
     tursoAuthToken: undefined,
-    wareraApiBaseUrl: "https://gateway.warerastats.io/trpc",
+    wareraApiBaseUrl: "https://api2.warera.io/trpc",
     wareraApiKey: undefined,
     wareraMaxRequestsPerMinute: 120,
     discordWebhookUrl: undefined,

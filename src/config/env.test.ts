@@ -9,7 +9,7 @@ describe("parseConfig", () => {
     expect(cfg.host).toBe("127.0.0.1");
     expect(cfg.port).toBe(8787);
     expect(cfg.wareraMaxRequestsPerMinute).toBe(120);
-    expect(cfg.wareraApiBaseUrl).toBe("https://gateway.warerastats.io/trpc");
+    expect(cfg.wareraApiBaseUrl).toBe("https://api2.warera.io/trpc");
   });
 
   it("parses PORT override", () => {

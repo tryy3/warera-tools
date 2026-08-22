@@ -40,7 +40,7 @@ export function parseConfig(
     port: Number(env.PORT ?? 8787),
     tursoDatabaseUrl,
     tursoAuthToken: env.TURSO_AUTH_TOKEN,
-    wareraApiBaseUrl: env.WARERA_API_BASE_URL ?? "https://gateway.warerastats.io/trpc",
+    wareraApiBaseUrl: env.WARERA_API_BASE_URL ?? "https://api2.warera.io/trpc",
     wareraApiKey: env.WARERA_API_KEY,
     wareraMaxRequestsPerMinute: Number(env.WARERA_MAX_REQUESTS_PER_MINUTE ?? 120),
     discordWebhookUrl: env.DISCORD_WEBHOOK_URL,
