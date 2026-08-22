@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vite-plus/test";
-import { createWareraClient } from "./client";
+import { createWareraClient, WARERA_BATCH_WINDOW_MS } from "./client";
 import type { AppConfig } from "../config/env";
 import { resetMetricsForTests, setMetricsBackend } from "../metrics";
 import { createRecordingBackend } from "../metrics/recording";
@@ -307,6 +307,75 @@ describe("createWareraClient", () => {
           e.value === 498,
       ),
     ).toBe(true);
+  });
+
+  it("dedups two concurrent identical GET singles", async () => {
+    const rec = createRecordingBackend();
+    setMetricsBackend(rec);
+    let resolveFetch!: (value: Response) => void;
+    const fetchMock = vi.fn(
+      () =>
+        new Promise<Response>((resolve) => {
+          resolveFetch = resolve;
+        }),
+    );
+    const client = createWareraClient({
+      config: { ...baseConfig, wareraMaxRequestsPerMinute: 10_000 },
+      logger: testLogger(),
+      fetchImpl: fetchMock,
+      sleep: async () => {},
+    });
+
+    const path = "user.getUserLite?input=%7B%22userId%22%3A%22a%22%7D";
+    const first = client.request(path);
+    const second = client.request(path);
+
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    resolveFetch(new Response(JSON.stringify({ result: { data: { id: "a" } } }), { status: 200 }));
+    await expect(Promise.all([first, second])).resolves.toEqual([
+      { result: { data: { id: "a" } } },
+      { result: { data: { id: "a" } } },
+    ]);
+    expect(
+      rec.events.some(
+        (event) => event.type === "count" && event.name === "warera.upstream.dedup_join",
+      ),
+    ).toBe(true);
+  });
+
+  it("coalesces background GET singles into one batch after 400ms", async () => {
+    const waits: number[] = [];
+    const sleep = vi.fn(async (ms: number) => {
+      waits.push(ms);
+    });
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(
+        new Response(
+          JSON.stringify([{ result: { data: { id: "a" } } }, { result: { data: { id: "b" } } }]),
+          { status: 200 },
+        ),
+      );
+    const client = createWareraClient({
+      config: { ...baseConfig, wareraMaxRequestsPerMinute: 10_000 },
+      logger: testLogger(),
+      fetchImpl: fetchMock,
+      sleep,
+    });
+
+    const results = await Promise.all([
+      client.request("user.getUserLite?input=%7B%22userId%22%3A%22a%22%7D", {
+        callClass: "background",
+      }),
+      client.request("user.getUserLite?input=%7B%22userId%22%3A%22b%22%7D", {
+        callClass: "background",
+      }),
+    ]);
+
+    expect(waits).toContain(WARERA_BATCH_WINDOW_MS);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(String(fetchMock.mock.calls[0]![0])).toContain("batch=1");
+    expect(results).toEqual([{ result: { data: { id: "a" } } }, { result: { data: { id: "b" } } }]);
   });
 
   it("records rate_limited on 429 then ok on retry", async () => {

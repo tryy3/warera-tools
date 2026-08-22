@@ -2,6 +2,7 @@ import type { AppConfig } from "../config/env";
 import type { Logger } from "../logging/logger";
 import { count, distribution, gauge } from "../metrics";
 import { inferCallClass, type WareraCallClass } from "./call-class";
+import { createInFlightDedup, dedupKey } from "./dedup";
 import { createGovernor, parseRateLimitHeaders } from "./governor";
 import {
   buildBatchInputRecord,
@@ -11,6 +12,7 @@ import {
   WARERA_MAX_BATCH_SLOTS,
   wareraBatchPath,
   wareraBatchPostPath,
+  wareraProcedurePath,
   type TrpcBatchSlotResult,
   type WareraBatchItem,
 } from "./trpc";
@@ -20,6 +22,7 @@ const MAX_RETRIES = 3;
 const BODY_SNIPPET_LEN = 200;
 /** Soft cap for tRPC batch GET URLs (split into multiple HTTP calls beyond this). */
 export const WARERA_MAX_BATCH_URL_LENGTH = 2000;
+export const WARERA_BATCH_WINDOW_MS = 400;
 export const API2_TRPC_BASE = "https://api2.warera.io/trpc";
 
 export type { TrpcBatchSlotResult, WareraBatchItem };
@@ -92,6 +95,13 @@ function procedureFromPath(path: string): string {
   return path.split("?")[0]!.replace(/^\//, "");
 }
 
+function inputFromPath(path: string): unknown {
+  const queryIndex = path.indexOf("?");
+  if (queryIndex === -1) return undefined;
+  const input = new URLSearchParams(path.slice(queryIndex + 1)).get("input");
+  return input === null ? undefined : JSON.parse(input);
+}
+
 function isBatchPost(method: string, path: string): boolean {
   if (method !== "POST") return false;
   const queryIndex = path.indexOf("?");
@@ -125,6 +135,18 @@ export function createWareraClient(options: CreateWareraClientOptions) {
     now,
     sleep,
   });
+  const inFlightDedup = createInFlightDedup();
+
+  type QueuedRequest = {
+    item: WareraBatchItem;
+    resolve: (value: unknown) => void;
+    reject: (reason: unknown) => void;
+    authStyle: WareraAuthStyle;
+    baseUrl: string;
+    callClass: WareraCallClass;
+  };
+  let queue: QueuedRequest[] = [];
+  let timer: Promise<void> | null = null;
 
   async function requestOnce(
     baseUrl: string,
@@ -306,6 +328,83 @@ export function createWareraClient(options: CreateWareraClientOptions) {
     throw new Error("WarEra request retry loop exhausted");
   }
 
+  async function flushQueue(): Promise<void> {
+    const pending = queue;
+    queue = [];
+    const groups = new Map<string, QueuedRequest[]>();
+    for (const queued of pending) {
+      const key = JSON.stringify(["GET", queued.authStyle, queued.baseUrl]);
+      const group = groups.get(key);
+      if (group) {
+        group.push(queued);
+      } else {
+        groups.set(key, [queued]);
+      }
+    }
+
+    await Promise.all(
+      [...groups.values()].map(async (group) => {
+        const first = group[0]!;
+        try {
+          if (group.length === 1) {
+            const result = await executeRequest(
+              wareraProcedurePath(first.item.procedure, first.item.input),
+              {},
+              "GET",
+              first.authStyle,
+              false,
+              first.baseUrl,
+              first.callClass,
+              [first.item.procedure],
+            );
+            first.resolve(result);
+            return;
+          }
+
+          const slots = await requestBatch(
+            group.map((queued) => queued.item),
+            {
+              authStyle: first.authStyle,
+              baseUrl: first.baseUrl,
+              callClass: first.callClass,
+            },
+          );
+          for (let index = 0; index < group.length; index++) {
+            const queued = group[index]!;
+            const slot = slots[index];
+            if (slot?.ok) {
+              queued.resolve({ result: { data: slot.data } });
+            } else {
+              queued.resolve({ error: slot?.error });
+            }
+          }
+        } catch (error) {
+          for (const queued of group) {
+            queued.reject(error);
+          }
+        }
+      }),
+    );
+  }
+
+  function enqueueBackgroundRequest(
+    item: WareraBatchItem,
+    authStyle: WareraAuthStyle,
+    baseUrl: string,
+    callClass: WareraCallClass,
+  ): Promise<unknown> {
+    const promise = new Promise<unknown>((resolve, reject) => {
+      queue.push({ item, resolve, reject, authStyle, baseUrl, callClass });
+    });
+    if (timer === null) {
+      timer = sleep(WARERA_BATCH_WINDOW_MS).then(async () => {
+        timer = null;
+        await flushQueue();
+      });
+    }
+    return promise;
+  }
+
   async function request<T>(path: string, init: WareraRequestInit = {}): Promise<T> {
     const {
       skipRateLimit,
@@ -327,6 +426,35 @@ export function createWareraClient(options: CreateWareraClientOptions) {
       fetchInit.headers = headers;
     }
 
+    const procedure = procedureFromPath(path);
+    const resolvedBaseUrl = baseUrlOverride ?? options.config.wareraApiBaseUrl;
+    if (method === "GET" && json === undefined) {
+      const input = inputFromPath(path);
+      const { joined, promise } = inFlightDedup.join(
+        dedupKey({ method, procedure, input, authStyle, baseUrl: resolvedBaseUrl }),
+        () =>
+          callClass === "background" && !skipRateLimit
+            ? enqueueBackgroundRequest({ procedure, input }, authStyle, resolvedBaseUrl, callClass)
+            : executeRequest(
+                path,
+                fetchInit,
+                method,
+                authStyle,
+                Boolean(skipRateLimit),
+                baseUrlOverride,
+                callClass,
+                [procedure],
+              ),
+      );
+      if (joined) {
+        count("warera.upstream.dedup_join", 1, {
+          procedure,
+          call_class: callClass,
+        });
+      }
+      return (await promise) as T;
+    }
+
     return (await executeRequest(
       path,
       fetchInit,
@@ -335,7 +463,7 @@ export function createWareraClient(options: CreateWareraClientOptions) {
       Boolean(skipRateLimit),
       baseUrlOverride,
       callClass,
-      [procedureFromPath(path)],
+      [procedure],
     )) as T;
   }
 
