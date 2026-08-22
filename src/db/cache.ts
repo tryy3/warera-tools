@@ -16,10 +16,7 @@ export function classifyCacheLookup(
   return "hit";
 }
 
-export function recordCacheLookup(
-  cache_kind: string,
-  result: "hit" | "miss" | "stale",
-): void {
+export function recordCacheLookup(cache_kind: string, result: "hit" | "miss" | "stale"): void {
   count("cache.l1.lookup", 1, { cache_kind, result });
 }
 

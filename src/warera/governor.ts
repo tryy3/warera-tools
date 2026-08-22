@@ -134,9 +134,7 @@ export function createGovernor(options: GovernorOptions) {
 
     return {
       waitMs:
-        (initialHeaderWait?.waitMs ?? 0) +
-        acquiredLocalWaitMs +
-        (postLocalHeaderWait?.waitMs ?? 0),
+        (initialHeaderWait?.waitMs ?? 0) + acquiredLocalWaitMs + (postLocalHeaderWait?.waitMs ?? 0),
       reason:
         postLocalHeaderWait?.reason ??
         initialHeaderWait?.reason ??

@@ -15,7 +15,10 @@ describe("classifyCacheLookup", () => {
       classifyCacheLookup({ fetchedAt: new Date("2026-07-31T12:00:00.000Z"), ttlSeconds: 30 }, now),
     ).toBe("stale");
     expect(
-      classifyCacheLookup({ fetchedAt: new Date("2026-07-31T12:00:00.000Z"), ttlSeconds: 120 }, now),
+      classifyCacheLookup(
+        { fetchedAt: new Date("2026-07-31T12:00:00.000Z"), ttlSeconds: 120 },
+        now,
+      ),
     ).toBe("hit");
   });
 });
@@ -26,7 +29,12 @@ describe("recordCacheLookup", () => {
     setMetricsBackend(rec);
     recordCacheLookup("kv", "hit");
     expect(rec.events).toEqual([
-      { type: "count", name: "cache.l1.lookup", value: 1, attrs: { cache_kind: "kv", result: "hit" } },
+      {
+        type: "count",
+        name: "cache.l1.lookup",
+        value: 1,
+        attrs: { cache_kind: "kv", result: "hit" },
+      },
     ]);
   });
 });
