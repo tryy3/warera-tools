@@ -85,11 +85,10 @@ describe("fetchItemMarketTransactionsPage", () => {
     const page = await fetchItemMarketTransactionsPage({ request }, { limit: 100 });
     expect(request).toHaveBeenCalledWith(
       expect.stringContaining("transaction.getPaginatedTransactions"),
-      expect.objectContaining({
-        baseUrl: "https://api2.warera.io/trpc",
-        authStyle: "api-key",
-      }),
+      expect.objectContaining({ authStyle: "api-key" }),
     );
+    const init = request.mock.calls[0]![1] as Record<string, unknown>;
+    expect(init).not.toHaveProperty("baseUrl");
     const called = String(request.mock.calls[0][0]);
     expect(called).toContain("itemMarket");
     expect(decodeURIComponent(called)).toContain('"limit":100');

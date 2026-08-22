@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vite-plus/test";
 import {
   extractCompanyIds,
+  fetchBestRecommendedRegion,
   fetchCompanyProductionBonus,
   parseCompany,
   parseRecommendedRegions,
@@ -99,7 +100,7 @@ describe("parseRecommendedRegions", () => {
 });
 
 describe("fetchCompanyProductionBonus", () => {
-  it("calls api2 directly (skips gateway)", async () => {
+  it("calls getProductionBonus without overriding baseUrl", async () => {
     const request = vi.fn(async () => ({
       result: {
         data: {
@@ -112,9 +113,27 @@ describe("fetchCompanyProductionBonus", () => {
       },
     }));
     await fetchCompanyProductionBonus({ request } as never, "company-1");
+    expect(request).toHaveBeenCalledOnce();
+    expect(request.mock.calls[0]).toHaveLength(1);
+    expect(String(request.mock.calls[0]![0])).toContain("company.getProductionBonus");
+  });
+});
+
+describe("fetchBestRecommendedRegion", () => {
+  it("POSTs with X-API-Key auth style", async () => {
+    const request = vi.fn(async () => ({
+      result: { data: ["reg-a"] },
+    }));
+    await fetchBestRecommendedRegion({ request } as never, "lead");
     expect(request).toHaveBeenCalledWith(
-      expect.stringContaining("company.getProductionBonus"),
-      expect.objectContaining({ baseUrl: "https://api2.warera.io/trpc" }),
+      "company.getRecommendedRegionIdsByItemCode",
+      expect.objectContaining({
+        method: "POST",
+        json: { itemCode: "lead", count: 1 },
+        authStyle: "api-key",
+      }),
     );
+    const init = request.mock.calls[0]![1] as Record<string, unknown>;
+    expect(init).not.toHaveProperty("baseUrl");
   });
 });

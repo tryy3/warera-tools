@@ -153,7 +153,7 @@ export async function fetchCompanyById(
   return parseCompany(unwrapTrpcData(json));
 }
 
-/** Bonus as fraction. Auth-required explorer endpoint (falls back via client to api2). */
+/** Bonus as fraction. Auth-required explorer endpoint. */
 export type ProductionBonusDetails = {
   /** Fraction, e.g. 0.505 */
   total: number;
@@ -175,7 +175,6 @@ export async function fetchCompanyProductionBonus(
   try {
     const json = await warera.request<unknown>(
       wareraProcedurePath("company.getProductionBonus", { companyId }),
-      { baseUrl: "https://api2.warera.io/trpc" },
     );
     const data = unwrapTrpcData(json);
     const obj = asRecord(data);
@@ -292,12 +291,11 @@ export async function fetchBestRecommendedRegion(
   warera: WareraRequester,
   itemCode: string,
 ): Promise<RecommendedRegion | null> {
-  // Not on gateway; api2 requires POST + X-API-Key + JSON body (Bearer does not work).
+  // Undocumented procedure; requires POST + X-API-Key + JSON body (Bearer does not work).
   const json = await warera.request<unknown>("company.getRecommendedRegionIdsByItemCode", {
     method: "POST",
     json: { itemCode, count: 1 },
     authStyle: "api-key",
-    baseUrl: "https://api2.warera.io/trpc",
   });
   const regions = parseRecommendedRegions(json);
   return regions[0] ?? null;

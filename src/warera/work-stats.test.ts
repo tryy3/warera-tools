@@ -140,8 +140,7 @@ describe("fetchWorkStatsBatch", () => {
       method: "GET",
       authStyle: "api-key",
     });
-    expect(typeof init.baseUrl).toBe("string");
-    expect(init.baseUrl).toContain("api2.warera.io");
+    expect(init).not.toHaveProperty("baseUrl");
 
     expect(companies.get("c1")).toEqual([
       expect.objectContaining({ dailyDate: "2026-08-19", total: 1442.2 }),

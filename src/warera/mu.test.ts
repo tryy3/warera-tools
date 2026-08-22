@@ -76,7 +76,7 @@ describe("fetch helpers", () => {
     expect(parsed.name).toBe("Sweed Liberty");
   });
 
-  it("forces api2 for muMember.getByMu", async () => {
+  it("calls muMember.getByMu without overriding baseUrl", async () => {
     const request = vi.fn().mockResolvedValue({
       result: {
         data: [
@@ -95,11 +95,8 @@ describe("fetch helpers", () => {
       },
     });
     await fetchMuMembersByMu({ request }, "mu1");
-    expect(request).toHaveBeenCalledWith(
-      expect.stringContaining("muMember.getByMu"),
-      expect.objectContaining({
-        baseUrl: "https://api2.warera.io/trpc",
-      }),
-    );
+    expect(request).toHaveBeenCalledOnce();
+    expect(request.mock.calls[0]).toHaveLength(1);
+    expect(String(request.mock.calls[0]![0])).toContain("muMember.getByMu");
   });
 });

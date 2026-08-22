@@ -228,16 +228,14 @@ export async function fetchMuById(warera: WareraRequester, muId: string): Promis
 }
 
 /**
- * Live api2 procedure; not on official OpenAPI. Force api2 (same class as
+ * Live api2 procedure; not on official OpenAPI (same class as
  * company.getRecommendedRegionIdsByItemCode).
  */
 export async function fetchMuMembersByMu(
   warera: WareraRequester,
   muId: string,
 ): Promise<ParsedMuMember[]> {
-  const json = await warera.request<unknown>(wareraProcedurePath("muMember.getByMu", { muId }), {
-    baseUrl: "https://api2.warera.io/trpc",
-  });
+  const json = await warera.request<unknown>(wareraProcedurePath("muMember.getByMu", { muId }));
   return parseMuMembers(unwrapTrpcData(json));
 }
 

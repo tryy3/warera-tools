@@ -1,4 +1,3 @@
-import { API2_TRPC_BASE } from "./client";
 import { isWareraGetRejectedError } from "./errors";
 import type { Logger } from "../logging/logger";
 import type { WareraRequester } from "./prices";
@@ -84,7 +83,6 @@ export function parseWorkerWorkDays(raw: unknown): WorkerWorkDay[] {
 
 const WORK_STATS_BATCH_INIT = {
   authStyle: "api-key" as const,
-  baseUrl: API2_TRPC_BASE,
 };
 
 /**
@@ -109,10 +107,10 @@ async function requestWorkStatsBatch(
 }
 
 /**
- * Batch-fetch daily work stats from api2 via GET (POST fallback) + X-API-Key.
+ * Batch-fetch daily work stats via GET (POST fallback) + X-API-Key.
  *
  * Procedures `work.getStatsByCompany` and `work.getStatsByWorkerAndCompany`
- * are not on the official OpenAPI; they require api2 + `X-API-Key`
+ * are not on the official OpenAPI; they require `X-API-Key`
  * (same class as `company.getRecommendedRegionIdsByItemCode`).
  *
  * The batch layer (`requestBatch` + `parseTrpcBatchResponse`) unwraps each

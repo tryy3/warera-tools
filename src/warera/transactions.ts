@@ -1,5 +1,4 @@
 import type { WareraRequestInit } from "./client";
-import { API2_TRPC_BASE } from "./client";
 import type { WareraRequester } from "./prices";
 import { unwrapTrpcData, wareraProcedurePath } from "./trpc";
 
@@ -151,8 +150,7 @@ export function parseItemMarketTransactionsPage(data: unknown): ItemMarketTransa
 }
 
 /**
- * Force official api2 with X-API-Key: gateway (warerastats) has had DB failures
- * on this procedure. Official input uses `limit` (max 100), not `perPage`:
+ * Official input uses `limit` (max 100), not `perPage`:
  * https://api2.warera.io/docs/#/transaction/transaction.getPaginatedTransactions
  */
 export async function fetchItemMarketTransactionsPage(
@@ -168,7 +166,6 @@ export async function fetchItemMarketTransactionsPage(
   const path = wareraProcedurePath("transaction.getPaginatedTransactions", input);
   const requestInit: WareraRequestInit = {
     ...init,
-    baseUrl: API2_TRPC_BASE,
     authStyle: "api-key",
   };
   const json = await warera.request<unknown>(path, requestInit);
