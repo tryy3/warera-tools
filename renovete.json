@@ -1,0 +1,35 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended", "docker:enableMajor", ":separateMultipleMajorReleases"],
+  "gomod": {
+    "postUpdateOptions": ["gomodTidy"]
+  },
+  "labels": ["type/chore", "area/ci"],
+  "packageRules": [
+    {
+      "description": "Group Go dependency minor/patch updates",
+      "matchManagers": ["gomod"],
+      "matchUpdateTypes": ["minor", "patch"],
+      "groupName": "go dependencies (non-major)"
+    },
+    {
+      "description": "Group npm dependency minor/patch updates",
+      "matchManagers": ["npm"],
+      "matchUpdateTypes": ["minor", "patch"],
+      "groupName": "npm dependencies (non-major)"
+    },
+    {
+      "description": "Group Docker minor/patch updates",
+      "matchManagers": ["dockerfile", "docker-compose"],
+      "matchUpdateTypes": ["minor", "patch"],
+      "groupName": "docker dependencies (non-major)"
+    },
+    {
+      "description": "Group GitHub Actions minor/patch updates",
+      "matchManagers": ["github-actions"],
+      "matchUpdateTypes": ["minor", "patch"],
+      "groupName": "github-actions (non-major)"
+    }
+  ],
+  "ignorePaths": ["**/node_modules/**", "**/.go/pkg/mod/**"]
+}
