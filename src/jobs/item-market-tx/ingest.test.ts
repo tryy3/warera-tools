@@ -87,12 +87,10 @@ describe("walkItemMarketTransactions", () => {
 
   it("backfill enables handoff after first successful page even if later stop", async () => {
     const now = new Date("2026-08-04T18:00:00.000Z");
-    const fetchPage = vi.fn(
-      async (): Promise<ItemMarketTransactionsPage> => ({
-        items: [makeTx({ id: "fresh", createdAt: new Date("2026-08-04T17:00:00.000Z") })],
-        nextCursor: null,
-      }),
-    );
+    const fetchPage = vi.fn(async (): Promise<ItemMarketTransactionsPage> => ({
+      items: [makeTx({ id: "fresh", createdAt: new Date("2026-08-04T17:00:00.000Z") })],
+      nextCursor: null,
+    }));
 
     expect(isItemMarketTxPollEnabled()).toBe(false);
 
@@ -148,21 +146,19 @@ describe("walkItemMarketTransactions", () => {
 
   it("backfill 24h cutoff stops without requiring known id", async () => {
     const now = new Date("2026-08-04T18:00:00.000Z");
-    const fetchPage = vi.fn(
-      async (): Promise<ItemMarketTransactionsPage> => ({
-        items: [
-          makeTx({
-            id: "old-a",
-            createdAt: new Date("2026-08-03T17:00:00.000Z"), // 25h ago
-          }),
-          makeTx({
-            id: "old-b",
-            createdAt: new Date("2026-08-03T16:00:00.000Z"), // 26h ago
-          }),
-        ],
-        nextCursor: "would-continue",
-      }),
-    );
+    const fetchPage = vi.fn(async (): Promise<ItemMarketTransactionsPage> => ({
+      items: [
+        makeTx({
+          id: "old-a",
+          createdAt: new Date("2026-08-03T17:00:00.000Z"), // 25h ago
+        }),
+        makeTx({
+          id: "old-b",
+          createdAt: new Date("2026-08-03T16:00:00.000Z"), // 26h ago
+        }),
+      ],
+      nextCursor: "would-continue",
+    }));
 
     const result = await walkItemMarketTransactions({
       db,
@@ -182,12 +178,10 @@ describe("walkItemMarketTransactions", () => {
   });
 
   it("backfill does not enable handoff when insert fails", async () => {
-    const fetchPage = vi.fn(
-      async (): Promise<ItemMarketTransactionsPage> => ({
-        items: [makeTx({ id: "fresh" })],
-        nextCursor: null,
-      }),
-    );
+    const fetchPage = vi.fn(async (): Promise<ItemMarketTransactionsPage> => ({
+      items: [makeTx({ id: "fresh" })],
+      nextCursor: null,
+    }));
 
     vi.spyOn(
       itemMarketTransactions,
@@ -212,12 +206,10 @@ describe("walkItemMarketTransactions", () => {
   });
 
   it("poll does not enable handoff", async () => {
-    const fetchPage = vi.fn(
-      async (): Promise<ItemMarketTransactionsPage> => ({
-        items: [makeTx({ id: "poll-tx" })],
-        nextCursor: null,
-      }),
-    );
+    const fetchPage = vi.fn(async (): Promise<ItemMarketTransactionsPage> => ({
+      items: [makeTx({ id: "poll-tx" })],
+      nextCursor: null,
+    }));
 
     expect(isItemMarketTxPollEnabled()).toBe(false);
 
