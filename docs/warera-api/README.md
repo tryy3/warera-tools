@@ -1,6 +1,6 @@
 # WarEra API & data docs
 
-Living documentation for how this app talks to WarEra, classifies data, and (over time) replaces the community gateway with an in-process access facade optimized for our workloads.
+Living documentation for how this app talks to WarEra, classifies data, and routes traffic through the in-process access facade (`createWareraClient` → api2).
 
 ## Documents
 

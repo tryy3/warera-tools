@@ -33,14 +33,7 @@ export const EQUIPMENT_TIER_SHORT_LABEL: Record<GearTierId, string> = {
   red: "Mythic",
 };
 
-export type EquipmentSlot =
-  | "weapon"
-  | "helmet"
-  | "chest"
-  | "gloves"
-  | "pants"
-  | "boots"
-  | "other";
+export type EquipmentSlot = "weapon" | "helmet" | "chest" | "gloves" | "pants" | "boots" | "other";
 
 const SLOT_ORDER: readonly EquipmentSlot[] = [
   "weapon",

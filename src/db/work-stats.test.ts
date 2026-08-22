@@ -56,9 +56,7 @@ async function listWorkerRows(db: Db, companyId: string, workerId: string) {
   return db
     .select()
     .from(workerWorkStats)
-    .where(
-      and(eq(workerWorkStats.companyId, companyId), eq(workerWorkStats.workerId, workerId)),
-    )
+    .where(and(eq(workerWorkStats.companyId, companyId), eq(workerWorkStats.workerId, workerId)))
     .orderBy(asc(workerWorkStats.dailyDate));
 }
 
@@ -137,12 +135,8 @@ describe("work-stats db", () => {
       payload: { dailyDate: "2026-08-20" },
     };
 
-    expect(
-      await upsertWorkerWorkDays(db, { companyId: "c1", workerId: "w1" }, [day], t1),
-    ).toBe(1);
-    expect(
-      await upsertWorkerWorkDays(db, { companyId: "c2", workerId: "w1" }, [day], t1),
-    ).toBe(1);
+    expect(await upsertWorkerWorkDays(db, { companyId: "c1", workerId: "w1" }, [day], t1)).toBe(1);
+    expect(await upsertWorkerWorkDays(db, { companyId: "c2", workerId: "w1" }, [day], t1)).toBe(1);
 
     const c1Rows = await listWorkerRows(db, "c1", "w1");
     const c2Rows = await listWorkerRows(db, "c2", "w1");

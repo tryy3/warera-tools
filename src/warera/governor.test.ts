@@ -28,6 +28,24 @@ describe("parseRateLimitHeaders", () => {
 });
 
 describe("createGovernor", () => {
+  it("waits when remaining is 0 without ratelimit-reset using a fallback deadline", async () => {
+    const sleep = vi.fn(async (ms: number) => {
+      t += ms;
+    });
+    let t = 1_000;
+    const g = createGovernor({
+      maxPerMinute: 1000,
+      now: () => t,
+      sleep,
+      jitter: () => 0,
+    });
+    g.recordHeaders(new Headers({ "ratelimit-remaining": "0" }));
+    const result = await g.acquire();
+    expect(result.reason).toBe("header_exhausted");
+    expect(result.waitMs).toBe(1000);
+    expect(sleep).toHaveBeenCalledWith(1000);
+  });
+
   it("waits when remaining is 0 until resetAt", async () => {
     const sleep = vi.fn(async (ms: number) => {
       t += ms;

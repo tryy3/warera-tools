@@ -376,9 +376,7 @@ describe("GET /:itemCode", () => {
     ]);
 
     const skills = encodeURIComponent(JSON.stringify([{ key: "armor", target: 22, band: 1 }]));
-    const res = await appFor(db).request(
-      `http://localhost/chest4?skills=${skills}&countryId=nope`,
-    );
+    const res = await appFor(db).request(`http://localhost/chest4?skills=${skills}&countryId=nope`);
     expect(res.status).toBe(200);
     const body = (await res.json()) as {
       taxRate: number | null;

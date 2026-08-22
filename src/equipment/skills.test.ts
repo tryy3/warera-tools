@@ -1,9 +1,5 @@
 import { describe, expect, it } from "vite-plus/test";
-import {
-  lowestObservedSkills,
-  matchesSkillBands,
-  parseSkillNumbers,
-} from "./skills";
+import { lowestObservedSkills, matchesSkillBands, parseSkillNumbers } from "./skills";
 
 describe("parseSkillNumbers", () => {
   it("keeps finite numbers only", () => {

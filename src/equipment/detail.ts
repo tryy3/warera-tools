@@ -134,8 +134,7 @@ export function buildEquipmentDetail(input: BuildEquipmentDetailInput): Equipmen
   const marketMedian = median(marketMatched.map((r) => r.money));
   const trades = marketMatched.length;
 
-  const sellerNet =
-    marketMedian != null && taxRate != null ? marketMedian / (1 + taxRate) : null;
+  const sellerNet = marketMedian != null && taxRate != null ? marketMedian / (1 + taxRate) : null;
 
   const scrapFloor =
     tier != null && scrapPrice != null ? scrapAmountForTier(tier) * scrapPrice : null;

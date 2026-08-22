@@ -2,7 +2,9 @@ import { describe, expect, it } from "vite-plus/test";
 import type { ItemMarketTxRow } from "../db/item-market-tx-read";
 import { buildEquipmentOverview } from "./overview";
 
-function tx(overrides: Partial<ItemMarketTxRow> & Pick<ItemMarketTxRow, "id" | "money" | "itemCode">): ItemMarketTxRow {
+function tx(
+  overrides: Partial<ItemMarketTxRow> & Pick<ItemMarketTxRow, "id" | "money" | "itemCode">,
+): ItemMarketTxRow {
   return {
     skills: null,
     createdAt: new Date("2026-08-05T12:00:00.000Z"),
@@ -33,19 +35,13 @@ describe("buildEquipmentOverview", () => {
   });
 
   it("does not invent zero-trade item codes", () => {
-    const items = buildEquipmentOverview(
-      [tx({ id: "a", itemCode: "helmet4", money: 30 })],
-      0.2,
-    );
+    const items = buildEquipmentOverview([tx({ id: "a", itemCode: "helmet4", money: 30 })], 0.2);
     expect(items.map((r) => r.itemCode)).toEqual(["helmet4"]);
     expect(items.every((r) => r.trades > 0)).toBe(true);
   });
 
   it("returns null scrap floor and spread when scrap price or tier is missing", () => {
-    const noScrap = buildEquipmentOverview(
-      [tx({ id: "a", itemCode: "chest4", money: 40 })],
-      null,
-    );
+    const noScrap = buildEquipmentOverview([tx({ id: "a", itemCode: "chest4", money: 40 })], null);
     expect(noScrap[0]).toMatchObject({
       marketMedian: 40,
       scrapFloor: null,

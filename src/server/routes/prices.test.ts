@@ -79,7 +79,7 @@ describe("GET /history", () => {
   });
 
   it("returns history for an item", async () => {
-    const recordedAt = new Date("2026-08-01T12:00:00.000Z");
+    const recordedAt = new Date();
     const pollId = await insertPricePoll(db, {
       recordedAt,
       status: "success",

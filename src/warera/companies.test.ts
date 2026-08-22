@@ -116,6 +116,7 @@ describe("fetchCompanyProductionBonus", () => {
     expect(request).toHaveBeenCalledOnce();
     expect(request.mock.calls[0]).toHaveLength(1);
     expect(String(request.mock.calls[0]![0])).toContain("company.getProductionBonus");
+    expect(request.mock.calls[0]?.[1]).toBeUndefined();
   });
 });
 

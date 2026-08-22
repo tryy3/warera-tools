@@ -32,8 +32,7 @@ export function workerDay(input: WorkerDayInput): WorkerDayResult {
   const actionsPerDay = dailyActionsFromBar(skillValueFromLevel("energy", input.energyLevel));
   const ppPerAction = skillValueFromLevel("production", input.productionLevel);
   const basePpPerDay = actionsPerDay * ppPerAction;
-  const effectivePpPerDay =
-    basePpPerDay * (1 + input.productionBonus + input.fidelityPct / 100);
+  const effectivePpPerDay = basePpPerDay * (1 + input.productionBonus + input.fidelityPct / 100);
   const revenuePerDay = effectivePpPerDay * input.profitPerPp;
   const ownerCostPerDay = basePpPerDay * input.grossWagePerPp;
   const contributionPerDay = revenuePerDay - ownerCostPerDay;

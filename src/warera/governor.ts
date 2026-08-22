@@ -64,7 +64,12 @@ export function createGovernor(options: GovernorOptions) {
     const hasActivePause =
       remaining !== null && remaining <= 0 && resetAt !== null && resetAt > now();
     if (hasActivePause && parsed.remaining !== null && parsed.remaining > 0) return;
-    if (parsed.remaining !== null) remaining = parsed.remaining;
+    if (parsed.remaining !== null) {
+      remaining = parsed.remaining;
+      if (remaining <= 0 && parsed.resetSeconds === null && resetAt === null) {
+        resetAt = now() + 1000;
+      }
+    }
     if (parsed.resetSeconds !== null) resetAt = now() + parsed.resetSeconds * 1000;
   }
 

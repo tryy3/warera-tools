@@ -310,6 +310,156 @@ describe("createWareraClient", () => {
           e.value === 498,
       ),
     ).toBe(true);
+    expect(
+      rec.events.some(
+        (e) =>
+          e.type === "distribution" &&
+          e.name === "warera.upstream.latency_ms" &&
+          e.attrs?.call_class === "interactive" &&
+          e.attrs?.outcome === "ok",
+      ),
+    ).toBe(true);
+    expect(
+      rec.events.some(
+        (e) =>
+          e.type === "distribution" && e.name === "warera.upstream.batch_size" && e.value === 1,
+      ),
+    ).toBe(true);
+    expect(
+      rec.events.some(
+        (e) =>
+          e.type === "distribution" &&
+          e.name === "warera.upstream.response_bytes" &&
+          e.value === 11,
+      ),
+    ).toBe(true);
+  });
+
+  it("emits rate_limit_wait_ms when governor pauses", async () => {
+    const rec = createRecordingBackend();
+    setMetricsBackend(rec);
+    let t = 0;
+    const sleep = vi.fn(async (ms: number) => {
+      t += ms;
+    });
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ ok: true }), {
+          status: 200,
+          headers: { "ratelimit-remaining": "0", "ratelimit-reset": "1" },
+        }),
+      )
+      .mockResolvedValueOnce(new Response(JSON.stringify({ ok: true }), { status: 200 }));
+
+    const client = createWareraClient({
+      config: { ...baseConfig, wareraMaxRequestsPerMinute: 10_000 },
+      logger: testLogger(),
+      fetchImpl: fetchMock,
+      sleep,
+      now: () => t,
+    });
+
+    await client.request("/v1/ping");
+    await client.request("/v1/ping");
+    expect(
+      rec.events.some(
+        (e) =>
+          e.type === "distribution" &&
+          e.name === "warera.upstream.rate_limit_wait_ms" &&
+          e.attrs?.reason === "header_exhausted" &&
+          (e.value as number) >= 1000,
+      ),
+    ).toBe(true);
+  });
+
+  it("records wire response_bytes not JSON.stringify length", async () => {
+    const rec = createRecordingBackend();
+    setMetricsBackend(rec);
+    const wireBody = '{ "a": 1 }\n';
+    const fetchMock = vi.fn().mockResolvedValue(new Response(wireBody, { status: 200 }));
+    const client = createWareraClient({
+      config: { ...baseConfig, wareraMaxRequestsPerMinute: 10_000 },
+      logger: testLogger(),
+      fetchImpl: fetchMock,
+      sleep: async () => {},
+    });
+
+    await client.request("/v1/ping");
+    expect(
+      rec.events.some(
+        (e) =>
+          e.type === "distribution" &&
+          e.name === "warera.upstream.response_bytes" &&
+          e.value === wireBody.length,
+      ),
+    ).toBe(true);
+    expect(wireBody.length).not.toBe(JSON.stringify({ a: 1 }).length);
+  });
+
+  it("dedups two concurrent identical POST singles with json body", async () => {
+    const rec = createRecordingBackend();
+    setMetricsBackend(rec);
+    let resolveFetch!: (value: Response) => void;
+    const fetchMock = vi.fn(
+      () =>
+        new Promise<Response>((resolve) => {
+          resolveFetch = resolve;
+        }),
+    );
+    const client = createWareraClient({
+      config: { ...baseConfig, wareraMaxRequestsPerMinute: 10_000 },
+      logger: testLogger(),
+      fetchImpl: fetchMock,
+      sleep: async () => {},
+    });
+
+    const init = {
+      method: "POST" as const,
+      json: { itemCode: "lead", count: 1 },
+      authStyle: "api-key" as const,
+    };
+    const first = client.request("company.getRecommendedRegionIdsByItemCode", init);
+    const second = client.request("company.getRecommendedRegionIdsByItemCode", init);
+
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    resolveFetch(new Response(JSON.stringify({ result: { data: ["reg-a"] } }), { status: 200 }));
+    await expect(Promise.all([first, second])).resolves.toEqual([
+      { result: { data: ["reg-a"] } },
+      { result: { data: ["reg-a"] } },
+    ]);
+    expect(
+      rec.events.some(
+        (event) => event.type === "count" && event.name === "warera.upstream.dedup_join",
+      ),
+    ).toBe(true);
+  });
+
+  it("treats malformed GET input query as undefined for dedup", async () => {
+    let resolveFetch!: (value: Response) => void;
+    const fetchMock = vi.fn(
+      () =>
+        new Promise<Response>((resolve) => {
+          resolveFetch = resolve;
+        }),
+    );
+    const client = createWareraClient({
+      config: { ...baseConfig, wareraMaxRequestsPerMinute: 10_000 },
+      logger: testLogger(),
+      fetchImpl: fetchMock,
+      sleep: async () => {},
+    });
+
+    const path = "user.getUserLite?input=not-json";
+    const first = client.request(path);
+    const second = client.request(path);
+
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    resolveFetch(new Response(JSON.stringify({ result: { data: { id: "a" } } }), { status: 200 }));
+    await expect(Promise.all([first, second])).resolves.toEqual([
+      { result: { data: { id: "a" } } },
+      { result: { data: { id: "a" } } },
+    ]);
   });
 
   it("dedups two concurrent identical GET singles", async () => {

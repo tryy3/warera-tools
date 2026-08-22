@@ -1,10 +1,5 @@
 export { isWareraNotFoundError, isWareraGetRejectedError } from "./errors";
-export {
-  createWareraClient,
-  API2_TRPC_BASE,
-  type WareraAuthStyle,
-  type WareraRequestInit,
-} from "./client";
+export { createWareraClient, type WareraAuthStyle, type WareraRequestInit } from "./client";
 export { inferCallClass, type WareraCallClass } from "./call-class";
 export { createRateLimiter } from "./rate-limit";
 export {

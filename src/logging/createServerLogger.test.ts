@@ -1,10 +1,43 @@
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, describe, expect, it } from "vite-plus/test";
+import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import type { AppConfig } from "../config/env";
 import { createServerLogger } from "./createServerLogger";
 import { MASK_KEYS, resolveMaskEnabled } from "./mask";
+
+const {
+  initSentryMock,
+  attachSentryTransportsMock,
+  setMetricsBackendMock,
+  createSentryMetricsBackendMock,
+} = vi.hoisted(() => ({
+  initSentryMock: vi.fn(() => true),
+  attachSentryTransportsMock: vi.fn(),
+  setMetricsBackendMock: vi.fn(),
+  createSentryMetricsBackendMock: vi.fn(() => ({
+    count: vi.fn(),
+    distribution: vi.fn(),
+    gauge: vi.fn(),
+  })),
+}));
+
+vi.mock("./sentry", () => ({
+  initSentry: initSentryMock,
+  attachSentryTransports: attachSentryTransportsMock,
+}));
+
+vi.mock("../metrics", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../metrics")>();
+  return {
+    ...actual,
+    setMetricsBackend: setMetricsBackendMock,
+  };
+});
+
+vi.mock("../metrics/sentry", () => ({
+  createSentryMetricsBackend: createSentryMetricsBackendMock,
+}));
 
 function baseConfig(overrides: Partial<AppConfig> = {}): AppConfig {
   return {
@@ -46,6 +79,7 @@ describe("createServerLogger", () => {
   afterEach(() => {
     for (const dir of dirs) rmSync(dir, { recursive: true, force: true });
     dirs.length = 0;
+    vi.clearAllMocks();
   });
 
   it("exposes level methods and child", () => {
@@ -79,6 +113,17 @@ describe("createServerLogger", () => {
 
   it("does not throw when sentryDsn is unset", () => {
     expect(() => createServerLogger(baseConfig({ sentryDsn: undefined }))).not.toThrow();
+    expect(initSentryMock).not.toHaveBeenCalled();
+    expect(setMetricsBackendMock).not.toHaveBeenCalled();
+  });
+
+  it("wires Sentry metrics backend when initSentry succeeds", () => {
+    initSentryMock.mockReturnValueOnce(true);
+    createServerLogger(baseConfig({ sentryDsn: "https://example@o0.ingest.sentry.io/0" }));
+    expect(initSentryMock).toHaveBeenCalledOnce();
+    expect(createSentryMetricsBackendMock).toHaveBeenCalledOnce();
+    expect(setMetricsBackendMock).toHaveBeenCalledOnce();
+    expect(attachSentryTransportsMock).toHaveBeenCalledOnce();
   });
 
   it("writes JSON lines to LOG_FILE when set", async () => {

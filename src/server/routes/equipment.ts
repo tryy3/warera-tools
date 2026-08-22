@@ -25,11 +25,7 @@ function parseSkillsQuery(raw: string | undefined): SkillBand[] | null {
     if (!Array.isArray(v)) throw new Error("not array");
     return v.map((row) => {
       const r = row as SkillBand;
-      if (
-        typeof r.key !== "string" ||
-        typeof r.target !== "number" ||
-        typeof r.band !== "number"
-      ) {
+      if (typeof r.key !== "string" || typeof r.target !== "number" || typeof r.band !== "number") {
         throw new Error("bad band");
       }
       return { key: r.key, target: r.target, band: r.band };

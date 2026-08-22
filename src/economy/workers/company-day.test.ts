@@ -142,9 +142,7 @@ describe("companyDay", () => {
       win.workers[0]!.current.contributionPerDay,
     );
     expect(win.workers[0]!.atMaxFidelity.effectivePpPerDay).toBeCloseTo(
-      win.workers[0]!.current.effectivePpPerDay *
-        (1 + 0.5 + MAX_FIDELITY_PCT / 100) /
-        (1 + 0.5),
+      (win.workers[0]!.current.effectivePpPerDay * (1 + 0.5 + MAX_FIDELITY_PCT / 100)) / (1 + 0.5),
       6,
     );
     expect(win.netPerDayAtMaxWorkerFidelity).toBeGreaterThan(win.netPerDay);

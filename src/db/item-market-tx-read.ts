@@ -16,7 +16,10 @@ export async function listItemMarketTxSince(
   itemCode?: string,
 ): Promise<ItemMarketTxRow[]> {
   const cond = itemCode
-    ? and(gte(itemMarketTransactions.createdAt, since), eq(itemMarketTransactions.itemCode, itemCode))
+    ? and(
+        gte(itemMarketTransactions.createdAt, since),
+        eq(itemMarketTransactions.itemCode, itemCode),
+      )
     : gte(itemMarketTransactions.createdAt, since);
   const rows = await db
     .select({

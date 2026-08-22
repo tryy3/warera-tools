@@ -37,8 +37,7 @@ export function buildEquipmentOverview(
     const marketMedian = median(moneys);
     const scrapFloor =
       tier != null && scrapPrice != null ? scrapAmountForTier(tier) * scrapPrice : null;
-    const spread =
-      marketMedian != null && scrapFloor != null ? marketMedian - scrapFloor : null;
+    const spread = marketMedian != null && scrapFloor != null ? marketMedian - scrapFloor : null;
     items.push({
       itemCode,
       tier,

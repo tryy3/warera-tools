@@ -112,9 +112,7 @@ function trpc(data: unknown) {
   return { result: { data } };
 }
 
-function mockUserLiteBatch(overrides?: {
-  failUserIds?: Set<string>;
-}) {
+function mockUserLiteBatch(overrides?: { failUserIds?: Set<string> }) {
   return vi.fn(async (items: { input?: { userId?: string } }[]) =>
     items.map((item) => {
       const userId = item.input?.userId ?? "unknown";

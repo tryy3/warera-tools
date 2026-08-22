@@ -63,11 +63,7 @@ export async function upsertWorkerWorkDays(
         fetchedAt,
       })
       .onConflictDoUpdate({
-        target: [
-          workerWorkStats.companyId,
-          workerWorkStats.workerId,
-          workerWorkStats.dailyDate,
-        ],
+        target: [workerWorkStats.companyId, workerWorkStats.workerId, workerWorkStats.dailyDate],
         set: {
           employeeProd: day.employeeProd,
           total: day.total,

@@ -110,8 +110,7 @@ export function mergeWorkersWithUserLite(
     return {
       ...w,
       username: lite.username || w.username,
-      energyLevel:
-        typeof lite.skillLevels.energy === "number" ? lite.skillLevels.energy : null,
+      energyLevel: typeof lite.skillLevels.energy === "number" ? lite.skillLevels.energy : null,
       productionLevel:
         typeof lite.skillLevels.production === "number" ? lite.skillLevels.production : null,
       enrichmentError: false,

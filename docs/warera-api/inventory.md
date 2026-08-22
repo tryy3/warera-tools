@@ -44,8 +44,8 @@ Browser (SPA)
 | Resource | What | Who refreshes | Cadence (default) | Upstream today | Storage | Main consumers |
 | --- | --- | --- | --- | --- | --- | --- |
 | Market prices | Item + scraps prices, top-order aggregates | `price-poll`; manual Market refresh | Hourly (`0 0 * * * *`) | api2 | Append history (`price_polls` / `price_snapshots`) + latest reads | Market, Calculator, Companies, Growth, Opportunities |
-| Recommended regions | Best region id per producible item | `recommended-regions-poll`; cold miss on advisor paths | Hourly (`0 0 * * * *`) | **Forced api2** POST + `X-API-Key` (not on gateway) | Latest upsert (`recommended_regions`) | Advisor / company economy |
-| Item-market transactions | Equipment / itemMarket sales stream | `item-market-tx-backfill` (once per process) then `item-market-tx-poll` | Poll every minute; backfill `maxRuns: 1` | **Forced api2** (gateway DB issues historically) | Append-only (`item_market_transactions`) + handoff cursor | Equipment Market (`/api/equipment`) |
+| Recommended regions | Best region id per producible item | `recommended-regions-poll`; cold miss on advisor paths | Hourly (`0 0 * * * *`) | api2 POST + `X-API-Key` | Latest upsert (`recommended_regions`) | Advisor / company economy |
+| Item-market transactions | Equipment / itemMarket sales stream | `item-market-tx-backfill` (once per process) then `item-market-tx-poll` | Poll every minute; backfill `maxRuns: 1` | api2 + `X-API-Key` | Append-only (`item_market_transactions`) + handoff cursor | Equipment Market (`/api/equipment`) |
 
 ### Geo
 
@@ -65,7 +65,7 @@ The MU watchlist is the set of distinct ids in `mu_watch_reasons` (seeded by `mi
 | --- | --- | --- | --- | --- | --- | --- |
 | Selected player | `userId` + username | Shell selection (no WarEra cron) | Session / explicit Load | Search/lite via api2 | Shell state; recent list in localStorage | All user tools |
 | Followed players | Followed player ids + reasons; current `players` row (username, MU, workplace) | `sync-followed-players` (runs inside `mu-stats-poll` + `work-stats-poll`); Follow CRUD from shell | On poll; on add/remove | `user.getUserById` via api2 batch | `player_watch_reasons` (reasons) + `players` (current) | MU follow reconcile, work-stats poll, follow UI |
-| Work daily stats | Employer totals (`work.getStatsByCompany`) + per-employee days (`work.getStatsByWorkerAndCompany`) for followed players’ factories | `work-stats-poll` | Hourly at `:10` | **Forced api2** GET batch with POST fallback + `X-API-Key` (not on gateway) | Upsert `company_work_stats` / `worker_work_stats` (latest per company+date / company+worker+date) | Work / income views (planned) |
+| Work daily stats | Employer totals (`work.getStatsByCompany`) + per-employee days (`work.getStatsByWorkerAndCompany`) for followed players’ factories | `work-stats-poll` | Hourly at `:10` | api2 GET batch with POST fallback + `X-API-Key` | Upsert `company_work_stats` / `worker_work_stats` (latest per company+date / company+worker+date) | Work / income views (planned) |
 | Company pack | Companies + advisor inputs for a player (opportunities include live `buyPrice`/`sellPrice`) | Shell Load/Refresh (`refresh=1` busts pack) | Server TTL ~600s | Mix: companies/regions via api2; some company helpers use `X-API-Key` | `company_packs` + TQ memory; Companies page may apply session-only buy/sell overrides (not persisted) | Companies, Growth |
 | User aggregate | Skills / job / income-oriented payload | `GET /api/user` on demand | Aligned with pack / Load | api2 | Server TTL patterns + TQ | Skills optimizer, income views |
 | Workers / wages | Work offers / worker rows + lite skills/username | Advisor on Companies Load/Refresh: `worker.getWorkers` then batched `user.getUserLite` for unique worker ids | On Load / tool need | api2 | Ephemeral / pack-adjacent — not a long Global history | Companies (sim + badges); wage helpers |
