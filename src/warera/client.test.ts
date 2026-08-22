@@ -1,6 +1,8 @@
 import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import { createWareraClient } from "./client";
 import type { AppConfig } from "../config/env";
+import { resetMetricsForTests, setMetricsBackend } from "../metrics";
+import { createRecordingBackend } from "../metrics/recording";
 
 const baseConfig = {
   wareraApiBaseUrl: "https://api2.warera.io/trpc",
@@ -20,6 +22,7 @@ function testLogger() {
 
 describe("createWareraClient", () => {
   afterEach(() => {
+    resetMetricsForTests();
     vi.unstubAllGlobals();
     vi.restoreAllMocks();
   });
@@ -241,7 +244,7 @@ describe("createWareraClient", () => {
     expect(sleep).not.toHaveBeenCalled();
   });
 
-  it("logs path, status, and durationMs", async () => {
+  it("logs procedure, call class, status, duration, and outcome", async () => {
     const logger = testLogger() as { debug: ReturnType<typeof vi.fn> };
     const fetchMock = vi
       .fn()
@@ -257,13 +260,83 @@ describe("createWareraClient", () => {
     await client.request("/v1/ping");
     expect(logger.debug).toHaveBeenCalledWith(
       expect.objectContaining({
-        path: "/v1/ping",
+        procedure: "v1/ping",
+        call_class: "interactive",
         status: 200,
         durationMs: expect.any(Number),
         outcome: "ok",
       }),
-      expect.any(String),
+      "warera request",
     );
+  });
+
+  it("emits call/latency/batch metrics on success", async () => {
+    const rec = createRecordingBackend();
+    setMetricsBackend(rec);
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ ok: true }), {
+        status: 200,
+        headers: { "ratelimit-remaining": "498", "ratelimit-reset": "59" },
+      }),
+    );
+    const client = createWareraClient({
+      config: { ...baseConfig, wareraMaxRequestsPerMinute: 10_000 },
+      logger: testLogger(),
+      fetchImpl: fetchMock,
+      sleep: async () => {},
+    });
+    await client.request("country.getAllCountries", { callClass: "interactive" });
+    expect(rec.events.some((e) => e.type === "count" && e.name === "warera.upstream.call")).toBe(
+      true,
+    );
+    expect(
+      rec.events.some(
+        (e) =>
+          e.type === "count" &&
+          e.name === "warera.upstream.call" &&
+          e.attrs?.procedure === "country.getAllCountries" &&
+          e.attrs?.call_class === "interactive" &&
+          e.attrs?.outcome === "ok",
+      ),
+    ).toBe(true);
+    expect(
+      rec.events.some(
+        (e) =>
+          e.type === "gauge" &&
+          e.name === "warera.upstream.rate_limit_remaining" &&
+          e.value === 498,
+      ),
+    ).toBe(true);
+  });
+
+  it("records rate_limited on 429 then ok on retry", async () => {
+    const rec = createRecordingBackend();
+    setMetricsBackend(rec);
+    let t = 0;
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response("nope", {
+          status: 429,
+          headers: { "ratelimit-reset": "1", "ratelimit-remaining": "0" },
+        }),
+      )
+      .mockResolvedValueOnce(new Response(JSON.stringify({ ok: true }), { status: 200 }));
+    const client = createWareraClient({
+      config: { ...baseConfig, wareraMaxRequestsPerMinute: 10_000 },
+      logger: testLogger(),
+      fetchImpl: fetchMock,
+      sleep: async (ms) => {
+        t += ms;
+      },
+      now: () => t,
+    });
+    await client.request("country.getAllCountries");
+    const outcomes = rec.events
+      .filter((e) => e.type === "count" && e.name === "warera.upstream.call")
+      .map((e) => e.attrs?.outcome);
+    expect(outcomes).toContain("rate_limited");
+    expect(outcomes).toContain("ok");
   });
 
   it("does not retry POST when another query value contains batch=1", async () => {
@@ -396,7 +469,7 @@ describe("createWareraClient", () => {
     expect(sleep).toHaveBeenCalled();
     expect(logger.debug).toHaveBeenCalledWith(
       expect.objectContaining({
-        path: "/v1/ping",
+        procedure: "v1/ping",
         status: 429,
         outcome: "rate_limited",
       }),
@@ -437,7 +510,7 @@ describe("createWareraClient", () => {
     expect(sleep).toHaveBeenCalled();
     expect(logger.debug).toHaveBeenCalledWith(
       expect.objectContaining({
-        path: "/v1/ping",
+        procedure: "v1/ping",
         status: 429,
         outcome: "rate_limited",
       }),

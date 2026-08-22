@@ -5,6 +5,7 @@ export {
   type WareraAuthStyle,
   type WareraRequestInit,
 } from "./client";
+export { inferCallClass, type WareraCallClass } from "./call-class";
 export { createRateLimiter } from "./rate-limit";
 export {
   fetchItemPrices,

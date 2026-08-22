@@ -1,6 +1,8 @@
 import type { AppConfig } from "../config/env";
 import type { Logger } from "../logging/logger";
-import { createGovernor } from "./governor";
+import { count, distribution, gauge } from "../metrics";
+import { inferCallClass, type WareraCallClass } from "./call-class";
+import { createGovernor, parseRateLimitHeaders } from "./governor";
 import {
   buildBatchInputRecord,
   chunkBatchItemsByMaxUrlLength,
@@ -26,6 +28,7 @@ export type WareraAuthStyle = "auto" | "api-key" | "bearer";
 
 export type WareraRequestInit = RequestInit & {
   skipRateLimit?: boolean;
+  callClass?: WareraCallClass;
   /** JSON body — sets Content-Type and stringifies (for POST procedures). */
   json?: unknown;
   /**
@@ -65,12 +68,28 @@ export type CreateWareraClientOptions = {
 class WareraRequestError extends Error {
   readonly status: number | undefined;
   readonly outcome: "rate_limited" | "http_error";
+  readonly byteLength: number;
+  readonly headers: Headers | undefined;
 
-  constructor(message: string, status: number | undefined, outcome: "rate_limited" | "http_error") {
+  constructor(
+    message: string,
+    status: number | undefined,
+    outcome: "rate_limited" | "http_error",
+    byteLength = 0,
+    headers?: Headers,
+  ) {
     super(message);
     this.status = status;
     this.outcome = outcome;
+    this.byteLength = byteLength;
+    this.headers = headers;
   }
+}
+
+type RequestOutcome = "ok" | "rate_limited" | "http_error" | "network_error";
+
+function procedureFromPath(path: string): string {
+  return path.split("?")[0]!.replace(/^\//, "");
 }
 
 function isBatchPost(method: string, path: string): boolean {
@@ -125,22 +144,25 @@ export function createWareraClient(options: CreateWareraClientOptions) {
     const response = await fetchImpl(url, { ...fetchInit, method, headers });
     governor.recordHeaders(response.headers);
     if (response.ok) {
-      let json: unknown;
+      let bodyText = "";
       try {
-        json = await response.json();
+        bodyText = await response.text();
+        const json: unknown = JSON.parse(bodyText);
+        return {
+          ok: true,
+          json,
+          status: response.status,
+          headers: response.headers,
+        };
       } catch {
         throw new WareraRequestError(
           `WarEra response JSON parse failed: HTTP ${response.status}`,
           response.status,
           "http_error",
+          bodyText.length,
+          response.headers,
         );
       }
-      return {
-        ok: true,
-        json,
-        status: response.status,
-        headers: response.headers,
-      };
     }
     if (response.status === 429) {
       governor.note429(response.headers);
@@ -152,12 +174,16 @@ export function createWareraClient(options: CreateWareraClientOptions) {
           "WarEra request failed: 429 (body read failed)",
           response.status,
           "rate_limited",
+          0,
+          response.headers,
         );
       }
       throw new WareraRequestError(
         `WarEra request failed: 429 ${bodyText.slice(0, BODY_SNIPPET_LEN)}`.trim(),
         response.status,
         "rate_limited",
+        bodyText.length,
+        response.headers,
       );
     }
     const bodyText = await response.text();
@@ -171,11 +197,65 @@ export function createWareraClient(options: CreateWareraClientOptions) {
     authStyle: WareraAuthStyle,
     skipRateLimit: boolean,
     baseUrlOverride: string | undefined,
+    callClass: WareraCallClass,
+    procedures: string[],
   ): Promise<unknown> {
     const baseUrl = baseUrlOverride ?? options.config.wareraApiBaseUrl;
+    const procedure = procedureFromPath(path);
+
+    function emitAttempt(
+      outcome: RequestOutcome,
+      durationMs: number,
+      byteLength: number,
+      status: number | undefined,
+      headers: Headers | undefined,
+    ): void {
+      for (const slotProcedure of procedures) {
+        count("warera.upstream.call", 1, {
+          procedure: slotProcedure,
+          call_class: callClass,
+          outcome,
+        });
+      }
+      distribution(
+        "warera.upstream.latency_ms",
+        durationMs,
+        { call_class: callClass, outcome },
+        "millisecond",
+      );
+      distribution("warera.upstream.batch_size", procedures.length, { call_class: callClass });
+      distribution("warera.upstream.response_bytes", byteLength, { call_class: callClass });
+
+      const parsedHeaders = headers === undefined ? null : parseRateLimitHeaders(headers);
+      if (parsedHeaders?.remaining !== null && parsedHeaders?.remaining !== undefined) {
+        gauge("warera.upstream.rate_limit_remaining", parsedHeaders.remaining);
+      }
+
+      options.logger.debug(
+        {
+          procedure,
+          call_class: callClass,
+          status,
+          durationMs,
+          outcome,
+          ...(parsedHeaders?.remaining == null
+            ? {}
+            : { ratelimit_remaining: parsedHeaders.remaining }),
+          ...(parsedHeaders?.resetSeconds == null
+            ? {}
+            : { ratelimit_reset: parsedHeaders.resetSeconds }),
+        },
+        "warera request",
+      );
+    }
 
     for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
-      await governor.acquire({ skipLocal: skipRateLimit });
+      const acquire = await governor.acquire({ skipLocal: skipRateLimit });
+      if (acquire.waitMs > 0 && acquire.reason !== null) {
+        distribution("warera.upstream.rate_limit_wait_ms", acquire.waitMs, {
+          reason: acquire.reason,
+        });
+      }
 
       const started = now();
       try {
@@ -183,9 +263,12 @@ export function createWareraClient(options: CreateWareraClientOptions) {
         const durationMs = now() - started;
 
         if (response.ok) {
-          options.logger.debug(
-            { path, status: response.status, durationMs, outcome: "ok" },
-            "warera request",
+          emitAttempt(
+            "ok",
+            durationMs,
+            JSON.stringify(response.json).length,
+            response.status,
+            response.headers,
           );
           return response.json;
         }
@@ -195,14 +278,19 @@ export function createWareraClient(options: CreateWareraClientOptions) {
           `WarEra request failed: ${response.status} ${bodySnippet}`.trim(),
           response.status,
           "http_error",
+          response.bodyText.length,
+          response.headers,
         );
       } catch (err) {
         const durationMs = now() - started;
         const requestError = err instanceof WareraRequestError ? err : null;
         const outcome = requestError?.outcome ?? "network_error";
-        options.logger.debug(
-          { path, status: requestError?.status, durationMs, outcome },
-          "warera request",
+        emitAttempt(
+          outcome,
+          durationMs,
+          requestError?.byteLength ?? 0,
+          requestError?.status,
+          requestError?.headers,
         );
         const is429 = outcome === "rate_limited";
         if (attempt >= MAX_RETRIES || !canRetry(method, path, requestError?.status, is429)) {
@@ -219,8 +307,16 @@ export function createWareraClient(options: CreateWareraClientOptions) {
   }
 
   async function request<T>(path: string, init: WareraRequestInit = {}): Promise<T> {
-    const { skipRateLimit, json, authStyle = "auto", baseUrl: baseUrlOverride, ...rest } = init;
+    const {
+      skipRateLimit,
+      callClass: callClassOverride,
+      json,
+      authStyle = "auto",
+      baseUrl: baseUrlOverride,
+      ...rest
+    } = init;
     const method = (rest.method ?? (json !== undefined ? "POST" : "GET")).toUpperCase();
+    const callClass = inferCallClass(callClassOverride);
     const fetchInit: RequestInit = { ...rest };
     if (json !== undefined) {
       fetchInit.body = JSON.stringify(json);
@@ -238,6 +334,8 @@ export function createWareraClient(options: CreateWareraClientOptions) {
       authStyle,
       Boolean(skipRateLimit),
       baseUrlOverride,
+      callClass,
+      [procedureFromPath(path)],
     )) as T;
   }
 
@@ -247,9 +345,15 @@ export function createWareraClient(options: CreateWareraClientOptions) {
   ): Promise<TrpcBatchSlotResult[]> {
     if (items.length === 0) return [];
 
-    const { skipRateLimit, authStyle = "auto", baseUrl: baseUrlOverride } = init;
+    const {
+      skipRateLimit,
+      callClass: callClassOverride,
+      authStyle = "auto",
+      baseUrl: baseUrlOverride,
+    } = init;
     const method = (init.method ?? "GET").toUpperCase();
     const isPost = method === "POST";
+    const callClass = inferCallClass(callClassOverride);
 
     const out: TrpcBatchSlotResult[] = [];
 
@@ -275,6 +379,8 @@ export function createWareraClient(options: CreateWareraClientOptions) {
           authStyle,
           Boolean(skipRateLimit),
           baseUrlOverride,
+          callClass,
+          chunk.map((item) => item.procedure),
         );
         out.push(...parseTrpcBatchResponse(json));
       }
