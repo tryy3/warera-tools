@@ -166,6 +166,59 @@ describe("createWareraClient", () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
+  it("does not advance the governor clock once per concurrent sleep", async () => {
+    vi.spyOn(Math, "random").mockReturnValue(0);
+    let t = 0;
+    const sleeps: Array<{ ms: number; resolve: () => void }> = [];
+    const sleep = vi.fn(
+      (ms: number) =>
+        new Promise<void>((resolve) => {
+          sleeps.push({ ms, resolve });
+        }),
+    );
+    let resolveFirstFetch!: (response: Response) => void;
+    const firstFetch = new Promise<Response>((resolve) => {
+      resolveFirstFetch = resolve;
+    });
+    const fetchMock = vi
+      .fn()
+      .mockReturnValueOnce(firstFetch)
+      .mockImplementation(() => new Response(JSON.stringify({ ok: true }), { status: 200 }));
+    const client = createWareraClient({
+      config: { ...baseConfig, wareraMaxRequestsPerMinute: 1 },
+      logger: testLogger(),
+      fetchImpl: fetchMock,
+      sleep,
+      now: () => t,
+    });
+
+    const first = client.request("/a");
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    const second = client.request("/b");
+    await vi.waitFor(() => expect(sleeps).toHaveLength(1));
+    expect(sleeps[0]?.ms).toBe(60_001);
+
+    resolveFirstFetch(
+      new Response("slow down", {
+        status: 429,
+        headers: { "Retry-After": "10" },
+      }),
+    );
+    await vi.waitFor(() => expect(sleeps).toHaveLength(2));
+    expect(sleeps[1]?.ms).toBe(10_010);
+
+    t = 60_001;
+    sleeps[0]?.resolve();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    sleeps[1]?.resolve();
+    await vi.waitFor(() => expect(sleeps).toHaveLength(3));
+    expect(sleeps[2]?.ms).toBe(60_001);
+
+    t = 120_002;
+    sleeps[2]?.resolve();
+    await expect(Promise.all([first, second])).resolves.toEqual([{ ok: true }, { ok: true }]);
+  });
+
   it("skips local budget waits when skipRateLimit is set and headers are healthy", async () => {
     let t = 0;
     const sleep = vi.fn(async (ms: number) => {
@@ -325,14 +378,17 @@ describe("createWareraClient", () => {
         text: () => Promise.reject(new Error("body read failed")),
       } as Response)
       .mockResolvedValueOnce(new Response(JSON.stringify({ ok: true }), { status: 200 }));
-    const sleep = vi.fn(async () => {});
+    let t = 0;
+    const sleep = vi.fn(async (ms: number) => {
+      t += ms;
+    });
     const logger = testLogger() as { debug: ReturnType<typeof vi.fn> };
     const client = createWareraClient({
       config: { ...baseConfig, wareraMaxRequestsPerMinute: 10_000 },
       logger: logger as never,
       fetchImpl: fetchMock,
       sleep,
-      now: () => 0,
+      now: () => t,
     });
 
     await expect(client.request("/v1/ping")).resolves.toEqual({ ok: true });
@@ -362,14 +418,17 @@ describe("createWareraClient", () => {
         }),
       )
       .mockResolvedValueOnce(new Response(JSON.stringify({ ok: true }), { status: 200 }));
-    const sleep = vi.fn(async () => {});
+    let t = 0;
+    const sleep = vi.fn(async (ms: number) => {
+      t += ms;
+    });
     const logger = testLogger() as { debug: ReturnType<typeof vi.fn> };
     const client = createWareraClient({
       config: { ...baseConfig, wareraMaxRequestsPerMinute: 10_000 },
       logger: logger as never,
       fetchImpl: fetchMock,
       sleep,
-      now: () => 0,
+      now: () => t,
     });
     await expect(client.request("/v1/ping", { skipRateLimit: true })).resolves.toEqual({
       ok: true,

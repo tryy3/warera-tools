@@ -101,14 +101,10 @@ export function createWareraClient(options: CreateWareraClientOptions) {
   const fetchImpl = options.fetchImpl ?? globalThis.fetch.bind(globalThis);
   const sleep = options.sleep ?? ((ms: number) => new Promise((r) => setTimeout(r, ms)));
   const now = options.now ?? (() => Date.now());
-  let governorNow = now();
   const governor = createGovernor({
     maxPerMinute: options.config.wareraMaxRequestsPerMinute,
-    now: () => Math.max(now(), governorNow),
-    sleep: async (ms) => {
-      await sleep(ms);
-      governorNow = Math.max(now(), governorNow + ms);
-    },
+    now,
+    sleep,
   });
 
   async function requestOnce(
