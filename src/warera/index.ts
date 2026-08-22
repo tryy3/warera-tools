@@ -22,6 +22,8 @@ export {
   buildBatchInputRecord,
   parseTrpcBatchResponse,
   chunkBatchItemsByMaxUrlLength,
+  chunkBatchItemsByMaxSlots,
+  WARERA_MAX_BATCH_SLOTS,
   unwrapTrpcData,
   type WareraBatchItem,
   type TrpcBatchSlotResult,

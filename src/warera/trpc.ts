@@ -9,6 +9,20 @@ export type WareraBatchItem = {
   input?: unknown;
 };
 
+export const WARERA_MAX_BATCH_SLOTS = 50;
+
+export function chunkBatchItemsByMaxSlots(
+  items: WareraBatchItem[],
+  maxSlots: number,
+): WareraBatchItem[][] {
+  if (items.length === 0) return [];
+  const chunks: WareraBatchItem[][] = [];
+  for (let i = 0; i < items.length; i += maxSlots) {
+    chunks.push(items.slice(i, i + maxSlots));
+  }
+  return chunks;
+}
+
 export type TrpcBatchSlotResult<T = unknown> =
   | { ok: true; data: T }
   | { ok: false; error: unknown };

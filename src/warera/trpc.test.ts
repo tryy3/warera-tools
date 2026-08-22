@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vite-plus/test";
 import {
+  chunkBatchItemsByMaxSlots,
   chunkBatchItemsByMaxUrlLength,
   parseTrpcBatchResponse,
   wareraBatchPath,
@@ -55,6 +56,17 @@ describe("parseTrpcBatchResponse", () => {
   it("treats missing result.data as ok false", () => {
     expect(parseTrpcBatchResponse([{}])).toEqual([{ ok: false, error: {} }]);
   });
+});
+
+it("chunkBatchItemsByMaxSlots splits 51 items into 50 + 1", () => {
+  const items = Array.from({ length: 51 }, (_, i) => ({
+    procedure: "user.getUserLite",
+    input: { userId: String(i) },
+  }));
+  const chunks = chunkBatchItemsByMaxSlots(items, 50);
+  expect(chunks).toHaveLength(2);
+  expect(chunks[0]).toHaveLength(50);
+  expect(chunks[1]).toHaveLength(1);
 });
 
 describe("chunkBatchItemsByMaxUrlLength", () => {
