@@ -1,6 +1,7 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": ["config:recommended", "docker:enableMajor", ":separateMultipleMajorReleases"],
+  "minimumReleaseAge": "3 days",
   "gomod": {
     "postUpdateOptions": ["gomodTidy"]
   },
