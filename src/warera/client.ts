@@ -1,28 +1,26 @@
 import type { AppConfig } from "../config/env";
 import type { Logger } from "../logging/logger";
-import { createRateLimiter } from "./rate-limit";
+import { createGovernor } from "./governor";
 import {
   buildBatchInputRecord,
   chunkBatchItemsByMaxUrlLength,
+  chunkBatchItemsByMaxSlots,
   parseTrpcBatchResponse,
+  WARERA_MAX_BATCH_SLOTS,
   wareraBatchPath,
   wareraBatchPostPath,
   type TrpcBatchSlotResult,
   type WareraBatchItem,
 } from "./trpc";
 
-const RETRYABLE_STATUSES = new Set([502, 503, 504]);
-const MAX_RETRIES = 2;
+const RETRYABLE_STATUSES = new Set([500, 502, 503, 504]);
+const MAX_RETRIES = 3;
 const BODY_SNIPPET_LEN = 200;
 /** Soft cap for tRPC batch GET URLs (split into multiple HTTP calls beyond this). */
-export const WARERA_MAX_BATCH_URL_LENGTH = 2000;
+export const WARERA_MAX_BATCH_URL_LENGTH = 4096;
 export const API2_TRPC_BASE = "https://api2.warera.io/trpc";
 
 export type { TrpcBatchSlotResult, WareraBatchItem };
-
-function isUnknownMethodBody(body: string): boolean {
-  return /unknown method/i.test(body);
-}
 
 export type WareraAuthStyle = "auto" | "api-key" | "bearer";
 
@@ -64,8 +62,32 @@ export type CreateWareraClientOptions = {
   now?: () => number;
 };
 
-function isRetryableMethod(method: string): boolean {
-  return method === "GET";
+class WareraRequestError extends Error {
+  readonly status: number | undefined;
+  readonly is429: boolean;
+
+  constructor(message: string, status: number | undefined, is429: boolean) {
+    super(message);
+    this.status = status;
+    this.is429 = is429;
+  }
+}
+
+function isBatchPost(method: string, path: string): boolean {
+  return method === "POST" && path.includes("batch=1");
+}
+
+function canRetry(
+  method: string,
+  path: string,
+  status: number | undefined,
+  is429: boolean,
+): boolean {
+  if (is429) return true;
+  const idempotent = method === "GET" || isBatchPost(method, path);
+  if (!idempotent) return false;
+  if (status === undefined) return true;
+  return RETRYABLE_STATUSES.has(status);
 }
 
 function joinUrl(baseUrl: string, path: string): string {
@@ -76,20 +98,15 @@ export function createWareraClient(options: CreateWareraClientOptions) {
   const fetchImpl = options.fetchImpl ?? globalThis.fetch.bind(globalThis);
   const sleep = options.sleep ?? ((ms: number) => new Promise((r) => setTimeout(r, ms)));
   const now = options.now ?? (() => Date.now());
-  const rateLimiter = createRateLimiter({
+  let governorNow = now();
+  const governor = createGovernor({
     maxPerMinute: options.config.wareraMaxRequestsPerMinute,
-    now,
-    sleep,
+    now: () => Math.max(now(), governorNow),
+    sleep: async (ms) => {
+      await sleep(ms);
+      governorNow = Math.max(now(), governorNow + ms);
+    },
   });
-
-  // Serialize acquire so concurrent request() calls cannot race past maxPerMinute
-  // (createRateLimiter itself is not concurrency-safe).
-  let acquireChain: Promise<void> = Promise.resolve();
-  function acquireSerialized(): Promise<void> {
-    const run = acquireChain.then(() => rateLimiter.acquire());
-    acquireChain = run.catch(() => {});
-    return run;
-  }
 
   async function requestOnce(
     baseUrl: string,
@@ -97,18 +114,35 @@ export function createWareraClient(options: CreateWareraClientOptions) {
     fetchInit: RequestInit,
     method: string,
     authStyle: WareraAuthStyle,
-  ): Promise<{ ok: true; json: unknown } | { ok: false; status: number; bodyText: string }> {
+  ): Promise<
+    | { ok: true; json: unknown; status: number; headers: Headers }
+    | { ok: false; status: number; bodyText: string; headers: Headers }
+  > {
     const url = joinUrl(baseUrl, path);
     const headers = new Headers(fetchInit.headers);
     const auth = authHeaders(baseUrl, options.config.wareraApiKey, authStyle);
     auth.forEach((value, key) => headers.set(key, value));
 
     const response = await fetchImpl(url, { ...fetchInit, method, headers });
+    governor.recordHeaders(response.headers);
     if (response.ok) {
-      return { ok: true, json: await response.json() };
+      return {
+        ok: true,
+        json: await response.json(),
+        status: response.status,
+        headers: response.headers,
+      };
     }
     const bodyText = await response.text();
-    return { ok: false, status: response.status, bodyText };
+    if (response.status === 429) {
+      governor.note429(response.headers);
+      throw new WareraRequestError(
+        `WarEra request failed: 429 ${bodyText.slice(0, BODY_SNIPPET_LEN)}`.trim(),
+        response.status,
+        true,
+      );
+    }
+    return { ok: false, status: response.status, bodyText, headers: response.headers };
   }
 
   async function executeRequest(
@@ -119,97 +153,53 @@ export function createWareraClient(options: CreateWareraClientOptions) {
     skipRateLimit: boolean,
     baseUrlOverride: string | undefined,
   ): Promise<unknown> {
-    const primaryBase = baseUrlOverride ?? options.config.wareraApiBaseUrl;
-    const canFallbackToApi2 =
-      !baseUrlOverride &&
-      primaryBase.includes("gateway.warerastats.io") &&
-      !primaryBase.includes("api2.warera.io");
-
-    let lastError: unknown;
-    let lastStatus: number | undefined;
-    let lastBodySnippet = "";
+    const baseUrl = baseUrlOverride ?? options.config.wareraApiBaseUrl;
 
     for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
       if (!skipRateLimit) {
-        await acquireSerialized();
+        await governor.acquire();
       }
 
       const started = now();
       try {
-        const primary = await requestOnce(primaryBase, path, fetchInit, method, authStyle);
+        const response = await requestOnce(baseUrl, path, fetchInit, method, authStyle);
         const durationMs = now() - started;
 
-        if (primary.ok) {
-          options.logger.debug({ path, status: 200, durationMs }, "warera request");
-          return primary.json;
+        if (response.ok) {
+          options.logger.debug({ path, status: response.status, durationMs }, "warera request");
+          return response.json;
         }
 
-        // Gateway may not mirror every api2 procedure — retry once on official API.
-        if (
-          canFallbackToApi2 &&
-          (primary.status === 404 ||
-            (primary.status === 400 && isUnknownMethodBody(primary.bodyText)))
-        ) {
+        const bodySnippet = response.bodyText.slice(0, BODY_SNIPPET_LEN);
+        options.logger.debug({ path, status: response.status, durationMs }, "warera request");
+        throw new WareraRequestError(
+          `WarEra request failed: ${response.status} ${bodySnippet}`.trim(),
+          response.status,
+          false,
+        );
+      } catch (err) {
+        const durationMs = now() - started;
+        const requestError = err instanceof WareraRequestError ? err : null;
+        if (requestError === null || requestError.is429) {
           options.logger.debug(
-            { path, status: primary.status, durationMs },
-            "warera request (gateway miss; trying api2)",
-          );
-          if (!skipRateLimit) {
-            await acquireSerialized();
-          }
-          const fallbackStarted = now();
-          const fallback = await requestOnce(API2_TRPC_BASE, path, fetchInit, method, authStyle);
-          const fallbackMs = now() - fallbackStarted;
-          if (fallback.ok) {
-            options.logger.debug(
-              { path, status: 200, durationMs: fallbackMs, via: "api2" },
-              "warera request",
-            );
-            return fallback.json;
-          }
-          lastStatus = fallback.status;
-          lastBodySnippet = fallback.bodyText.slice(0, BODY_SNIPPET_LEN);
-          lastError = new Error(
-            `WarEra request failed: ${fallback.status} ${lastBodySnippet}`.trim(),
-          );
-          options.logger.debug(
-            { path, status: fallback.status, durationMs: fallbackMs, via: "api2" },
+            { path, status: requestError?.status, durationMs },
             "warera request",
           );
-          throw lastError;
         }
-
-        lastStatus = primary.status;
-        lastBodySnippet = primary.bodyText.slice(0, BODY_SNIPPET_LEN);
-        lastError = new Error(`WarEra request failed: ${primary.status} ${lastBodySnippet}`.trim());
-        options.logger.debug({ path, status: primary.status, durationMs }, "warera request");
-
-        const canRetry =
-          isRetryableMethod(method) &&
-          RETRYABLE_STATUSES.has(primary.status) &&
-          attempt < MAX_RETRIES;
-        if (!canRetry) {
-          throw lastError;
-        }
-        await sleep(0);
-      } catch (err) {
-        if (err === lastError) {
+        if (
+          attempt >= MAX_RETRIES ||
+          !canRetry(method, path, requestError?.status, requestError?.is429 ?? false)
+        ) {
           throw err;
         }
-        const durationMs = now() - started;
-        options.logger.debug({ path, status: undefined, durationMs }, "warera request");
-        lastError = err;
-        const canRetry = isRetryableMethod(method) && attempt < MAX_RETRIES;
-        if (!canRetry) {
-          throw err;
+        if (!requestError?.is429) {
+          const backoffMs = Math.min(5000, 250 * 2 ** attempt) + Math.random() * 250;
+          await sleep(backoffMs);
         }
-        await sleep(0);
       }
     }
 
-    throw lastError instanceof Error
-      ? lastError
-      : new Error(`WarEra request failed: ${lastStatus ?? "unknown"} ${lastBodySnippet}`.trim());
+    throw new Error("WarEra request retry loop exhausted");
   }
 
   async function request<T>(path: string, init: WareraRequestInit = {}): Promise<T> {
@@ -245,28 +235,33 @@ export function createWareraClient(options: CreateWareraClientOptions) {
     const method = (init.method ?? "GET").toUpperCase();
     const isPost = method === "POST";
 
-    const chunks = isPost
-      ? chunkBatchItemsByMaxUrlLength(items, WARERA_MAX_BATCH_URL_LENGTH, wareraBatchPostPath)
-      : chunkBatchItemsByMaxUrlLength(items, WARERA_MAX_BATCH_URL_LENGTH);
     const out: TrpcBatchSlotResult[] = [];
 
-    for (const chunk of chunks) {
-      const path = isPost ? wareraBatchPostPath(chunk) : wareraBatchPath(chunk);
-      const fetchInit: RequestInit = isPost
-        ? {
-            body: JSON.stringify(buildBatchInputRecord(chunk)),
-            headers: { "content-type": "application/json" },
-          }
-        : {};
-      const json = await executeRequest(
-        path,
-        fetchInit,
-        method,
-        authStyle,
-        Boolean(skipRateLimit),
-        baseUrlOverride,
+    const slotChunks = chunkBatchItemsByMaxSlots(items, WARERA_MAX_BATCH_SLOTS);
+    for (const slotChunk of slotChunks) {
+      const urlChunks = chunkBatchItemsByMaxUrlLength(
+        slotChunk,
+        WARERA_MAX_BATCH_URL_LENGTH,
+        isPost ? wareraBatchPostPath : wareraBatchPath,
       );
-      out.push(...parseTrpcBatchResponse(json));
+      for (const chunk of urlChunks) {
+        const path = isPost ? wareraBatchPostPath(chunk) : wareraBatchPath(chunk);
+        const fetchInit: RequestInit = isPost
+          ? {
+              body: JSON.stringify(buildBatchInputRecord(chunk)),
+              headers: { "content-type": "application/json" },
+            }
+          : {};
+        const json = await executeRequest(
+          path,
+          fetchInit,
+          method,
+          authStyle,
+          Boolean(skipRateLimit),
+          baseUrlOverride,
+        );
+        out.push(...parseTrpcBatchResponse(json));
+      }
     }
 
     return out;

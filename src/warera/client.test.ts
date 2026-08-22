@@ -3,7 +3,7 @@ import { createWareraClient } from "./client";
 import type { AppConfig } from "../config/env";
 
 const baseConfig = {
-  wareraApiBaseUrl: "https://gateway.warerastats.io/trpc",
+  wareraApiBaseUrl: "https://api2.warera.io/trpc",
   wareraApiKey: "test-key",
   wareraMaxRequestsPerMinute: 1000,
 } as AppConfig;
@@ -74,7 +74,7 @@ describe("createWareraClient", () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
-  it("stops after 2 retries on repeated 503", async () => {
+  it("stops after 3 retries on repeated 503", async () => {
     const fetchMock = vi.fn().mockImplementation(() => new Response("down", { status: 503 }));
     const client = createWareraClient({
       config: baseConfig,
@@ -84,7 +84,7 @@ describe("createWareraClient", () => {
     });
 
     await expect(client.request("/v1/ping")).rejects.toThrow(/503/);
-    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(fetchMock).toHaveBeenCalledTimes(4);
   });
 
   it("sends X-API-Key when using the gateway base URL", async () => {
@@ -93,7 +93,10 @@ describe("createWareraClient", () => {
       .mockResolvedValue(new Response(JSON.stringify({ ok: true }), { status: 200 }));
 
     const client = createWareraClient({
-      config: baseConfig,
+      config: {
+        ...baseConfig,
+        wareraApiBaseUrl: "https://gateway.warerastats.io/trpc",
+      },
       logger: testLogger(),
       fetchImpl: fetchMock,
       sleep: async () => {},
@@ -192,29 +195,20 @@ describe("createWareraClient", () => {
     );
   });
 
-  it("falls back to api2 when gateway returns unknown method", async () => {
+  it("does not fall back to a second host on unknown method", async () => {
     const fetchMock = vi
       .fn()
-      .mockResolvedValueOnce(
+      .mockResolvedValue(
         new Response("unknown method: company.getProductionBonus\n", { status: 400 }),
-      )
-      .mockResolvedValueOnce(
-        new Response(JSON.stringify({ result: { data: { total: 50.5 } } }), { status: 200 }),
       );
-
     const client = createWareraClient({
       config: baseConfig,
       logger: testLogger(),
       fetchImpl: fetchMock,
       sleep: async () => {},
     });
-
-    const result = await client.request<{ result: { data: { total: number } } }>(
-      "company.getProductionBonus?input=%7B%7D",
-    );
-    expect(result.result.data.total).toBe(50.5);
-    expect(fetchMock).toHaveBeenCalledTimes(2);
-    expect(String(fetchMock.mock.calls[1]![0])).toContain("api2.warera.io");
+    await expect(client.request("company.getProductionBonus?input=%7B%7D")).rejects.toThrow(/400/);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
   it("requestBatch returns [] without fetch for empty items", async () => {
@@ -264,6 +258,54 @@ describe("createWareraClient", () => {
       { ok: true, data: { username: "B" } },
       { ok: false, error: { message: "nope" } },
     ]);
+  });
+
+  it("requestBatch of 51 items sends two HTTP calls (50 + 1)", async () => {
+    const fetchMock = vi.fn().mockImplementation(async (url: string) => {
+      const path = String(url).split("?")[0];
+      const procs = path.split("/").pop()!.split(",");
+      return new Response(JSON.stringify(procs.map(() => ({ result: { data: {} } }))), {
+        status: 200,
+      });
+    });
+    const client = createWareraClient({
+      config: { ...baseConfig, wareraMaxRequestsPerMinute: 10_000 },
+      logger: testLogger(),
+      fetchImpl: fetchMock,
+      sleep: async () => {},
+    });
+    const items = Array.from({ length: 51 }, (_, i) => ({
+      procedure: "user.getUserLite",
+      input: { userId: `u${i}` },
+    }));
+    const results = await client.requestBatch(items);
+    expect(results).toHaveLength(51);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    const firstUrl = String(fetchMock.mock.calls[0]![0]);
+    expect(firstUrl.split("?")[0].split("/").pop()!.split(",")).toHaveLength(50);
+  });
+
+  it("retries GET after 429 once the governor waits", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response("slow down", {
+          status: 429,
+          headers: { "ratelimit-reset": "1", "ratelimit-remaining": "0" },
+        }),
+      )
+      .mockResolvedValueOnce(new Response(JSON.stringify({ ok: true }), { status: 200 }));
+    const sleep = vi.fn(async () => {});
+    const client = createWareraClient({
+      config: { ...baseConfig, wareraMaxRequestsPerMinute: 10_000 },
+      logger: testLogger(),
+      fetchImpl: fetchMock,
+      sleep,
+      now: () => 0,
+    });
+    await expect(client.request("/v1/ping")).resolves.toEqual({ ok: true });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(sleep).toHaveBeenCalled();
   });
 
   it("POSTs JSON with X-API-Key when authStyle is api-key", async () => {
