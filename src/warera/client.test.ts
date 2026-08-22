@@ -1,6 +1,8 @@
 import { afterEach, describe, expect, it, vi } from "vite-plus/test";
+import { Logger as TsLogger } from "tslog";
 import { createWareraClient, WARERA_BATCH_WINDOW_MS } from "./client";
 import type { AppConfig } from "../config/env";
+import { registerServerTsLogger, withLogContext } from "../logging/context";
 import { resetMetricsForTests, setMetricsBackend } from "../metrics";
 import { createRecordingBackend } from "../metrics/recording";
 
@@ -22,6 +24,7 @@ function testLogger() {
 
 describe("createWareraClient", () => {
   afterEach(() => {
+    registerServerTsLogger(null);
     resetMetricsForTests();
     vi.unstubAllGlobals();
     vi.restoreAllMocks();
@@ -343,7 +346,7 @@ describe("createWareraClient", () => {
     ).toBe(true);
   });
 
-  it("coalesces background GET singles into one batch after 400ms", async () => {
+  it("infers background context and preserves compatible init while batching", async () => {
     const waits: number[] = [];
     const sleep = vi.fn(async (ms: number) => {
       waits.push(ms);
@@ -362,20 +365,67 @@ describe("createWareraClient", () => {
       fetchImpl: fetchMock,
       sleep,
     });
+    const log = new TsLogger({ type: "hidden", minLevel: "INFO" });
+    registerServerTsLogger(log);
+    const controller = new AbortController();
 
-    const results = await Promise.all([
-      client.request("user.getUserLite?input=%7B%22userId%22%3A%22a%22%7D", {
-        callClass: "background",
-      }),
-      client.request("user.getUserLite?input=%7B%22userId%22%3A%22b%22%7D", {
-        callClass: "background",
-      }),
-    ]);
+    const results = await withLogContext(
+      {
+        attributes: { job_id: "j" },
+        spanName: "j",
+        spanOp: "job.run",
+      },
+      () =>
+        Promise.all([
+          client.request("user.getUserLite?input=%7B%22userId%22%3A%22a%22%7D", {
+            headers: { "x-correlation": "shared" },
+            signal: controller.signal,
+          }),
+          client.request("user.getUserLite?input=%7B%22userId%22%3A%22b%22%7D", {
+            headers: { "x-correlation": "shared" },
+            signal: controller.signal,
+          }),
+        ]),
+    );
 
     expect(waits).toContain(WARERA_BATCH_WINDOW_MS);
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(String(fetchMock.mock.calls[0]![0])).toContain("batch=1");
+    const init = fetchMock.mock.calls[0]![1] as RequestInit;
+    expect(new Headers(init.headers).get("x-correlation")).toBe("shared");
+    expect(init.signal).toBe(controller.signal);
     expect(results).toEqual([{ result: { data: { id: "a" } } }, { result: { data: { id: "b" } } }]);
+  });
+
+  it("does not coalesce background GET singles with incompatible headers", async () => {
+    const fetchMock = vi.fn().mockImplementation(async (_url: string, init: RequestInit) => {
+      const requestId = new Headers(init.headers).get("x-request-id");
+      return new Response(JSON.stringify({ result: { data: { requestId } } }), { status: 200 });
+    });
+    const client = createWareraClient({
+      config: { ...baseConfig, wareraMaxRequestsPerMinute: 10_000 },
+      logger: testLogger(),
+      fetchImpl: fetchMock,
+      sleep: async () => {},
+    });
+
+    const results = await Promise.all([
+      client.request("user.getUserLite?input=%7B%22userId%22%3A%22a%22%7D", {
+        callClass: "background",
+        headers: { "x-request-id": "a" },
+      }),
+      client.request("user.getUserLite?input=%7B%22userId%22%3A%22b%22%7D", {
+        callClass: "background",
+        headers: { "x-request-id": "b" },
+      }),
+    ]);
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock.mock.calls.every(([url]) => !String(url).includes("batch=1"))).toBe(true);
+    expect(results).toEqual([
+      { result: { data: { requestId: "a" } } },
+      { result: { data: { requestId: "b" } } },
+    ]);
   });
 
   it("records rate_limited on 429 then ok on retry", async () => {

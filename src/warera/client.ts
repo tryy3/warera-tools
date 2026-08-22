@@ -136,6 +136,32 @@ export function createWareraClient(options: CreateWareraClientOptions) {
     sleep,
   });
   const inFlightDedup = createInFlightDedup();
+  const requestInitObjectIds = new WeakMap<object, number>();
+  let nextRequestInitObjectId = 1;
+
+  function requestInitObjectId(value: object): number {
+    const existing = requestInitObjectIds.get(value);
+    if (existing !== undefined) return existing;
+    const id = nextRequestInitObjectId++;
+    requestInitObjectIds.set(value, id);
+    return id;
+  }
+
+  function requestInitGroupKey(init: RequestInit): string {
+    const headers = [...new Headers(init.headers).entries()].toSorted(([a], [b]) =>
+      a.localeCompare(b),
+    );
+    const fields = Object.entries(init)
+      .filter(([key]) => key !== "headers" && key !== "method")
+      .toSorted(([a], [b]) => a.localeCompare(b))
+      .map(([key, value]) => [
+        key,
+        value !== null && (typeof value === "object" || typeof value === "function")
+          ? { objectId: requestInitObjectId(value) }
+          : value,
+      ]);
+    return JSON.stringify({ headers, fields });
+  }
 
   type QueuedRequest = {
     item: WareraBatchItem;
@@ -144,6 +170,8 @@ export function createWareraClient(options: CreateWareraClientOptions) {
     authStyle: WareraAuthStyle;
     baseUrl: string;
     callClass: WareraCallClass;
+    fetchInit: RequestInit;
+    fetchInitGroupKey: string;
   };
   let queue: QueuedRequest[] = [];
   let timer: Promise<void> | null = null;
@@ -333,7 +361,12 @@ export function createWareraClient(options: CreateWareraClientOptions) {
     queue = [];
     const groups = new Map<string, QueuedRequest[]>();
     for (const queued of pending) {
-      const key = JSON.stringify(["GET", queued.authStyle, queued.baseUrl]);
+      const key = JSON.stringify([
+        "GET",
+        queued.authStyle,
+        queued.baseUrl,
+        queued.fetchInitGroupKey,
+      ]);
       const group = groups.get(key);
       if (group) {
         group.push(queued);
@@ -349,7 +382,7 @@ export function createWareraClient(options: CreateWareraClientOptions) {
           if (group.length === 1) {
             const result = await executeRequest(
               wareraProcedurePath(first.item.procedure, first.item.input),
-              {},
+              first.fetchInit,
               "GET",
               first.authStyle,
               false,
@@ -364,6 +397,7 @@ export function createWareraClient(options: CreateWareraClientOptions) {
           const slots = await requestBatch(
             group.map((queued) => queued.item),
             {
+              ...first.fetchInit,
               authStyle: first.authStyle,
               baseUrl: first.baseUrl,
               callClass: first.callClass,
@@ -392,9 +426,19 @@ export function createWareraClient(options: CreateWareraClientOptions) {
     authStyle: WareraAuthStyle,
     baseUrl: string,
     callClass: WareraCallClass,
+    fetchInit: RequestInit,
   ): Promise<unknown> {
     const promise = new Promise<unknown>((resolve, reject) => {
-      queue.push({ item, resolve, reject, authStyle, baseUrl, callClass });
+      queue.push({
+        item,
+        resolve,
+        reject,
+        authStyle,
+        baseUrl,
+        callClass,
+        fetchInit,
+        fetchInitGroupKey: requestInitGroupKey(fetchInit),
+      });
     });
     if (timer === null) {
       timer = sleep(WARERA_BATCH_WINDOW_MS).then(async () => {
@@ -431,10 +475,22 @@ export function createWareraClient(options: CreateWareraClientOptions) {
     if (method === "GET" && json === undefined) {
       const input = inputFromPath(path);
       const { joined, promise } = inFlightDedup.join(
-        dedupKey({ method, procedure, input, authStyle, baseUrl: resolvedBaseUrl }),
+        `${dedupKey({
+          method,
+          procedure,
+          input,
+          authStyle,
+          baseUrl: resolvedBaseUrl,
+        })}\0${requestInitGroupKey(fetchInit)}`,
         () =>
           callClass === "background" && !skipRateLimit
-            ? enqueueBackgroundRequest({ procedure, input }, authStyle, resolvedBaseUrl, callClass)
+            ? enqueueBackgroundRequest(
+                { procedure, input },
+                authStyle,
+                resolvedBaseUrl,
+                callClass,
+                fetchInit,
+              )
             : executeRequest(
                 path,
                 fetchInit,
@@ -478,8 +534,10 @@ export function createWareraClient(options: CreateWareraClientOptions) {
       callClass: callClassOverride,
       authStyle = "auto",
       baseUrl: baseUrlOverride,
+      json: _json,
+      ...rest
     } = init;
-    const method = (init.method ?? "GET").toUpperCase();
+    const method = (rest.method ?? "GET").toUpperCase();
     const isPost = method === "POST";
     const callClass = inferCallClass(callClassOverride);
 
@@ -494,12 +552,15 @@ export function createWareraClient(options: CreateWareraClientOptions) {
       );
       for (const chunk of urlChunks) {
         const path = isPost ? wareraBatchPostPath(chunk) : wareraBatchPath(chunk);
-        const fetchInit: RequestInit = isPost
-          ? {
-              body: JSON.stringify(buildBatchInputRecord(chunk)),
-              headers: { "content-type": "application/json" },
-            }
-          : {};
+        const fetchInit: RequestInit = { ...rest };
+        if (isPost) {
+          fetchInit.body = JSON.stringify(buildBatchInputRecord(chunk));
+          const headers = new Headers(fetchInit.headers);
+          if (!headers.has("content-type")) {
+            headers.set("content-type", "application/json");
+          }
+          fetchInit.headers = headers;
+        }
         const json = await executeRequest(
           path,
           fetchInit,
