@@ -16,7 +16,7 @@ export default defineConfig({
     ],
   },
   lint: {
-    ignorePatterns: ["docs/**", ".superpowers/**", "src/web/routeTree.gen.ts"],
+    ignorePatterns: ["docs/**", ".superpowers/**", "scripts/**", "src/web/routeTree.gen.ts"],
     plugins: ["react", "typescript", "oxc"],
     rules: {
       "react/rules-of-hooks": "error",

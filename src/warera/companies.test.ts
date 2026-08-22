@@ -101,7 +101,7 @@ describe("parseRecommendedRegions", () => {
 
 describe("fetchCompanyProductionBonus", () => {
   it("calls getProductionBonus without overriding baseUrl", async () => {
-    const request = vi.fn(async () => ({
+    const request = vi.fn(async (_path: string, _init?: unknown) => ({
       result: {
         data: {
           total: 50.5,
@@ -122,7 +122,7 @@ describe("fetchCompanyProductionBonus", () => {
 
 describe("fetchBestRecommendedRegion", () => {
   it("POSTs with X-API-Key auth style", async () => {
-    const request = vi.fn(async () => ({
+    const request = vi.fn(async (_path: string, _init?: unknown) => ({
       result: { data: ["reg-a"] },
     }));
     await fetchBestRecommendedRegion({ request } as never, "lead");
@@ -134,7 +134,6 @@ describe("fetchBestRecommendedRegion", () => {
         authStyle: "api-key",
       }),
     );
-    const init = request.mock.calls[0]![1] as Record<string, unknown>;
-    expect(init).not.toHaveProperty("baseUrl");
+    expect(request.mock.calls[0]![1]).not.toHaveProperty("baseUrl");
   });
 });

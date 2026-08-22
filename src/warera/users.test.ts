@@ -239,7 +239,7 @@ describe("fetchUserLite / fetchUserById", () => {
 
 describe("fetchUserLiteBatch", () => {
   it("dedupes ids and maps ok / failed slots", async () => {
-    const requestBatch = vi.fn(async () => [
+    const requestBatch = vi.fn(async (_calls: unknown[]) => [
       {
         ok: true as const,
         data: {
