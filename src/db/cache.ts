@@ -1,9 +1,26 @@
 import { eq } from "drizzle-orm";
+import { count } from "../metrics";
 import type { Db } from "./client";
 import { cache } from "./schema";
 
 export function isCacheFresh(fetchedAt: Date, ttlSeconds: number, now = new Date()): boolean {
   return now.getTime() < fetchedAt.getTime() + ttlSeconds * 1000;
+}
+
+export function classifyCacheLookup(
+  row: { fetchedAt: Date; ttlSeconds: number } | null,
+  now: Date,
+): "hit" | "miss" | "stale" {
+  if (!row) return "miss";
+  if (!isCacheFresh(row.fetchedAt, row.ttlSeconds, now)) return "stale";
+  return "hit";
+}
+
+export function recordCacheLookup(
+  cache_kind: string,
+  result: "hit" | "miss" | "stale",
+): void {
+  count("cache.l1.lookup", 1, { cache_kind, result });
 }
 
 export async function getCachedRow<T>(
@@ -22,8 +39,9 @@ export async function getCachedRow<T>(
 
 export async function getCached<T>(db: Db, key: string): Promise<T | null> {
   const row = await getCachedRow<T>(db, key);
-  if (!row) return null;
-  if (!isCacheFresh(row.fetchedAt, row.ttlSeconds)) return null;
+  const result = classifyCacheLookup(row, new Date());
+  recordCacheLookup("kv", result);
+  if (result !== "hit" || !row) return null;
   return row.payload;
 }
 
