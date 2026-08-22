@@ -315,6 +315,43 @@ describe("createWareraClient", () => {
     expect(firstUrl.split("?")[0].split("/").pop()!.split(",")).toHaveLength(50);
   });
 
+  it("429 note429 runs before body read and stays rate_limited when text() rejects", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 429,
+        headers: new Headers({ "Retry-After": "1", "ratelimit-remaining": "0" }),
+        text: () => Promise.reject(new Error("body read failed")),
+      } as Response)
+      .mockResolvedValueOnce(new Response(JSON.stringify({ ok: true }), { status: 200 }));
+    const sleep = vi.fn(async () => {});
+    const logger = testLogger() as { debug: ReturnType<typeof vi.fn> };
+    const client = createWareraClient({
+      config: { ...baseConfig, wareraMaxRequestsPerMinute: 10_000 },
+      logger: logger as never,
+      fetchImpl: fetchMock,
+      sleep,
+      now: () => 0,
+    });
+
+    await expect(client.request("/v1/ping")).resolves.toEqual({ ok: true });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(sleep).toHaveBeenCalled();
+    expect(logger.debug).toHaveBeenCalledWith(
+      expect.objectContaining({
+        path: "/v1/ping",
+        status: 429,
+        outcome: "rate_limited",
+      }),
+      expect.any(String),
+    );
+    expect(logger.debug).not.toHaveBeenCalledWith(
+      expect.objectContaining({ outcome: "network_error" }),
+      expect.any(String),
+    );
+  });
+
   it("skipRateLimit still waits after 429 and logs rate_limited", async () => {
     const fetchMock = vi
       .fn()

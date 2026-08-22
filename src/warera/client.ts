@@ -146,15 +146,25 @@ export function createWareraClient(options: CreateWareraClientOptions) {
         headers: response.headers,
       };
     }
-    const bodyText = await response.text();
     if (response.status === 429) {
       governor.note429(response.headers);
+      let bodyText = "";
+      try {
+        bodyText = await response.text();
+      } catch {
+        throw new WareraRequestError(
+          "WarEra request failed: 429 (body read failed)",
+          response.status,
+          "rate_limited",
+        );
+      }
       throw new WareraRequestError(
         `WarEra request failed: 429 ${bodyText.slice(0, BODY_SNIPPET_LEN)}`.trim(),
         response.status,
         "rate_limited",
       );
     }
+    const bodyText = await response.text();
     return { ok: false, status: response.status, bodyText, headers: response.headers };
   }
 
