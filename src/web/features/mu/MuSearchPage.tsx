@@ -1,6 +1,7 @@
 import { useNavigate } from "@tanstack/react-router";
 import { useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
+import { parseMuDetailSearch } from "../../lib/muSearch";
 import { IdSearchField } from "../follow/IdSearchField";
 
 export function MuSearchPage() {
@@ -10,7 +11,11 @@ export function MuSearchPage() {
   function goToMu(id: string) {
     const trimmed = id.trim();
     if (!trimmed) return;
-    void navigate({ to: "/mu/$muId", params: { muId: trimmed } });
+    void navigate({
+      to: "/mu/$muId",
+      params: { muId: trimmed },
+      search: parseMuDetailSearch({}),
+    });
   }
 
   function handleSubmit(e: FormEvent) {
