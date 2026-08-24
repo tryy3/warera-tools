@@ -25,6 +25,7 @@ const tabs = [
   { to: "/equipment", label: "Equipment" },
   { to: "/countries", label: "Countries" },
   { to: "/follow", label: "Follow" },
+  { to: "/mu", label: "MU" },
 ] as const;
 
 export function Shell({ children }: ShellProps) {

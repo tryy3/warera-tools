@@ -19,9 +19,11 @@ import { Route as FollowRouteImport } from './routes/follow'
 import { Route as GrowthRouteImport } from './routes/growth'
 import { Route as JobsRouteImport } from './routes/jobs'
 import { Route as MarketRouteImport } from './routes/market'
+import { Route as MuRouteImport } from './routes/mu'
 import { Route as SkillsRouteImport } from './routes/skills'
 import { Route as EquipmentItemCodeRouteImport } from './routes/equipment_.$itemCode'
 import { Route as MarketItemCodeRouteImport } from './routes/market_.$itemCode'
+import { Route as MuMuIdRouteImport } from './routes/mu_.$muId'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -73,6 +75,11 @@ const MarketRoute = MarketRouteImport.update({
   path: '/market',
   getParentRoute: () => rootRouteImport,
 } as any)
+const MuRoute = MuRouteImport.update({
+  id: '/mu',
+  path: '/mu',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SkillsRoute = SkillsRouteImport.update({
   id: '/skills',
   path: '/skills',
@@ -88,6 +95,11 @@ const MarketItemCodeRoute = MarketItemCodeRouteImport.update({
   path: '/market/$itemCode',
   getParentRoute: () => rootRouteImport,
 } as any)
+const MuMuIdRoute = MuMuIdRouteImport.update({
+  id: '/mu_/$muId',
+  path: '/mu/$muId',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -100,9 +112,11 @@ export interface FileRoutesByFullPath {
   '/growth': typeof GrowthRoute
   '/jobs': typeof JobsRoute
   '/market': typeof MarketRoute
+  '/mu': typeof MuRoute
   '/skills': typeof SkillsRoute
   '/equipment/$itemCode': typeof EquipmentItemCodeRoute
   '/market/$itemCode': typeof MarketItemCodeRoute
+  '/mu/$muId': typeof MuMuIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -115,9 +129,11 @@ export interface FileRoutesByTo {
   '/growth': typeof GrowthRoute
   '/jobs': typeof JobsRoute
   '/market': typeof MarketRoute
+  '/mu': typeof MuRoute
   '/skills': typeof SkillsRoute
   '/equipment/$itemCode': typeof EquipmentItemCodeRoute
   '/market/$itemCode': typeof MarketItemCodeRoute
+  '/mu/$muId': typeof MuMuIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -131,9 +147,11 @@ export interface FileRoutesById {
   '/growth': typeof GrowthRoute
   '/jobs': typeof JobsRoute
   '/market': typeof MarketRoute
+  '/mu': typeof MuRoute
   '/skills': typeof SkillsRoute
   '/equipment_/$itemCode': typeof EquipmentItemCodeRoute
   '/market_/$itemCode': typeof MarketItemCodeRoute
+  '/mu_/$muId': typeof MuMuIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -148,9 +166,11 @@ export interface FileRouteTypes {
     | '/growth'
     | '/jobs'
     | '/market'
+    | '/mu'
     | '/skills'
     | '/equipment/$itemCode'
     | '/market/$itemCode'
+    | '/mu/$muId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -163,9 +183,11 @@ export interface FileRouteTypes {
     | '/growth'
     | '/jobs'
     | '/market'
+    | '/mu'
     | '/skills'
     | '/equipment/$itemCode'
     | '/market/$itemCode'
+    | '/mu/$muId'
   id:
     | '__root__'
     | '/'
@@ -178,9 +200,11 @@ export interface FileRouteTypes {
     | '/growth'
     | '/jobs'
     | '/market'
+    | '/mu'
     | '/skills'
     | '/equipment_/$itemCode'
     | '/market_/$itemCode'
+    | '/mu_/$muId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -194,9 +218,11 @@ export interface RootRouteChildren {
   GrowthRoute: typeof GrowthRoute
   JobsRoute: typeof JobsRoute
   MarketRoute: typeof MarketRoute
+  MuRoute: typeof MuRoute
   SkillsRoute: typeof SkillsRoute
   EquipmentItemCodeRoute: typeof EquipmentItemCodeRoute
   MarketItemCodeRoute: typeof MarketItemCodeRoute
+  MuMuIdRoute: typeof MuMuIdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -271,6 +297,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof MarketRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/mu': {
+      id: '/mu'
+      path: '/mu'
+      fullPath: '/mu'
+      preLoaderRoute: typeof MuRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/skills': {
       id: '/skills'
       path: '/skills'
@@ -292,6 +325,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof MarketItemCodeRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/mu_/$muId': {
+      id: '/mu_/$muId'
+      path: '/mu/$muId'
+      fullPath: '/mu/$muId'
+      preLoaderRoute: typeof MuMuIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -306,9 +346,11 @@ const rootRouteChildren: RootRouteChildren = {
   GrowthRoute: GrowthRoute,
   JobsRoute: JobsRoute,
   MarketRoute: MarketRoute,
+  MuRoute: MuRoute,
   SkillsRoute: SkillsRoute,
   EquipmentItemCodeRoute: EquipmentItemCodeRoute,
   MarketItemCodeRoute: MarketItemCodeRoute,
+  MuMuIdRoute: MuMuIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

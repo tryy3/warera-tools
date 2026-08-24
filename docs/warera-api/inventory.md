@@ -53,7 +53,7 @@ Browser (SPA)
 | --- | --- | --- | --- | --- | --- | --- |
 | Countries | Country list + tax metadata | `country-sync` | Daily midnight | api2 | Latest rows (`countries`) | Calculator, Equipment prefs, economy UI |
 | Regions | Region facts for watchlist ids | `region-sync`; advisor cold miss upserts + enqueues | Hourly at :05 | api2 | Latest rows (`regions`); row presence = watchlist | Advisor, Growth, recommended-region follow-ups |
-| Military units (MU) | MU metadata + member roster/stats | `mu-stats-poll` over watchlist | Every 30 minutes | `mu.getById` via api2; **`muMember.getByMu` forced api2 + X-API-Key** | Latest roster + append stat snapshots | MU tools / stats |
+| Military units (MU) | MU metadata + member roster/stats | `mu-stats-poll` over watchlist | Every 30 minutes | `mu.getById` via api2; **`muMember.getByMu` forced api2 + X-API-Key** | Latest roster + append stat snapshots | MU tool (`/mu`, `GET /api/mu/:id`, `GET /api/mu/:id/history`), Follow |
 
 Event-driven Geo (`enqueueGeoRefresh` from battles/laws/etc.) is **documented as planned** in the data-tier design; not implemented. Quiet regions may stay unchanged for days; hot war regions change often — today’s sync does not differentiate.
 
