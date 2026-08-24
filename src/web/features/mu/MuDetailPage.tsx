@@ -326,6 +326,7 @@ export function MuDetailPage() {
                   {detail.mu.level != null
                     ? ` · Level ${formatDisplayNumber(detail.mu.level, 0)}`
                     : ""}
+                  {detail.mu.countryId ? ` · Country ${detail.mu.countryId}` : ""}
                   {detail.members.length > 0
                     ? ` · ${formatDisplayNumber(detail.members.length, 0)} members`
                     : ""}
