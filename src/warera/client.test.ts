@@ -651,6 +651,28 @@ describe("createWareraClient", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
+  it("requestBatch accepts a single-slot object response for one item", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ result: { data: { _id: "m1", name: "Sweed Liberty" } } }), {
+        status: 200,
+      }),
+    );
+    const client = createWareraClient({
+      config: { ...baseConfig, wareraMaxRequestsPerMinute: 10_000 },
+      logger: testLogger(),
+      fetchImpl: fetchMock,
+      sleep: async () => {},
+    });
+
+    const results = await client.requestBatch([
+      { procedure: "mu.getById", input: { muId: "m1" } },
+    ]);
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(String(fetchMock.mock.calls[0]![0])).toContain("mu.getById?batch=1");
+    expect(results).toEqual([{ ok: true, data: { _id: "m1", name: "Sweed Liberty" } }]);
+  });
+
   it("requestBatch sends one GET with batch=1 for multiple items", async () => {
     const fetchMock = vi
       .fn()

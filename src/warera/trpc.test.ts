@@ -56,6 +56,18 @@ describe("parseTrpcBatchResponse", () => {
   it("treats missing result.data as ok false", () => {
     expect(parseTrpcBatchResponse([{}])).toEqual([{ ok: false, error: {} }]);
   });
+
+  it("accepts a single slot object for 1-item batches", () => {
+    expect(parseTrpcBatchResponse({ result: { data: { name: "Sweed Liberty" } } })).toEqual([
+      { ok: true, data: { name: "Sweed Liberty" } },
+    ]);
+  });
+
+  it("throws for non-array, non-slot payloads", () => {
+    expect(() => parseTrpcBatchResponse({ foo: "bar" })).toThrow(
+      "WarEra batch response is not an array",
+    );
+  });
 });
 
 it("chunkBatchItemsByMaxSlots splits 51 items into 50 + 1", () => {

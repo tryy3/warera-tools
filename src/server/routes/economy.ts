@@ -32,12 +32,28 @@ export function economyRoutes(deps: EconomyRouteDeps) {
     const type = parseSearchType(c.req.query("type"));
     try {
       if (type === "mu") {
-        const mus = await searchMus(warera, q);
+        const mus = await searchMus(warera, q, 8, { logger });
+        logger.debug(
+          { search_text: q, search_type: type, result_count: mus.length },
+          "economy search complete",
+        );
         return c.json({ mus });
       }
       const users = await searchUsers(warera, q);
+      logger.debug(
+        { search_text: q, search_type: type, result_count: users.length },
+        "economy search complete",
+      );
       return c.json({ users });
     } catch (err) {
+      logger.warn(
+        {
+          search_text: q,
+          search_type: type,
+          error: err instanceof Error ? err.message : String(err),
+        },
+        "economy search failed",
+      );
       throw new HttpError(
         502,
         "upstream_error",
