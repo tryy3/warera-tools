@@ -32,15 +32,9 @@ export function buildBatchInputRecord(items: WareraBatchItem[]): Record<string, 
   if (items.length === 0) {
     throw new Error("buildBatchInputRecord requires at least one item");
   }
-  // WarEra expects unindexed input for 1-item ?batch=1 calls (indexed {"0":…} leaves muId undefined).
-  if (items.length === 1) {
-    const input = items[0]!.input;
-    if (input === undefined) return {};
-    if (input != null && typeof input === "object" && !Array.isArray(input)) {
-      return input as Record<string, unknown>;
-    }
-    return { value: input };
-  }
+  // Always index by slot (`{"0":…}`), including 1-item batches. Unindexed
+  // `{"userId":…}` / `{"muId":…}` under `?batch=1` is rejected by live api2
+  // (`input` arrives undefined → 400 Required).
   const inputRecord: Record<string, unknown> = {};
   for (let i = 0; i < items.length; i++) {
     inputRecord[String(i)] = items[i]!.input === undefined ? null : items[i]!.input;

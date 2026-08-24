@@ -21,16 +21,16 @@ describe("wareraBatchPath", () => {
     });
   });
 
+  it("indexes a single-item batch under 0 (api2 rejects unindexed ?batch=1 input)", () => {
+    const path = wareraBatchPath([{ procedure: "mu.getById", input: { muId: "m1" } }]);
+    const inputParam = new URLSearchParams(path.slice(path.indexOf("?") + 1)).get("input");
+    expect(JSON.parse(inputParam!)).toEqual({ 0: { muId: "m1" } });
+  });
+
   it("allows undefined input slots as null in the input record", () => {
     const path = wareraBatchPath([{ procedure: "gameConfig.getDates" }]);
     const inputParam = new URLSearchParams(path.slice(path.indexOf("?") + 1)).get("input");
-    expect(JSON.parse(inputParam!)).toEqual({});
-  });
-
-  it("uses unindexed input for a single-item batch", () => {
-    const path = wareraBatchPath([{ procedure: "mu.getById", input: { muId: "m1" } }]);
-    const inputParam = new URLSearchParams(path.slice(path.indexOf("?") + 1)).get("input");
-    expect(JSON.parse(inputParam!)).toEqual({ muId: "m1" });
+    expect(JSON.parse(inputParam!)).toEqual({ 0: null });
   });
 });
 
