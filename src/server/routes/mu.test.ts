@@ -317,6 +317,14 @@ describe("muRoutes — GET /:id", () => {
       payload: null,
       fetchedAt: at,
     });
+    await upsertPlayerCurrent(db, {
+      id: "u2",
+      username: "bob",
+      muId: "mu1",
+      workplaceCompanyId: null,
+      payload: null,
+      fetchedAt: at,
+    });
     await insertMuWatchReason(db, {
       muId: "mu1",
       reason: WATCH_REASON_MANUAL,
@@ -412,7 +420,7 @@ describe("muRoutes — GET /:id", () => {
       {
         userId: "u2",
         role: "commander",
-        username: null,
+        username: "bob",
         latest: null,
       },
     ]);
@@ -472,6 +480,36 @@ describe("muRoutes — GET /:id", () => {
     expect(muSnapRows).toHaveLength(0);
     const memberSnapRows = await db.select().from(schema.muMemberStatSnapshots);
     expect(memberSnapRows).toHaveLength(0);
+  });
+
+  it("cold path enriches member usernames via user.getUserLite batch", async () => {
+    const parsed = sampleParsedMu();
+    const request = vi.fn(async (path: string) => {
+      if (path.includes("mu.getById")) return muByIdResponse(parsed);
+      if (path.includes("muMember.getByMu")) return muMembersResponse("mu1");
+      if (path.includes("user.getUserLite")) {
+        const input = new URL(path, "http://x").searchParams.get("input");
+        const userId = input ? (JSON.parse(input) as { userId?: string }).userId : undefined;
+        return {
+          result: {
+            data: {
+              _id: userId,
+              username: userId === "u1" ? "alice" : userId === "u2" ? "bob" : userId,
+            },
+          },
+        };
+      }
+      throw new Error(`unexpected warera call: ${path}`);
+    });
+
+    const res = await appFor(db, request).request("http://localhost/mu1");
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      members: Array<{ userId: string; username: string | null }>;
+    };
+    expect(body.members.find((m) => m.userId === "u1")?.username).toBe("alice");
+    expect(body.members.find((m) => m.userId === "u2")?.username).toBe("bob");
+    expect(request).toHaveBeenCalledWith(expect.stringContaining("user.getUserLite"));
   });
 
   it("404s when getById is not found and leaves no watch reason", async () => {

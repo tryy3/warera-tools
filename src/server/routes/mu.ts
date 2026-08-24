@@ -11,6 +11,7 @@ import {
   type MuMemberStatHistoryPoint,
 } from "../../db/mu-history";
 import { listMuMembers, replaceMuMembers, upsertMuCurrent } from "../../db/mus";
+import { upsertPlayerCurrent } from "../../db/players";
 import { mus, muWatchReasons, players } from "../../db/schema";
 import { MANUAL_SOURCE_ID, WATCH_REASON_MANUAL, insertMuWatchReason } from "../../db/watch-reasons";
 import type { MemberHistoryMetric, MuHistoryMetric } from "../../mu/metrics";
@@ -30,6 +31,7 @@ import {
   type ParsedMuStats,
 } from "../../warera/mu";
 import type { WareraRequester } from "../../warera/prices";
+import { fetchUserLiteBatch } from "../../warera/users";
 import type { Logger } from "../../logging/logger";
 import { HttpError } from "../errors";
 
@@ -100,6 +102,40 @@ async function loadUsernamesById(db: Db, ids: string[]): Promise<Map<string, str
     .where(inArray(players.id, unique));
   for (const row of playerRows) {
     usernameById.set(row.id, row.username);
+  }
+  return usernameById;
+}
+
+async function resolveMemberUsernames(
+  db: Db,
+  warera: WareraRequester,
+  ids: string[],
+  now: Date,
+): Promise<Map<string, string | null>> {
+  const usernameById = await loadUsernamesById(db, ids);
+  const missing = [...new Set(ids)].filter((id) => {
+    const username = usernameById.get(id);
+    return username == null || username.length === 0;
+  });
+  if (missing.length === 0 || !warera.requestBatch) return usernameById;
+
+  const liteById = await fetchUserLiteBatch(warera, missing);
+  for (const userId of missing) {
+    const lite = liteById.get(userId);
+    const username = lite?.username ?? null;
+    if (username) {
+      usernameById.set(userId, username);
+      await upsertPlayerCurrent(db, {
+        id: userId,
+        username,
+        muId: null,
+        workplaceCompanyId: null,
+        payload: null,
+        fetchedAt: now,
+      });
+    } else if (!usernameById.has(userId)) {
+      usernameById.set(userId, null);
+    }
   }
   return usernameById;
 }
@@ -199,9 +235,11 @@ export function muRoutes(deps: MuRouteDeps) {
       }
       const rows = await getMuMemberStatHistory(db, id, metric, range, now);
       const grouped = groupMemberHistory(rows);
-      const usernameById = await loadUsernamesById(
+      const usernameById = await resolveMemberUsernames(
         db,
+        warera,
         grouped.map((s) => s.userId),
+        now,
       );
       return c.json({
         range,
@@ -289,9 +327,11 @@ export function muRoutes(deps: MuRouteDeps) {
     }
 
     const memberRows = await listMuMembers(db, id);
-    const usernameById = await loadUsernamesById(
+    const usernameById = await resolveMemberUsernames(
       db,
+      warera,
       memberRows.map((m) => m.userId),
+      now,
     );
 
     const snapshotByUserId = new Map<string, MemberLatest>();

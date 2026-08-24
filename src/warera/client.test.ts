@@ -669,7 +669,10 @@ describe("createWareraClient", () => {
     ]);
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
-    expect(String(fetchMock.mock.calls[0]![0])).toContain("mu.getById?batch=1");
+    const url = String(fetchMock.mock.calls[0]![0]);
+    expect(url).toContain("mu.getById?batch=1");
+    const inputParam = new URLSearchParams(url.slice(url.indexOf("?") + 1)).get("input");
+    expect(JSON.parse(inputParam!)).toEqual({ muId: "m1" });
     expect(results).toEqual([{ ok: true, data: { _id: "m1", name: "Sweed Liberty" } }]);
   });
 
