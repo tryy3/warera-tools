@@ -1,13 +1,15 @@
 import { defineChart, lineY } from "@tanstack/charts";
+import { crosshair } from "@tanstack/charts/crosshair";
 import { tooltip } from "@tanstack/charts/tooltip";
 import { Chart } from "@tanstack/react-charts";
 import { scaleLinear, scaleUtc } from "d3-scale";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { colorForUserId } from "./formatMu";
 import type { MuMemberHistorySeries } from "./types";
 
 const MAX_SERIES = 25;
+const CHART_HEIGHT = 520;
 
 type ChartRow = {
   date: Date;
@@ -46,34 +48,46 @@ export function MuMemberHistoryChart({
   metricLabel: string;
 }) {
   const prepared = useMemo(() => prepareSeries(series), [series]);
-  const [visible, setVisible] = useState<Set<string>>(() => new Set());
+  const [hidden, setHidden] = useState<Set<string>>(() => new Set());
 
-  useEffect(() => {
-    setVisible(new Set(prepared.map((s) => s.userId)));
-  }, [prepared]);
-
-  const active = useMemo(() => prepared.filter((s) => visible.has(s.userId)), [prepared, visible]);
+  const active = useMemo(
+    () => prepared.filter((s) => !hidden.has(s.userId)),
+    [prepared, hidden],
+  );
 
   const definition = useMemo(
     () =>
       defineChart({
-        marks: active.map((s) =>
-          lineY(s.rows, {
-            x: "date",
-            y: "value",
-            stroke: s.color,
-            strokeWidth: 2,
-          }),
-        ),
+        marks: [
+          ...active.map((s) =>
+            lineY(s.rows, {
+              id: s.label,
+              x: "date",
+              y: "value",
+              stroke: s.color,
+              strokeWidth: 2,
+            }),
+          ),
+          crosshair({ x: { label: true }, y: false }),
+        ],
         x: { scale: scaleUtc, nice: true, axis: { label: "Time" } },
         y: { scale: scaleLinear, nice: true, grid: true, axis: { label: metricLabel } },
-        tooltip,
+        focus: "nearest-x",
+        maxFocusDistance: Number.POSITIVE_INFINITY,
+        tooltip: {
+          use: tooltip,
+          items: [
+            "x",
+            { channel: "group", label: "Member" },
+            { channel: "y", label: metricLabel },
+          ],
+        },
       }),
     [active, metricLabel],
   );
 
   function toggleSeries(userId: string) {
-    setVisible((prev) => {
+    setHidden((prev) => {
       const next = new Set(prev);
       if (next.has(userId)) next.delete(userId);
       else next.add(userId);
@@ -91,7 +105,7 @@ export function MuMemberHistoryChart({
     <div>
       <div className="mb-3 flex flex-wrap gap-1.5" role="group" aria-label="Member series legend">
         {prepared.map((s) => {
-          const on = visible.has(s.userId);
+          const on = !hidden.has(s.userId);
           return (
             <Button
               key={s.userId}
@@ -115,7 +129,11 @@ export function MuMemberHistoryChart({
       {active.length === 0 ? (
         <p className="text-sm text-muted-foreground">Toggle a member above to show their series.</p>
       ) : (
-        <Chart definition={definition} height={360} ariaLabel={`Member ${metricLabel} history`} />
+        <Chart
+          definition={definition}
+          height={CHART_HEIGHT}
+          ariaLabel={`Member ${metricLabel} history`}
+        />
       )}
     </div>
   );
