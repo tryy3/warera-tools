@@ -330,6 +330,7 @@ export function MuDetailPage() {
                     ? ` · ${formatDisplayNumber(detail.members.length, 0)} members`
                     : ""}
                   {detail.meta.watched ? " · watched" : ""}
+                  {detail.meta.liveFilled ? " · live-fetched" : ""}
                   {detail.mu.fetchedAt
                     ? ` · fetched ${new Date(detail.mu.fetchedAt).toLocaleString()}`
                     : ""}
