@@ -5,7 +5,7 @@ import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { beforeEach, describe, expect, it, vi } from "vite-plus/test";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 import type { Db } from "../../db/client";
 import {
   insertMuMemberStatSnapshots,
@@ -489,5 +489,353 @@ describe("muRoutes — GET /:id", () => {
 
     expect(await db.select().from(schema.muWatchReasons)).toHaveLength(0);
     expect(await db.select().from(schema.mus)).toHaveLength(0);
+  });
+});
+
+describe("muRoutes — GET /:id/history", () => {
+  let db: Db;
+  const at = new Date("2026-08-21T12:00:00.000Z");
+
+  beforeEach(async () => {
+    db = await createDb();
+    vi.useFakeTimers();
+    vi.setSystemTime(at);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  async function seedMuWithPolls() {
+    await upsertMuCurrent(db, sampleParsedMu(), at);
+    const pollId = await insertMuPoll(db, {
+      recordedAt: new Date("2026-08-19T12:00:00.000Z"),
+      status: "success",
+      muCount: 1,
+      memberCount: 2,
+    });
+    await insertMuStatSnapshots(db, pollId, [
+      {
+        muId: "mu1",
+        weeklyDamages: 800,
+        weeklyDamagesRank: 5,
+        weeklyDamagesTier: "gold",
+        bounty: null,
+        bountyRank: null,
+        bountyTier: null,
+        reputation: null,
+        reputationRank: null,
+        reputationTier: null,
+        damages: 4000,
+        damagesRank: 3,
+        damagesTier: "gold",
+        terrain: null,
+        terrainRank: null,
+        terrainTier: null,
+        wealth: null,
+        wealthRank: null,
+        wealthTier: null,
+        levelingLevel: 5,
+        levelingMonthlyDamages: 600,
+        payload: null,
+      },
+    ]);
+    await insertMuMemberStatSnapshots(db, pollId, [
+      {
+        muId: "mu1",
+        userId: "u1",
+        memberRowId: "m1",
+        totalDamagesCount: 8000,
+        monthlyDamagesCount: 1600,
+        weeklyDamagesCount: 400,
+        totalHelpCount: 40,
+        monthlyHelpCount: 10,
+        weeklyHelpCount: 2,
+        payload: null,
+      },
+      {
+        muId: "mu1",
+        userId: "user-long-id-xyz",
+        memberRowId: "m2",
+        totalDamagesCount: 1000,
+        monthlyDamagesCount: 200,
+        weeklyDamagesCount: 50,
+        totalHelpCount: 5,
+        monthlyHelpCount: 1,
+        weeklyHelpCount: 0,
+        payload: null,
+      },
+    ]);
+    const pollId2 = await insertMuPoll(db, {
+      recordedAt: new Date("2026-08-20T12:00:00.000Z"),
+      status: "success",
+      muCount: 1,
+      memberCount: 2,
+    });
+    await insertMuStatSnapshots(db, pollId2, [
+      {
+        muId: "mu1",
+        weeklyDamages: 900,
+        weeklyDamagesRank: 4,
+        weeklyDamagesTier: "gold",
+        bounty: null,
+        bountyRank: null,
+        bountyTier: null,
+        reputation: null,
+        reputationRank: null,
+        reputationTier: null,
+        damages: 4500,
+        damagesRank: 2,
+        damagesTier: "gold",
+        terrain: null,
+        terrainRank: null,
+        terrainTier: null,
+        wealth: null,
+        wealthRank: null,
+        wealthTier: null,
+        levelingLevel: 5,
+        levelingMonthlyDamages: 700,
+        payload: null,
+      },
+    ]);
+    await insertMuMemberStatSnapshots(db, pollId2, [
+      {
+        muId: "mu1",
+        userId: "u1",
+        memberRowId: "m1",
+        totalDamagesCount: 8500,
+        monthlyDamagesCount: 1700,
+        weeklyDamagesCount: 450,
+        totalHelpCount: 42,
+        monthlyHelpCount: 11,
+        weeklyHelpCount: 3,
+        payload: null,
+      },
+      {
+        muId: "mu1",
+        userId: "user-long-id-xyz",
+        memberRowId: "m2",
+        totalDamagesCount: 1100,
+        monthlyDamagesCount: 220,
+        weeklyDamagesCount: 60,
+        totalHelpCount: 6,
+        monthlyHelpCount: 2,
+        weeklyHelpCount: 1,
+        payload: null,
+      },
+    ]);
+  }
+
+  it("400s for invalid metric on mu scope", async () => {
+    await upsertMuCurrent(db, sampleParsedMu(), at);
+    const request = vi.fn(async () => {
+      throw new Error("should not call warera");
+    });
+    const res = await appFor(db, request).request(
+      "http://localhost/mu1/history?scope=mu&metric=weeklyDamagesCount",
+    );
+    expect(res.status).toBe(400);
+    expect(((await res.json()) as { error: { code: string } }).error.code).toBe("bad_request");
+  });
+
+  it("400s for invalid metric on members scope", async () => {
+    await upsertMuCurrent(db, sampleParsedMu(), at);
+    const request = vi.fn(async () => {
+      throw new Error("should not call warera");
+    });
+    const res = await appFor(db, request).request(
+      "http://localhost/mu1/history?scope=members&metric=weeklyDamages",
+    );
+    expect(res.status).toBe(400);
+    expect(((await res.json()) as { error: { code: string } }).error.code).toBe("bad_request");
+  });
+
+  it("404s when MU is missing without calling warera", async () => {
+    const request = vi.fn(async () => {
+      throw new Error("should not call warera");
+    });
+    const res = await appFor(db, request).request("http://localhost/ghost/history");
+    expect(res.status).toBe(404);
+    expect(((await res.json()) as { error: { code: string } }).error.code).toBe("not_found");
+    expect(request).not.toHaveBeenCalled();
+  });
+
+  it("returns empty points when MU exists but has no snapshots", async () => {
+    await upsertMuCurrent(db, sampleParsedMu(), at);
+    const request = vi.fn(async () => {
+      throw new Error("should not call warera");
+    });
+    const res = await appFor(db, request).request(
+      "http://localhost/mu1/history?scope=mu&range=7d&metric=weeklyDamages",
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      range: string;
+      scope: string;
+      metric: string;
+      points: unknown[];
+    };
+    expect(body).toEqual({
+      range: "7d",
+      scope: "mu",
+      metric: "weeklyDamages",
+      points: [],
+    });
+  });
+
+  it("returns mu points with ISO recordedAt", async () => {
+    await seedMuWithPolls();
+    const request = vi.fn(async () => {
+      throw new Error("should not call warera");
+    });
+    const res = await appFor(db, request).request(
+      "http://localhost/mu1/history?scope=mu&range=7d&metric=damages",
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      range: string;
+      scope: string;
+      metric: string;
+      points: Array<{ recordedAt: string; value: number | null }>;
+    };
+    expect(body.range).toBe("7d");
+    expect(body.scope).toBe("mu");
+    expect(body.metric).toBe("damages");
+    expect(body.points).toEqual([
+      { recordedAt: "2026-08-19T12:00:00.000Z", value: 4000 },
+      { recordedAt: "2026-08-20T12:00:00.000Z", value: 4500 },
+    ]);
+    for (const point of body.points) {
+      expect(point.recordedAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+    }
+  });
+
+  it("groups member history into series with username labels", async () => {
+    await seedMuWithPolls();
+    await upsertPlayerCurrent(db, {
+      id: "u1",
+      username: "alice",
+      muId: "mu1",
+      workplaceCompanyId: null,
+      payload: null,
+      fetchedAt: at,
+    });
+    const request = vi.fn(async () => {
+      throw new Error("should not call warera");
+    });
+    const res = await appFor(db, request).request(
+      "http://localhost/mu1/history?scope=members&range=7d&metric=weeklyDamagesCount",
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      range: string;
+      scope: string;
+      metric: string;
+      series: Array<{
+        userId: string;
+        label: string;
+        points: Array<{ recordedAt: string; value: number | null }>;
+      }>;
+    };
+    expect(body.range).toBe("7d");
+    expect(body.scope).toBe("members");
+    expect(body.metric).toBe("weeklyDamagesCount");
+    expect(body.series).toHaveLength(2);
+
+    const alice = body.series.find((s) => s.userId === "u1");
+    expect(alice?.label).toBe("alice");
+    expect(alice?.points).toEqual([
+      { recordedAt: "2026-08-19T12:00:00.000Z", value: 400 },
+      { recordedAt: "2026-08-20T12:00:00.000Z", value: 450 },
+    ]);
+
+    const truncated = body.series.find((s) => s.userId === "user-long-id-xyz");
+    expect(truncated?.label).toBe("user-lon");
+    expect(truncated?.points).toHaveLength(2);
+  });
+
+  it("filters this_week using UTC calendar boundaries", async () => {
+    vi.setSystemTime(new Date("2026-08-05T12:00:00.000Z"));
+    await upsertMuCurrent(db, sampleParsedMu(), at);
+
+    const inWeek = await insertMuPoll(db, {
+      recordedAt: new Date("2026-08-04T12:00:00.000Z"),
+      status: "success",
+      muCount: 1,
+      memberCount: 0,
+    });
+    await insertMuStatSnapshots(db, inWeek, [
+      {
+        muId: "mu1",
+        weeklyDamages: 100,
+        weeklyDamagesRank: 1,
+        weeklyDamagesTier: "gold",
+        bounty: null,
+        bountyRank: null,
+        bountyTier: null,
+        reputation: null,
+        reputationRank: null,
+        reputationTier: null,
+        damages: 100,
+        damagesRank: 1,
+        damagesTier: "gold",
+        terrain: null,
+        terrainRank: null,
+        terrainTier: null,
+        wealth: null,
+        wealthRank: null,
+        wealthTier: null,
+        levelingLevel: 1,
+        levelingMonthlyDamages: 0,
+        payload: null,
+      },
+    ]);
+
+    const priorWeek = await insertMuPoll(db, {
+      recordedAt: new Date("2026-08-02T12:00:00.000Z"),
+      status: "success",
+      muCount: 1,
+      memberCount: 0,
+    });
+    await insertMuStatSnapshots(db, priorWeek, [
+      {
+        muId: "mu1",
+        weeklyDamages: 50,
+        weeklyDamagesRank: 2,
+        weeklyDamagesTier: "silver",
+        bounty: null,
+        bountyRank: null,
+        bountyTier: null,
+        reputation: null,
+        reputationRank: null,
+        reputationTier: null,
+        damages: 50,
+        damagesRank: 2,
+        damagesTier: "silver",
+        terrain: null,
+        terrainRank: null,
+        terrainTier: null,
+        wealth: null,
+        wealthRank: null,
+        wealthTier: null,
+        levelingLevel: 1,
+        levelingMonthlyDamages: 0,
+        payload: null,
+      },
+    ]);
+
+    const request = vi.fn(async () => {
+      throw new Error("should not call warera");
+    });
+    const res = await appFor(db, request).request(
+      "http://localhost/mu1/history?scope=mu&range=this_week&metric=damages",
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      range: string;
+      points: Array<{ value: number | null }>;
+    };
+    expect(body.range).toBe("this_week");
+    expect(body.points.map((p) => p.value)).toEqual([100]);
   });
 });

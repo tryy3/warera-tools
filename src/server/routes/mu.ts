@@ -4,13 +4,23 @@ import type { Db } from "../../db/client";
 import {
   getLatestMemberStatSnapshots,
   getLatestMuStatSnapshot,
+  getMuMemberStatHistory,
+  getMuStatHistory,
   type LatestMemberStatSnapshot,
   type LatestMuStatSnapshot,
+  type MuMemberStatHistoryPoint,
 } from "../../db/mu-history";
 import { listMuMembers, replaceMuMembers, upsertMuCurrent } from "../../db/mus";
 import { mus, muWatchReasons, players } from "../../db/schema";
 import { MANUAL_SOURCE_ID, WATCH_REASON_MANUAL, insertMuWatchReason } from "../../db/watch-reasons";
 import type { MemberHistoryMetric, MuHistoryMetric } from "../../mu/metrics";
+import {
+  DEFAULT_MEMBER_METRIC,
+  DEFAULT_MU_METRIC,
+  isMemberHistoryMetric,
+  isMuHistoryMetric,
+} from "../../mu/metrics";
+import { parseMuHistoryRange } from "../../mu/ranges";
 import { isWareraNotFoundError } from "../../warera/errors";
 import {
   deriveMemberRole,
@@ -45,6 +55,32 @@ type LatestMuStatsResponse = Partial<Record<MuHistoryMetric, number | null>> & {
 };
 
 type MemberLatest = Partial<Record<MemberHistoryMetric, number | null>>;
+
+type MuHistoryScope = "mu" | "members";
+
+function parseMuHistoryScope(value: unknown): MuHistoryScope {
+  if (value === "members") return "members";
+  return "mu";
+}
+
+function memberLabel(userId: string, username: string | null | undefined): string {
+  return username ?? userId.slice(0, 8);
+}
+
+function groupMemberHistory(rows: MuMemberStatHistoryPoint[]) {
+  const byUser = new Map<string, { recordedAt: Date; value: number | null }[]>();
+  for (const row of rows) {
+    let points = byUser.get(row.userId);
+    if (!points) {
+      points = [];
+      byUser.set(row.userId, points);
+    }
+    points.push({ recordedAt: row.recordedAt, value: row.value });
+  }
+  return [...byUser.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([userId, points]) => ({ userId, points }));
+}
 
 function mapLookupError(err: unknown, entity: "MU"): never {
   const message = err instanceof Error ? err.message : `${entity} lookup failed`;
@@ -143,6 +179,60 @@ function latestMuStatsFromParsed(stats: ParsedMuStats): LatestMuStatsResponse {
 export function muRoutes(deps: MuRouteDeps) {
   const { db, warera } = deps;
   const app = new Hono();
+
+  app.get("/:id/history", async (c) => {
+    const id = c.req.param("id");
+    const now = new Date();
+    const range = parseMuHistoryRange(c.req.query("range"));
+    const scope = parseMuHistoryScope(c.req.query("scope"));
+    const metricRaw = c.req.query("metric");
+
+    const existing = await db.select({ id: mus.id }).from(mus).where(eq(mus.id, id)).limit(1);
+    if (!existing[0]) {
+      throw new HttpError(404, "not_found", `MU ${id} not found`);
+    }
+
+    if (scope === "members") {
+      const metric = metricRaw ?? DEFAULT_MEMBER_METRIC;
+      if (!isMemberHistoryMetric(metric)) {
+        throw new HttpError(400, "bad_request", `Invalid metric for members scope: ${metric}`);
+      }
+      const rows = await getMuMemberStatHistory(db, id, metric, range, now);
+      const grouped = groupMemberHistory(rows);
+      const usernameById = await loadUsernamesById(
+        db,
+        grouped.map((s) => s.userId),
+      );
+      return c.json({
+        range,
+        scope: "members" as const,
+        metric,
+        series: grouped.map((s) => ({
+          userId: s.userId,
+          label: memberLabel(s.userId, usernameById.get(s.userId)),
+          points: s.points.map((p) => ({
+            recordedAt: p.recordedAt.toISOString(),
+            value: p.value,
+          })),
+        })),
+      });
+    }
+
+    const metric = metricRaw ?? DEFAULT_MU_METRIC;
+    if (!isMuHistoryMetric(metric)) {
+      throw new HttpError(400, "bad_request", `Invalid metric for mu scope: ${metric}`);
+    }
+    const points = await getMuStatHistory(db, id, metric, range, now);
+    return c.json({
+      range,
+      scope: "mu" as const,
+      metric,
+      points: points.map((p) => ({
+        recordedAt: p.recordedAt.toISOString(),
+        value: p.value,
+      })),
+    });
+  });
 
   app.get("/:id", async (c) => {
     const id = c.req.param("id");
