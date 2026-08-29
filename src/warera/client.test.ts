@@ -664,9 +664,7 @@ describe("createWareraClient", () => {
       sleep: async () => {},
     });
 
-    const results = await client.requestBatch([
-      { procedure: "mu.getById", input: { muId: "m1" } },
-    ]);
+    const results = await client.requestBatch([{ procedure: "mu.getById", input: { muId: "m1" } }]);
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
     const url = String(fetchMock.mock.calls[0]![0]);

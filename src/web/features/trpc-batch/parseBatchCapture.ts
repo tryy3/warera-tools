@@ -29,7 +29,10 @@ function extractProcedures(urlText: string): { procedures: string[]; error: stri
   return { procedures, error: null };
 }
 
-function parseJsonObject(text: string): { value: Record<string, unknown> | null; error: string | null } {
+function parseJsonObject(text: string): {
+  value: Record<string, unknown> | null;
+  error: string | null;
+} {
   const trimmed = text.trim();
   if (!trimmed) {
     return { value: {}, error: null };

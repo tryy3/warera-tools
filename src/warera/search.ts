@@ -68,7 +68,10 @@ export async function searchUsers(
  * so ids are hydrated via `mu.getById` (batched when `requestBatch` exists).
  * Collection uses stored ids; this function must never be called from a job.
  */
-function hydrateMuHit(muId: string, slot: { ok: boolean; data?: unknown; error?: unknown } | undefined): SearchMuHit {
+function hydrateMuHit(
+  muId: string,
+  slot: { ok: boolean; data?: unknown; error?: unknown } | undefined,
+): SearchMuHit {
   if (!slot?.ok) return { muId, name: muId };
   const mu = slot.data as { _id?: string; name?: string } | null;
   if (mu == null || typeof mu !== "object") return { muId, name: muId };

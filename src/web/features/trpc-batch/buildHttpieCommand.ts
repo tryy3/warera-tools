@@ -68,12 +68,7 @@ function appendFormArgs(out: string[], path: string, value: unknown): void {
 }
 
 export function buildHttpieCommand(row: Pick<BatchRow, "procedure" | "input">): string {
-  const parts = [
-    "https",
-    "POST",
-    shellQuoteUrlTarget(row.procedure),
-    "X-API-Key:$WARERA_API_KEY",
-  ];
+  const parts = ["https", "POST", shellQuoteUrlTarget(row.procedure), "X-API-Key:$WARERA_API_KEY"];
   if (row.input !== null && typeof row.input === "object" && !Array.isArray(row.input)) {
     const args: string[] = [];
     for (const [key, value] of Object.entries(row.input as Record<string, unknown>)) {

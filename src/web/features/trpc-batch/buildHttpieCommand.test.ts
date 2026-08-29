@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { buildHttpieCommand } from "./buildHttpieCommand";
 
 describe("buildHttpieCommand", () => {
@@ -68,9 +68,7 @@ describe("buildHttpieCommand", () => {
 
   it("omits form fields when input is null", () => {
     const cmd = buildHttpieCommand({ procedure: "mu.getById", input: null });
-    expect(cmd).toBe(
-      "https POST api2.warera.io/trpc/mu.getById X-API-Key:$WARERA_API_KEY",
-    );
+    expect(cmd).toBe("https POST api2.warera.io/trpc/mu.getById X-API-Key:$WARERA_API_KEY");
   });
 
   it("skips null fields", () => {
