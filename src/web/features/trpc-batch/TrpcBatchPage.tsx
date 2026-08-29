@@ -145,11 +145,19 @@ export function TrpcBatchPage() {
                   <TableRow
                     key={`${row.index}-${row.procedure}`}
                     data-state={isSelected ? "selected" : undefined}
-                    className="cursor-pointer"
-                    onClick={() => setSelectedIndex(row.index)}
+                    className={isSelected ? "bg-primary/15" : undefined}
                   >
                     <TableCell className="font-mono text-sm">{row.index}</TableCell>
-                    <TableCell className="font-mono text-sm font-medium">{row.procedure}</TableCell>
+                    <TableCell>
+                      <Button
+                        type="button"
+                        variant="link"
+                        className="h-auto p-0 font-mono text-sm font-medium"
+                        onClick={() => setSelectedIndex(row.index)}
+                      >
+                        {row.procedure}
+                      </Button>
+                    </TableCell>
                     <TableCell className="text-sm text-muted-foreground">
                       {inputKeys || "—"}
                     </TableCell>
