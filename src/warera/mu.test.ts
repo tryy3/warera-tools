@@ -76,7 +76,7 @@ describe("fetch helpers", () => {
     expect(parsed.name).toBe("Sweed Liberty");
   });
 
-  it("calls muMember.getByMu without overriding baseUrl", async () => {
+  it("calls muMember.getByMu with X-API-Key", async () => {
     const request = vi.fn().mockResolvedValue({
       result: {
         data: [
@@ -95,9 +95,45 @@ describe("fetch helpers", () => {
       },
     });
     await fetchMuMembersByMu({ request }, "mu1");
-    expect(request).toHaveBeenCalledOnce();
-    expect(request.mock.calls[0]).toHaveLength(1);
-    expect(String(request.mock.calls[0]![0])).toContain("muMember.getByMu");
-    expect(request.mock.calls[0]?.[1]).toBeUndefined();
+    expect(request).toHaveBeenCalledWith(
+      expect.stringContaining("muMember.getByMu"),
+      expect.objectContaining({ authStyle: "api-key", method: "GET" }),
+    );
+  });
+
+  it("falls back to POST when GET is rejected", async () => {
+    const request = vi
+      .fn()
+      .mockRejectedValueOnce(
+        new Error("WarEra request failed: 400 unknown method: muMember.getByMu"),
+      )
+      .mockResolvedValueOnce({
+        result: {
+          data: [
+            {
+              _id: "row1",
+              mu: "mu1",
+              user: "u1",
+              totalDamagesCount: 1,
+              monthlyDamagesCount: 0,
+              weeklyDamagesCount: 0,
+              totalHelpCount: 0,
+              monthlyHelpCount: 0,
+              weeklyHelpCount: 0,
+            },
+          ],
+        },
+      });
+    const rows = await fetchMuMembersByMu({ request }, "mu1");
+    expect(rows).toHaveLength(1);
+    expect(request).toHaveBeenCalledTimes(2);
+    expect(request.mock.calls[1]).toEqual([
+      "muMember.getByMu",
+      expect.objectContaining({
+        method: "POST",
+        json: { muId: "mu1" },
+        authStyle: "api-key",
+      }),
+    ]);
   });
 });

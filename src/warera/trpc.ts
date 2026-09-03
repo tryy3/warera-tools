@@ -32,6 +32,9 @@ export function buildBatchInputRecord(items: WareraBatchItem[]): Record<string, 
   if (items.length === 0) {
     throw new Error("buildBatchInputRecord requires at least one item");
   }
+  // Always index by slot (`{"0":…}`), including 1-item batches. Unindexed
+  // `{"userId":…}` / `{"muId":…}` under `?batch=1` is rejected by live api2
+  // (`input` arrives undefined → 400 Required).
   const inputRecord: Record<string, unknown> = {};
   for (let i = 0; i < items.length; i++) {
     inputRecord[String(i)] = items[i]!.input === undefined ? null : items[i]!.input;
@@ -58,12 +61,18 @@ export function wareraBatchPostPath(items: WareraBatchItem[]): string {
   return `${procedures}?batch=1`;
 }
 
+/** Normalize tRPC batch HTTP JSON — WarEra returns a single slot object for 1-item batches. */
+function normalizeTrpcBatchSlots(json: unknown): unknown[] {
+  if (Array.isArray(json)) return json;
+  if (json != null && typeof json === "object" && ("result" in json || "error" in json)) {
+    return [json];
+  }
+  throw new Error("WarEra batch response is not an array");
+}
+
 /** Parse a tRPC batch response array into per-index ok/error slots. */
 export function parseTrpcBatchResponse(json: unknown): TrpcBatchSlotResult[] {
-  if (!Array.isArray(json)) {
-    throw new Error("WarEra batch response is not an array");
-  }
-  return json.map((slot) => {
+  return normalizeTrpcBatchSlots(json).map((slot) => {
     if (slot != null && typeof slot === "object" && "result" in slot) {
       const data = (slot as { result?: { data?: unknown } }).result?.data;
       if (data !== undefined) {

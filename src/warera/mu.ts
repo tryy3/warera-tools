@@ -1,3 +1,4 @@
+import { isWareraGetRejectedError } from "./errors";
 import type { WareraRequester } from "./prices";
 import { unwrapTrpcData, wareraProcedurePath } from "./trpc";
 
@@ -227,16 +228,34 @@ export async function fetchMuById(warera: WareraRequester, muId: string): Promis
   return parseMuById(unwrapTrpcData(json));
 }
 
+const MU_MEMBER_BY_MU_INIT = {
+  authStyle: "api-key" as const,
+};
+
 /**
  * Live api2 procedure; not on official OpenAPI (same class as
- * company.getRecommendedRegionIdsByItemCode).
+ * company.getRecommendedRegionIdsByItemCode). Requires X-API-Key; prefer GET,
+ * fall back to POST when GET is rejected.
  */
 export async function fetchMuMembersByMu(
   warera: WareraRequester,
   muId: string,
 ): Promise<ParsedMuMember[]> {
-  const json = await warera.request<unknown>(wareraProcedurePath("muMember.getByMu", { muId }));
-  return parseMuMembers(unwrapTrpcData(json));
+  try {
+    const json = await warera.request<unknown>(wareraProcedurePath("muMember.getByMu", { muId }), {
+      ...MU_MEMBER_BY_MU_INIT,
+      method: "GET",
+    });
+    return parseMuMembers(unwrapTrpcData(json));
+  } catch (err) {
+    if (!isWareraGetRejectedError(err)) throw err;
+    const json = await warera.request<unknown>("muMember.getByMu", {
+      method: "POST",
+      json: { muId },
+      ...MU_MEMBER_BY_MU_INIT,
+    });
+    return parseMuMembers(unwrapTrpcData(json));
+  }
 }
 
 export function deriveMemberRole(

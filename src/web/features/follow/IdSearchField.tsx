@@ -6,6 +6,7 @@ import type { SearchMusResponse, SearchUsersResponse } from "./types";
 type Props = {
   id: string;
   onIdChange: (id: string) => void;
+  onPick?: (id: string) => void;
   searchType: "user" | "mu";
   disabled?: boolean;
 };
@@ -13,7 +14,7 @@ type Props = {
 type UserHit = { userId: string; username: string };
 type MuHit = { muId: string; name: string };
 
-export function IdSearchField({ id, onIdChange, searchType, disabled }: Props) {
+export function IdSearchField({ id, onIdChange, onPick, searchType, disabled }: Props) {
   const [query, setQuery] = useState("");
   const [users, setUsers] = useState<UserHit[]>([]);
   const [mus, setMus] = useState<MuHit[]>([]);
@@ -66,12 +67,14 @@ export function IdSearchField({ id, onIdChange, searchType, disabled }: Props) {
 
   function pickUser(hit: UserHit) {
     onIdChange(hit.userId);
+    onPick?.(hit.userId);
     setQuery("");
     setUsers([]);
   }
 
   function pickMu(hit: MuHit) {
     onIdChange(hit.muId);
+    onPick?.(hit.muId);
     setQuery("");
     setMus([]);
   }
