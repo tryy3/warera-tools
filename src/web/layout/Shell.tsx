@@ -17,6 +17,7 @@ type ShellProps = {
 const tabs = [
   { to: "/", label: "Dashboard" },
   { to: "/jobs", label: "Jobs" },
+  { to: "/trpc-batch", label: "tRPC Batch" },
   { to: "/calculator", label: "Calculator" },
   { to: "/companies", label: "Companies" },
   { to: "/growth", label: "Growth" },
@@ -25,6 +26,7 @@ const tabs = [
   { to: "/equipment", label: "Equipment" },
   { to: "/countries", label: "Countries" },
   { to: "/follow", label: "Follow" },
+  { to: "/mu", label: "MU" },
 ] as const;
 
 export function Shell({ children }: ShellProps) {

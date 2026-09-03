@@ -21,6 +21,12 @@ describe("wareraBatchPath", () => {
     });
   });
 
+  it("indexes a single-item batch under 0 (api2 rejects unindexed ?batch=1 input)", () => {
+    const path = wareraBatchPath([{ procedure: "mu.getById", input: { muId: "m1" } }]);
+    const inputParam = new URLSearchParams(path.slice(path.indexOf("?") + 1)).get("input");
+    expect(JSON.parse(inputParam!)).toEqual({ 0: { muId: "m1" } });
+  });
+
   it("allows undefined input slots as null in the input record", () => {
     const path = wareraBatchPath([{ procedure: "gameConfig.getDates" }]);
     const inputParam = new URLSearchParams(path.slice(path.indexOf("?") + 1)).get("input");
@@ -55,6 +61,18 @@ describe("parseTrpcBatchResponse", () => {
 
   it("treats missing result.data as ok false", () => {
     expect(parseTrpcBatchResponse([{}])).toEqual([{ ok: false, error: {} }]);
+  });
+
+  it("accepts a single slot object for 1-item batches", () => {
+    expect(parseTrpcBatchResponse({ result: { data: { name: "Sweed Liberty" } } })).toEqual([
+      { ok: true, data: { name: "Sweed Liberty" } },
+    ]);
+  });
+
+  it("throws for non-array, non-slot payloads", () => {
+    expect(() => parseTrpcBatchResponse({ foo: "bar" })).toThrow(
+      "WarEra batch response is not an array",
+    );
   });
 });
 

@@ -167,4 +167,45 @@ describe("searchMus", () => {
     const hits = await searchMus({ request, requestBatch } as never, "ab");
     expect(hits.map((h) => h.muId)).toEqual(["m1", "m2"]);
   });
+
+  it("logs searchAnything and hydrate details when logger is provided", async () => {
+    const request = vi.fn(async (path: string) => {
+      if (path.includes("search.searchAnything")) {
+        return searchAnythingResponse({ muIds: ["m1"] });
+      }
+      throw new Error(`unexpected call: ${path}`);
+    });
+    const requestBatch = vi
+      .fn()
+      .mockResolvedValue([{ ok: true, data: { _id: "m1", name: "MU m1" } }]);
+    const logger = {
+      debug: vi.fn(),
+      silly: vi.fn(),
+      trace: vi.fn(),
+      info: vi.fn(),
+      warn: vi.fn(),
+      error: vi.fn(),
+      fatal: vi.fn(),
+      child: vi.fn(),
+    };
+
+    await searchMus({ request, requestBatch } as never, "liberty", 8, { logger: logger as never });
+
+    expect(logger.debug).toHaveBeenCalledWith(
+      expect.objectContaining({
+        search_text: "liberty",
+        mu_ids_json: '["m1"]',
+        search_raw_json: expect.stringContaining("m1"),
+      }),
+      "mu search: searchAnything response",
+    );
+    expect(logger.debug).toHaveBeenCalledWith(
+      expect.objectContaining({
+        search_text: "liberty",
+        result_count: 1,
+        results_json: '[{"muId":"m1","name":"MU m1"}]',
+      }),
+      "mu search: hydrate complete",
+    );
+  });
 });
