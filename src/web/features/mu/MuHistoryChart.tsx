@@ -1,7 +1,8 @@
 import { defineChart, lineY } from "@tanstack/charts";
+import { scaleLinear } from "@tanstack/charts/scales/linear";
 import { tooltip } from "@tanstack/charts/tooltip";
 import { Chart } from "@tanstack/react-charts";
-import { scaleLinear, scaleUtc } from "d3-scale";
+import { scaleUtc } from "d3-scale";
 import { useMemo } from "react";
 import type { MuHistoryPoint } from "./types";
 
@@ -38,8 +39,10 @@ export function MuHistoryChart({
             strokeWidth: 2,
           }),
         ],
-        x: { scale: scaleUtc, nice: true, axis: { label: "Time" } },
-        y: { scale: scaleLinear, nice: true, grid: true, axis: { label: metricLabel } },
+        scales: {
+          x: { scale: scaleUtc, nice: true, axis: { label: "Time" } },
+          y: { scale: scaleLinear, nice: true, grid: true, axis: { label: metricLabel } },
+        },
         tooltip,
       }),
     [rows, metricLabel],

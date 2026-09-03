@@ -1,7 +1,7 @@
 import { defineChart, lineY } from "@tanstack/charts";
+import { scaleLinear } from "@tanstack/charts/scales/linear";
 import { tooltip } from "@tanstack/charts/tooltip";
 import { Chart } from "@tanstack/react-charts";
-import { scaleLinear } from "d3-scale";
 import { useMemo } from "react";
 import { PATH_THEME, type PathThemeKey } from "./pathTheme";
 import type { GrowthPlanResult } from "./types";
@@ -71,8 +71,10 @@ export function GrowthPathChart({
             strokeWidth: 2.5,
           }),
         ),
-        x: { scale: scaleLinear, nice: true, axis: { label: "Days" } },
-        y: { scale: scaleLinear, nice: true, grid: true, axis: { label: "G/day" } },
+        scales: {
+          x: { scale: scaleLinear, nice: true, axis: { label: "Days" } },
+          y: { scale: scaleLinear, nice: true, grid: true, axis: { label: "G/day" } },
+        },
         tooltip,
       }),
     [seriesRows],
