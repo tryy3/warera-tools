@@ -304,3 +304,104 @@ export const itemMarketTransactions = sqliteTable(
     index("item_market_tx_created_at_idx").on(t.createdAt),
   ],
 );
+
+export const battlePollStatuses = ["success", "partial", "error"] as const;
+export type BattlePollStatus = (typeof battlePollStatuses)[number];
+
+export const battles = sqliteTable(
+  "battles",
+  {
+    id: text("id").primaryKey(),
+    warId: text("war_id"),
+    type: text("type"),
+    isActive: integer("is_active", { mode: "boolean" }).notNull().default(true),
+    attackerCountryId: text("attacker_country_id"),
+    defenderCountryId: text("defender_country_id"),
+    attackerRegionId: text("attacker_region_id"),
+    defenderRegionId: text("defender_region_id"),
+    roundsToWin: integer("rounds_to_win"),
+    currentRoundId: text("current_round_id"),
+    currentRoundNumber: integer("current_round_number"),
+    attackerWonRounds: integer("attacker_won_rounds"),
+    defenderWonRounds: integer("defender_won_rounds"),
+    attackerMuOrders: text("attacker_mu_orders", { mode: "json" }).$type<string[] | null>(),
+    defenderMuOrders: text("defender_mu_orders", { mode: "json" }).$type<string[] | null>(),
+    stickyMuIds: text("sticky_mu_ids", { mode: "json" }).$type<string[] | null>(),
+    roundsHistory: text("rounds_history", { mode: "json" }).$type<unknown[] | null>(),
+    startedAtGame: integer("started_at_game", { mode: "timestamp_ms" }),
+    endedAt: integer("ended_at", { mode: "timestamp_ms" }),
+    finalizedAt: integer("finalized_at", { mode: "timestamp_ms" }),
+    fetchedAt: integer("fetched_at", { mode: "timestamp_ms" }),
+    payload: text("payload", { mode: "json" }).$type<Record<string, unknown> | null>(),
+  },
+  (t) => [index("battles_is_active_idx").on(t.isActive)],
+);
+
+export const battlePolls = sqliteTable(
+  "battle_polls",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    recordedAt: integer("recorded_at", { mode: "timestamp_ms" }).notNull(),
+    status: text("status").notNull(),
+    error: text("error"),
+    activeBattlePages: integer("active_battle_pages"),
+    battleCount: integer("battle_count").notNull().default(0),
+    lootSnapshotCount: integer("loot_snapshot_count").notNull().default(0),
+    finalizedCount: integer("finalized_count").notNull().default(0),
+  },
+  (t) => [index("battle_polls_status_recorded_at_idx").on(t.status, t.recordedAt)],
+);
+
+export const battleScoreboardSnapshots = sqliteTable(
+  "battle_scoreboard_snapshots",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    pollId: integer("poll_id")
+      .notNull()
+      .references(() => battlePolls.id),
+    battleId: text("battle_id").notNull(),
+    roundId: text("round_id"),
+    roundNumber: integer("round_number"),
+    roundIsActive: integer("round_is_active", { mode: "boolean" }),
+    attackerPoints: real("attacker_points"),
+    defenderPoints: real("defender_points"),
+    attackerDamages: real("attacker_damages"),
+    defenderDamages: real("defender_damages"),
+    attackerHitCount: integer("attacker_hit_count"),
+    defenderHitCount: integer("defender_hit_count"),
+    ticksCount: integer("ticks_count"),
+    nextTickAt: integer("next_tick_at", { mode: "timestamp_ms" }),
+    roundStartedAtGame: integer("round_started_at_game", { mode: "timestamp_ms" }),
+    recordedAt: integer("recorded_at", { mode: "timestamp_ms" }).notNull(),
+  },
+  (t) => [
+    index("battle_scoreboard_snapshots_battle_poll_idx").on(t.battleId, t.pollId),
+    index("battle_scoreboard_snapshots_battle_recorded_at_idx").on(t.battleId, t.recordedAt),
+  ],
+);
+
+export const battleLootSnapshots = sqliteTable(
+  "battle_loot_snapshots",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    pollId: integer("poll_id")
+      .notNull()
+      .references(() => battlePolls.id),
+    battleId: text("battle_id").notNull(),
+    userId: text("user_id").notNull(),
+    muId: text("mu_id").notNull(),
+    totalDmg: real("total_dmg"),
+    hits: integer("hits"),
+    totalMoneyFromBounty: real("total_money_from_bounty"),
+    totalMoneyFromContract: real("total_money_from_contract"),
+    case1Count: integer("case1_count"),
+    case2Count: integer("case2_count"),
+    poolLoot: text("pool_loot", { mode: "json" }).$type<unknown[] | null>(),
+    payload: text("payload", { mode: "json" }).$type<Record<string, unknown> | null>(),
+    recordedAt: integer("recorded_at", { mode: "timestamp_ms" }).notNull(),
+  },
+  (t) => [
+    index("battle_loot_snapshots_battle_user_poll_idx").on(t.battleId, t.userId, t.pollId),
+    index("battle_loot_snapshots_mu_recorded_at_idx").on(t.muId, t.recordedAt),
+  ],
+);

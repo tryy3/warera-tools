@@ -1,6 +1,6 @@
 # WarEra data inventory (as-is)
 
-**Last reviewed:** 2026-08-22  
+**Last reviewed:** 2026-09-03  
 **Status:** Living — update when cadence, ownership, or major consumers change  
 **Tier rules:** [Data tier caching strategy](../superpowers/specs/2026-08-02-data-tier-caching-strategy-design.md)
 
@@ -46,6 +46,9 @@ Browser (SPA)
 | Market prices | Item + scraps prices, top-order aggregates | `price-poll`; manual Market refresh | Hourly (`0 0 * * * *`) | api2 | Append history (`price_polls` / `price_snapshots`) + latest reads | Market, Calculator, Companies, Growth, Opportunities |
 | Recommended regions | Best region id per producible item | `recommended-regions-poll`; cold miss on advisor paths | Hourly (`0 0 * * * *`) | api2 POST + `X-API-Key` | Latest upsert (`recommended_regions`) | Advisor / company economy |
 | Item-market transactions | Equipment / itemMarket sales stream | `item-market-tx-backfill` (once per process) then `item-market-tx-poll` | Poll every minute; backfill `maxRuns: 1` | api2 + `X-API-Key` | Append-only (`item_market_transactions`) + handoff cursor | Equipment Market (`/api/equipment`) |
+| Battles (ordered) | Active/ended battles sticky when watched MU in `muOrders`; light scoreboard + per-member loot | `battle-info-poll` | Every 15 minutes | `battle.getBattles` (full cursor), `battle.getById` on finalize only, `battleLootSummary.getByBattleAndUser` | `battles` current + `battle_scoreboard_snapshots` / `battle_loot_snapshots` | Future MU achievements / battle contrib (no UI yet) |
+
+Global battle catalog (`battle.getBattles` cursor drain); rows enter and stay sticky when a watched MU (Geo watchlist from `mu_watch_reasons`) appears in attacker/defender `muOrders`.
 
 ### Geo
 
