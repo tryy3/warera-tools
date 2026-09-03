@@ -104,7 +104,9 @@ describe("fetch helpers", () => {
   it("falls back to POST when GET is rejected", async () => {
     const request = vi
       .fn()
-      .mockRejectedValueOnce(new Error("WarEra request failed: 400 unknown method: muMember.getByMu"))
+      .mockRejectedValueOnce(
+        new Error("WarEra request failed: 400 unknown method: muMember.getByMu"),
+      )
       .mockResolvedValueOnce({
         result: {
           data: [

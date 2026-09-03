@@ -17,6 +17,7 @@ type ShellProps = {
 const tabs = [
   { to: "/", label: "Dashboard" },
   { to: "/jobs", label: "Jobs" },
+  { to: "/trpc-batch", label: "tRPC Batch" },
   { to: "/calculator", label: "Calculator" },
   { to: "/companies", label: "Companies" },
   { to: "/growth", label: "Growth" },

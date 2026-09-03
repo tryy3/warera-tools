@@ -50,10 +50,7 @@ export function MuMemberHistoryChart({
   const prepared = useMemo(() => prepareSeries(series), [series]);
   const [hidden, setHidden] = useState<Set<string>>(() => new Set());
 
-  const active = useMemo(
-    () => prepared.filter((s) => !hidden.has(s.userId)),
-    [prepared, hidden],
-  );
+  const active = useMemo(() => prepared.filter((s) => !hidden.has(s.userId)), [prepared, hidden]);
 
   const definition = useMemo(
     () =>
@@ -76,11 +73,7 @@ export function MuMemberHistoryChart({
         maxFocusDistance: Number.POSITIVE_INFINITY,
         tooltip: {
           use: tooltip,
-          items: [
-            "x",
-            { channel: "group", label: "Member" },
-            { channel: "y", label: metricLabel },
-          ],
+          items: ["x", { channel: "group", label: "Member" }, { channel: "y", label: metricLabel }],
         },
       }),
     [active, metricLabel],

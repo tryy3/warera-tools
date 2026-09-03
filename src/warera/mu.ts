@@ -242,10 +242,10 @@ export async function fetchMuMembersByMu(
   muId: string,
 ): Promise<ParsedMuMember[]> {
   try {
-    const json = await warera.request<unknown>(
-      wareraProcedurePath("muMember.getByMu", { muId }),
-      { ...MU_MEMBER_BY_MU_INIT, method: "GET" },
-    );
+    const json = await warera.request<unknown>(wareraProcedurePath("muMember.getByMu", { muId }), {
+      ...MU_MEMBER_BY_MU_INIT,
+      method: "GET",
+    });
     return parseMuMembers(unwrapTrpcData(json));
   } catch (err) {
     if (!isWareraGetRejectedError(err)) throw err;

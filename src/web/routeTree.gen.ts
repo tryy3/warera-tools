@@ -21,6 +21,7 @@ import { Route as JobsRouteImport } from './routes/jobs'
 import { Route as MarketRouteImport } from './routes/market'
 import { Route as MuRouteImport } from './routes/mu'
 import { Route as SkillsRouteImport } from './routes/skills'
+import { Route as TrpcBatchRouteImport } from './routes/trpc-batch'
 import { Route as EquipmentItemCodeRouteImport } from './routes/equipment_.$itemCode'
 import { Route as MarketItemCodeRouteImport } from './routes/market_.$itemCode'
 import { Route as MuMuIdRouteImport } from './routes/mu_.$muId'
@@ -85,6 +86,11 @@ const SkillsRoute = SkillsRouteImport.update({
   path: '/skills',
   getParentRoute: () => rootRouteImport,
 } as any)
+const TrpcBatchRoute = TrpcBatchRouteImport.update({
+  id: '/trpc-batch',
+  path: '/trpc-batch',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const EquipmentItemCodeRoute = EquipmentItemCodeRouteImport.update({
   id: '/equipment_/$itemCode',
   path: '/equipment/$itemCode',
@@ -114,6 +120,7 @@ export interface FileRoutesByFullPath {
   '/market': typeof MarketRoute
   '/mu': typeof MuRoute
   '/skills': typeof SkillsRoute
+  '/trpc-batch': typeof TrpcBatchRoute
   '/equipment/$itemCode': typeof EquipmentItemCodeRoute
   '/market/$itemCode': typeof MarketItemCodeRoute
   '/mu/$muId': typeof MuMuIdRoute
@@ -131,6 +138,7 @@ export interface FileRoutesByTo {
   '/market': typeof MarketRoute
   '/mu': typeof MuRoute
   '/skills': typeof SkillsRoute
+  '/trpc-batch': typeof TrpcBatchRoute
   '/equipment/$itemCode': typeof EquipmentItemCodeRoute
   '/market/$itemCode': typeof MarketItemCodeRoute
   '/mu/$muId': typeof MuMuIdRoute
@@ -149,6 +157,7 @@ export interface FileRoutesById {
   '/market': typeof MarketRoute
   '/mu': typeof MuRoute
   '/skills': typeof SkillsRoute
+  '/trpc-batch': typeof TrpcBatchRoute
   '/equipment_/$itemCode': typeof EquipmentItemCodeRoute
   '/market_/$itemCode': typeof MarketItemCodeRoute
   '/mu_/$muId': typeof MuMuIdRoute
@@ -168,6 +177,7 @@ export interface FileRouteTypes {
     | '/market'
     | '/mu'
     | '/skills'
+    | '/trpc-batch'
     | '/equipment/$itemCode'
     | '/market/$itemCode'
     | '/mu/$muId'
@@ -185,6 +195,7 @@ export interface FileRouteTypes {
     | '/market'
     | '/mu'
     | '/skills'
+    | '/trpc-batch'
     | '/equipment/$itemCode'
     | '/market/$itemCode'
     | '/mu/$muId'
@@ -202,6 +213,7 @@ export interface FileRouteTypes {
     | '/market'
     | '/mu'
     | '/skills'
+    | '/trpc-batch'
     | '/equipment_/$itemCode'
     | '/market_/$itemCode'
     | '/mu_/$muId'
@@ -220,6 +232,7 @@ export interface RootRouteChildren {
   MarketRoute: typeof MarketRoute
   MuRoute: typeof MuRoute
   SkillsRoute: typeof SkillsRoute
+  TrpcBatchRoute: typeof TrpcBatchRoute
   EquipmentItemCodeRoute: typeof EquipmentItemCodeRoute
   MarketItemCodeRoute: typeof MarketItemCodeRoute
   MuMuIdRoute: typeof MuMuIdRoute
@@ -311,6 +324,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SkillsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/trpc-batch': {
+      id: '/trpc-batch'
+      path: '/trpc-batch'
+      fullPath: '/trpc-batch'
+      preLoaderRoute: typeof TrpcBatchRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/equipment_/$itemCode': {
       id: '/equipment_/$itemCode'
       path: '/equipment/$itemCode'
@@ -348,6 +368,7 @@ const rootRouteChildren: RootRouteChildren = {
   MarketRoute: MarketRoute,
   MuRoute: MuRoute,
   SkillsRoute: SkillsRoute,
+  TrpcBatchRoute: TrpcBatchRoute,
   EquipmentItemCodeRoute: EquipmentItemCodeRoute,
   MarketItemCodeRoute: MarketItemCodeRoute,
   MuMuIdRoute: MuMuIdRoute,

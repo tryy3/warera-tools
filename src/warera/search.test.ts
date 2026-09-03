@@ -175,9 +175,9 @@ describe("searchMus", () => {
       }
       throw new Error(`unexpected call: ${path}`);
     });
-    const requestBatch = vi.fn().mockResolvedValue([
-      { ok: true, data: { _id: "m1", name: "MU m1" } },
-    ]);
+    const requestBatch = vi
+      .fn()
+      .mockResolvedValue([{ ok: true, data: { _id: "m1", name: "MU m1" } }]);
     const logger = {
       debug: vi.fn(),
       silly: vi.fn(),
