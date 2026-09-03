@@ -1,5 +1,6 @@
 import type { Db } from "../db/client";
 import { jobs } from "../db/schema";
+import { battleInfoPollJob } from "./battle-info-poll";
 import { countrySyncJob } from "./country-sync";
 import { exampleHeartbeatJob } from "./example-heartbeat";
 import { itemMarketTxBackfillJob } from "./item-market-tx-backfill";
@@ -19,6 +20,7 @@ export function listJobDefinitions(): JobDefinition[] {
     recommendedRegionsPollJob,
     regionSyncJob,
     muStatsPollJob,
+    battleInfoPollJob,
     workStatsPollJob,
     itemMarketTxBackfillJob,
     itemMarketTxPollJob,
