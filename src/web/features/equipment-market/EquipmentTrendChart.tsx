@@ -1,7 +1,8 @@
 import { defineChart, lineY, ruleY } from "@tanstack/charts";
+import { scaleLinear } from "@tanstack/charts/scales/linear";
 import { tooltip } from "@tanstack/charts/tooltip";
 import { Chart } from "@tanstack/react-charts";
-import { scaleLinear, scaleUtc } from "d3-scale";
+import { scaleUtc } from "d3-scale";
 import { useMemo } from "react";
 import { formatDisplayNumber } from "@/lib/formatDisplayNumber";
 
@@ -56,8 +57,10 @@ export function EquipmentTrendChart({
               ]
             : []),
         ],
-        x: { scale: scaleUtc, nice: true, axis: { label: "Day" } },
-        y: { scale: scaleLinear, nice: true, grid: true, axis: { label: "Median" } },
+        scales: {
+          x: { scale: scaleUtc, nice: true, axis: { label: "Day" } },
+          y: { scale: scaleLinear, nice: true, grid: true, axis: { label: "Median" } },
+        },
         tooltip,
       }),
     [rows, floor],

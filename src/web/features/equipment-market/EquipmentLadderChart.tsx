@@ -1,7 +1,8 @@
 import { barY, defineChart } from "@tanstack/charts";
+import { scaleBand } from "@tanstack/charts/scales/band";
+import { scaleLinear } from "@tanstack/charts/scales/linear";
 import { tooltip } from "@tanstack/charts/tooltip";
 import { Chart } from "@tanstack/react-charts";
-import { scaleBand, scaleLinear } from "d3-scale";
 import { useMemo } from "react";
 
 type LadderBucket = { bucketLabel: string; median: number; trades: number };
@@ -28,11 +29,13 @@ export function EquipmentLadderChart({
             fillOpacity: 0.85,
           }),
         ],
-        x: {
-          scale: () => scaleBand().paddingInner(0.2).paddingOuter(0.1),
-          axis: { label: "Stat" },
+        scales: {
+          x: {
+            scale: () => scaleBand().paddingInner(0.2).paddingOuter(0.1),
+            axis: { label: "Stat" },
+          },
+          y: { scale: scaleLinear, nice: true, grid: true, axis: { label: "Median" } },
         },
-        y: { scale: scaleLinear, nice: true, grid: true, axis: { label: "Median" } },
         tooltip,
       }),
     [rows],

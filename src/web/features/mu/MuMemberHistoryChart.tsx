@@ -1,8 +1,9 @@
 import { defineChart, lineY } from "@tanstack/charts";
 import { crosshair } from "@tanstack/charts/crosshair";
+import { scaleLinear } from "@tanstack/charts/scales/linear";
 import { tooltip } from "@tanstack/charts/tooltip";
 import { Chart } from "@tanstack/react-charts";
-import { scaleLinear, scaleUtc } from "d3-scale";
+import { scaleUtc } from "d3-scale";
 import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { colorForUserId } from "./formatMu";
@@ -67,8 +68,10 @@ export function MuMemberHistoryChart({
           ),
           crosshair({ x: { label: true }, y: false }),
         ],
-        x: { scale: scaleUtc, nice: true, axis: { label: "Time" } },
-        y: { scale: scaleLinear, nice: true, grid: true, axis: { label: metricLabel } },
+        scales: {
+          x: { scale: scaleUtc, nice: true, axis: { label: "Time" } },
+          y: { scale: scaleLinear, nice: true, grid: true, axis: { label: metricLabel } },
+        },
         focus: "nearest-x",
         maxFocusDistance: Number.POSITIVE_INFINITY,
         tooltip: {
