@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vite-plus/test";
-import { drainDonations, parseDonationPage } from "./donations";
+import { drainDonations, fetchDonationPage, parseDonationPage } from "./donations";
 
 describe("parseDonationPage", () => {
   it("maps muId/countryId to scope and keeps running totals", () => {
@@ -99,5 +99,50 @@ describe("drainDonations", () => {
     });
     expect(rows.map((r) => r.userId)).toEqual(["u1", "u2"]);
     expect(request).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("fetchDonationPage", () => {
+  it("falls back to POST with an API key when GET is rejected", async () => {
+    const request = vi
+      .fn()
+      .mockRejectedValueOnce(
+        new Error("WarEra request failed: 400 unknown method: donation.getManyPaginated"),
+      )
+      .mockResolvedValueOnce({
+        result: {
+          data: {
+            items: [
+              {
+                _id: "d1",
+                muId: "mu1",
+                userId: "u1",
+                amount: 1,
+                createdAt: "2026-01-01T00:00:00.000Z",
+              },
+            ],
+            nextCursor: null,
+          },
+        },
+      });
+
+    const page = await fetchDonationPage({ request } as never, {
+      scopeType: "mu",
+      scopeId: "mu1",
+    });
+
+    expect(page.items).toHaveLength(1);
+    expect(request).toHaveBeenCalledTimes(2);
+    expect(request.mock.calls[0]?.[1]).toEqual(
+      expect.objectContaining({ method: "GET", authStyle: "api-key" }),
+    );
+    expect(request.mock.calls[1]).toEqual([
+      "donation.getManyPaginated",
+      expect.objectContaining({
+        method: "POST",
+        json: { limit: 100, muId: "mu1" },
+        authStyle: "api-key",
+      }),
+    ]);
   });
 });

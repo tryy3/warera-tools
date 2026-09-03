@@ -124,6 +124,13 @@ describe("runDonationPoll", () => {
     });
 
     expect(result).toMatchObject({ status: "success", scopeCount: 2, rowCount: 2 });
+    expect(warera.request).toHaveBeenCalledTimes(2);
+    expect(decodeURIComponent(String(warera.request.mock.calls[0]?.[0]))).toContain(
+      `"muId":"${MU_ID}"`,
+    );
+    expect(decodeURIComponent(String(warera.request.mock.calls[1]?.[0]))).toContain(
+      `"countryId":"${SEED_COUNTRY_SWEDEN_ID}"`,
+    );
     const countryReasons = await db.select().from(schema.countryWatchReasons);
     expect(countryReasons).toHaveLength(1);
     expect(countryReasons[0]?.countryId).toBe(SEED_COUNTRY_SWEDEN_ID);
