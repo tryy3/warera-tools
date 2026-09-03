@@ -114,6 +114,7 @@ Official OpenAPI is **incomplete** relative to live api2. Community explorers su
 | battleRanking | `getRanking` |
 | company | `getById`, `getCompanies`, `getProductionBonus`†, `getRecommendedRegionIdsByItemCode`† |
 | country | `getAllCountries`, `getCountryById` |
+| donation | `getManyPaginated`‡ |
 | event | `getEventsPaginated` |
 | gameConfig | `getDates`, `getGameConfig` |
 | government | `getByCountryId` |
@@ -142,6 +143,8 @@ Official OpenAPI is **incomplete** relative to live api2. Community explorers su
 § Not on official OpenAPI; force **api2** + `X-API-Key` for followed-entity work-stats (daily company/worker production). Prefer GET tRPC batch; POST fallback with body `{"0":input0,"1":input1}` when GET is rejected.
 
 ††† On official OpenAPI; force **api2** + `authStyle: "api-key"` for item-market ingest — gateway has had DB failures on this procedure. Requires `WARERA_API_KEY`.
+
+‡ Not on official OpenAPI; live api2 read used by donation poll — prefer GET, POST + `X-API-Key` fallback.
 
 For parameters and schemas: official OpenAPI. For observed response shapes: community `spec.md` / `spec.json` under majimawrks/warera-api-docs.
 
