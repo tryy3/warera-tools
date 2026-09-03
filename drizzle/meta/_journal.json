@@ -71,6 +71,13 @@
       "when": 1787263302743,
       "tag": "0009_nebulous_blue_marvel",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
+      "when": 1788434956046,
+      "tag": "0010_damp_prowler",
+      "breakpoints": true
     }
   ]
 }
