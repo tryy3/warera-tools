@@ -332,7 +332,9 @@ describe("runBattleInfoPoll", () => {
       now: new Date("2026-09-03T11:45:00.000Z"),
     });
     const warera = makeWarera({
-      activeBattles: [battleFixture({ id: "b1", attackerMuOrders: [] })],
+      activeBattles: [
+        battleFixture({ id: "b1", attackerMuOrders: [], roundNumber: 7, roundId: "round-7" }),
+      ],
       loot: () => lootFixture({}),
     });
     const result = await runBattleInfoPoll({
@@ -347,8 +349,11 @@ describe("runBattleInfoPoll", () => {
     const [row] = await db.select().from(schema.battles).where(eq(schema.battles.id, "b1"));
     expect(row?.stickyMuIds).toEqual(["mu-a"]);
     expect(row?.isActive).toBe(true);
+    expect(row?.attackerMuOrders).toEqual([]);
+    expect(row?.currentRoundNumber).toBe(7);
     const scoreboard = await db.select().from(schema.battleScoreboardSnapshots);
     expect(scoreboard).toHaveLength(2);
+    expect(scoreboard[1]?.roundNumber).toBe(7);
   });
 
   it("incomplete pagination: does not mark missing DB battle as ended, status partial", async () => {
@@ -450,6 +455,99 @@ describe("runBattleInfoPoll", () => {
       String(c[0]).includes("battle.getById"),
     );
     expect(getByIdCalls).toHaveLength(1);
+    const getByIdIdx = warera.request.mock.calls.findIndex((c) =>
+      String(c[0]).includes("battle.getById"),
+    );
+    const lootIdx = warera.request.mock.calls.findIndex((c) =>
+      String(c[0]).includes("battleLootSummary.getByBattleAndUser"),
+    );
+    expect(lootIdx).toBeGreaterThan(getByIdIdx);
+  });
+
+  it("reappearance after ended_at: clears ended_at; later absence starts a fresh settle window", async () => {
+    await seedMuWatch(db, "mu-a");
+    await seedMuMembers(db, "mu-a", ["u1"]);
+    await runBattleInfoPoll({
+      db,
+      warera: makeWarera({
+        activeBattles: [battleFixture({ id: "b1", attackerMuOrders: ["mu-a"] })],
+      }) as never,
+      logger: makeLogger() as never,
+      now: new Date("2026-09-03T12:00:00.000Z"),
+    });
+    await runBattleInfoPoll({
+      db,
+      warera: makeWarera({ activeBattles: [] }) as never,
+      logger: makeLogger() as never,
+      now: new Date("2026-09-03T12:10:00.000Z"),
+    });
+    const [endedRow] = await db.select().from(schema.battles).where(eq(schema.battles.id, "b1"));
+    expect(endedRow?.endedAt).toEqual(new Date("2026-09-03T12:10:00.000Z"));
+
+    // Reappears after grace would have elapsed — must clear ended_at, not finalize.
+    const reappear = await runBattleInfoPoll({
+      db,
+      warera: makeWarera({
+        activeBattles: [battleFixture({ id: "b1", attackerMuOrders: ["mu-a"], roundNumber: 4 })],
+      }) as never,
+      logger: makeLogger() as never,
+      now: new Date("2026-09-03T12:15:00.000Z"),
+    });
+    expect(reappear.finalizedCount).toBe(0);
+    const [liveRow] = await db.select().from(schema.battles).where(eq(schema.battles.id, "b1"));
+    expect(liveRow?.endedAt).toBeNull();
+    expect(liveRow?.isActive).toBe(true);
+    expect(liveRow?.finalizedAt).toBeNull();
+    expect(liveRow?.currentRoundNumber).toBe(4);
+
+    const absentAgain = await runBattleInfoPoll({
+      db,
+      warera: makeWarera({ activeBattles: [] }) as never,
+      logger: makeLogger() as never,
+      now: new Date("2026-09-03T12:16:00.000Z"),
+    });
+    expect(absentAgain.finalizedCount).toBe(0);
+    const [freshEnded] = await db.select().from(schema.battles).where(eq(schema.battles.id, "b1"));
+    expect(freshEnded?.endedAt).toEqual(new Date("2026-09-03T12:16:00.000Z"));
+    expect(freshEnded?.isActive).toBe(true);
+    expect(freshEnded?.finalizedAt).toBeNull();
+  });
+
+  it("finalize: crash during final loot leaves is_active true and unfinalized", async () => {
+    await seedMuWatch(db, "mu-a");
+    await seedMuMembers(db, "mu-a", ["u1"]);
+    await runBattleInfoPoll({
+      db,
+      warera: makeWarera({
+        activeBattles: [battleFixture({ id: "b1", attackerMuOrders: ["mu-a"] })],
+      }) as never,
+      logger: makeLogger() as never,
+      now: new Date("2026-09-03T12:00:00.000Z"),
+    });
+    await runBattleInfoPoll({
+      db,
+      warera: makeWarera({ activeBattles: [] }) as never,
+      logger: makeLogger() as never,
+      now: new Date("2026-09-03T12:10:00.000Z"),
+    });
+
+    const logger = makeLogger();
+    logger.warn.mockImplementation((_ctx, msg) => {
+      if (msg === "battle loot fetch failed") throw new Error("loot log boom");
+    });
+    const result = await runBattleInfoPoll({
+      db,
+      warera: makeWarera({
+        activeBattles: [],
+        lootThrowFor: new Set(["b1/u1"]),
+      }) as never,
+      logger: logger as never,
+      now: new Date("2026-09-03T12:15:00.000Z"),
+    });
+    expect(result.finalizedCount).toBe(0);
+    const [row] = await db.select().from(schema.battles).where(eq(schema.battles.id, "b1"));
+    expect(row?.isActive).toBe(true);
+    expect(row?.finalizedAt).toBeNull();
   });
 
   it("loot not-found: member with NOT_FOUND -> no loot row, poll still success", async () => {

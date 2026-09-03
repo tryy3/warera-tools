@@ -85,7 +85,15 @@ export async function runBattleInfoPoll(options: {
     const stickyMuIds = row.stickyMuIds ?? [];
 
     if (parsed) {
-      // Still active upstream — capture a scoreboard snapshot and loot.
+      // Still in the complete active list: refresh identity/orders/round so the
+      // row cannot go stale (including sticky battles whose current muOrders
+      // no longer hit the watchlist), and clear any prior ended_at so a later
+      // absence starts a fresh settle window instead of force-finalizing.
+      await upsertBattleFromParsed(db, parsed, {
+        stickyMuIds,
+        fetchedAt: now,
+        endedAt: null,
+      });
       const sb = scoreboardFromBattle(parsed);
       if (sb) {
         scoreboardRows.push({
@@ -132,10 +140,12 @@ export async function runBattleInfoPoll(options: {
     // Past grace — finalize with a single getById, final loot, then close.
     try {
       const fresh = await fetchBattleById(warera, row.id);
+      // Keep is_active true through final metadata + loot so a crash cannot
+      // drop the row from the workset unfinalized. markBattleFinalized is
+      // the only write that flips is_active false.
       await upsertBattleFromParsed(db, fresh, {
         stickyMuIds,
         fetchedAt: now,
-        isActive: false,
       });
       await collectLoot(warera, row.id, stickyMuIds, rosterByMu, lootRows, now, errors, logger);
       await markBattleFinalized(db, row.id, now);
