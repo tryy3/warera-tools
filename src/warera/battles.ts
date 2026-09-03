@@ -257,21 +257,48 @@ export function scoreboardFromBattle(battle: ParsedBattle): BattleScoreboardFiel
   };
 }
 
+export type ActiveBattlesPage = {
+  items: ParsedBattle[];
+  nextCursor: string | null;
+  /**
+   * True when the unwrapped payload was not a `{ items: unknown[] }` page
+   * shape, or when an item that looked like a battle object failed to parse
+   * to a battle with an id. Callers must treat a malformed page as an
+   * incomplete walk (do NOT infer "no more battles" from it).
+   */
+  malformed: boolean;
+};
+
 export async function fetchActiveBattlesPage(
   warera: WareraRequester,
   opts: { limit?: number; cursor?: string } = {},
-): Promise<{ items: ParsedBattle[]; nextCursor: string | null }> {
+): Promise<ActiveBattlesPage> {
   const input: Record<string, unknown> = { isActive: true, limit: opts.limit ?? 50 };
   if (opts.cursor) input.cursor = opts.cursor;
   const json = await warera.request<unknown>(wareraProcedurePath("battle.getBattles", input));
   const data = unwrapTrpcData(json);
-  const obj = asRecord(data) ?? {};
-  const rawItems = Array.isArray(obj.items) ? obj.items : [];
+  const obj = asRecord(data);
+  if (!obj || !Array.isArray(obj.items)) {
+    // Payload present but not a `{ items: unknown[] }` page shape.
+    return { items: [], nextCursor: null, malformed: true };
+  }
+  const items: ParsedBattle[] = [];
+  let malformed = false;
+  for (const raw of obj.items) {
+    const parsed = parseBattleListItem(raw);
+    if (parsed) {
+      items.push(parsed);
+      continue;
+    }
+    // Item failed to parse. If it looked like a battle object (had fields but
+    // no usable id), the page is malformed — do not silently drop it.
+    if (asRecord(raw)) malformed = true;
+  }
   const nextCursor =
     (typeof obj.nextCursor === "string" && obj.nextCursor) ||
     (typeof obj.cursor === "string" && obj.cursor) ||
     null;
-  return { items: rawItems.map(parseBattleListItem).filter(Boolean) as ParsedBattle[], nextCursor };
+  return { items, nextCursor, malformed };
 }
 
 export async function fetchAllActiveBattles(warera: WareraRequester): Promise<{
@@ -287,6 +314,11 @@ export async function fetchAllActiveBattles(warera: WareraRequester): Promise<{
       const page = await fetchActiveBattlesPage(warera, { cursor, limit: 50 });
       pages += 1;
       battles.push(...page.items);
+      // A malformed page means we cannot trust the walk to be complete —
+      // keep whatever valid items we parsed, but signal incompleteness.
+      if (page.malformed) {
+        return { battles, pages, complete: false };
+      }
       if (!page.nextCursor) return { battles, pages, complete: true };
       cursor = page.nextCursor;
     }

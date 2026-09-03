@@ -44,17 +44,9 @@ export async function runBattleInfoPoll(options: {
 
   const errors: string[] = [];
 
-  // Watchlist + rosters (Geo/User-tier reads; no live WarEra calls here).
+  // Watchlist (Geo/User-tier reads; no live WarEra calls here).
   const watchedMuIds = await listMusForSync(db);
   const watchedSet = new Set(watchedMuIds);
-  const rosterByMu = new Map<string, string[]>();
-  for (const muId of watchedMuIds) {
-    const members = await listMuMembers(db, muId);
-    rosterByMu.set(
-      muId,
-      members.map((m) => m.userId),
-    );
-  }
 
   // Drain the full active-battle cursor before any end-detection.
   const { battles: activeList, pages, complete } = await fetchAllActiveBattles(warera);
@@ -76,8 +68,28 @@ export async function runBattleInfoPoll(options: {
 
   // Phase 2 — process every tracked active battle.
   const dbActive = await listActiveTrackedBattles(db);
+
+  // Rosters: load members for every watched MU AND every sticky MU id across
+  // active tracked battles. Unwatched-but-sticky MUs still need their
+  // `mu_members` rows so their members get loot in phase 2.
+  const rosterMuIdSet = new Set(watchedMuIds);
+  for (const row of dbActive) {
+    for (const muId of row.stickyMuIds ?? []) rosterMuIdSet.add(muId);
+  }
+  const rosterByMu = new Map<string, string[]>();
+  for (const muId of rosterMuIdSet) {
+    const members = await listMuMembers(db, muId);
+    rosterByMu.set(
+      muId,
+      members.map((m) => m.userId),
+    );
+  }
+
   const scoreboardRows: BattleScoreboardSnapshotRow[] = [];
   const lootRows: BattleLootSnapshotRow[] = [];
+  // Battles that completed getById + final loot cleanly and are ready to be
+  // finalized — but only AFTER poll + scoreboard + loot snapshots are durable.
+  const finalizeCandidates: string[] = [];
   let finalizedCount = 0;
 
   for (const row of dbActive) {
@@ -137,19 +149,39 @@ export async function runBattleInfoPoll(options: {
       continue;
     }
 
-    // Past grace — finalize with a single getById, final loot, then close.
+    // Past grace — finalize with a single getById + final loot. Do NOT mark
+    // finalized here: buffer the id and finalize only after poll + scoreboard
+    // + loot snapshots are durable so a crash cannot drop the row from the
+    // workset unfinalized with lost final snapshots. If any non-not-found
+    // loot error occurs on the finalize path, leave the battle active for a
+    // retry instead of finalizing.
     try {
       const fresh = await fetchBattleById(warera, row.id);
       // Keep is_active true through final metadata + loot so a crash cannot
-      // drop the row from the workset unfinalized. markBattleFinalized is
-      // the only write that flips is_active false.
+      // drop the row from the workset unfinalized. markBattleFinalized (run
+      // after snapshot inserts) is the only write that flips is_active false.
       await upsertBattleFromParsed(db, fresh, {
         stickyMuIds,
         fetchedAt: now,
       });
-      await collectLoot(warera, row.id, stickyMuIds, rosterByMu, lootRows, now, errors, logger);
-      await markBattleFinalized(db, row.id, now);
-      finalizedCount += 1;
+      const lootErrors = await collectLoot(
+        warera,
+        row.id,
+        stickyMuIds,
+        rosterByMu,
+        lootRows,
+        now,
+        errors,
+        logger,
+      );
+      if (lootErrors === 0) {
+        finalizeCandidates.push(row.id);
+      } else {
+        logger.warn(
+          { battleId: row.id, lootErrors },
+          "battle finalize skipped due to finalize-path loot errors",
+        );
+      }
     } catch (err) {
       errors.push(`finalize ${row.id}: ${err instanceof Error ? err.message : String(err)}`);
       logger.warn(
@@ -165,7 +197,10 @@ export async function runBattleInfoPoll(options: {
   // failures (e.g. incomplete pagination with no work at all). Partial when
   // some work landed but errors remain. Success otherwise.
   const didWork =
-    scoreboardRows.length > 0 || lootRows.length > 0 || finalizedCount > 0 || battleCount > 0;
+    scoreboardRows.length > 0 ||
+    lootRows.length > 0 ||
+    finalizeCandidates.length > 0 ||
+    battleCount > 0;
   let status: "success" | "partial" | "error";
   if (errors.length > 0 && !didWork) {
     status = "error";
@@ -182,10 +217,26 @@ export async function runBattleInfoPoll(options: {
     activeBattlePages: pages,
     battleCount,
     lootSnapshotCount: lootRows.length,
-    finalizedCount,
+    finalizedCount: finalizeCandidates.length,
   });
   await insertBattleScoreboardSnapshots(db, pollId, scoreboardRows);
   await insertBattleLootSnapshots(db, pollId, lootRows);
+
+  // NOW that poll + scoreboard + loot snapshots are durable, flip is_active
+  // false for the battles that completed the finalize path cleanly. A crash
+  // before this point leaves the row active for a retry with snapshots safe.
+  for (const battleId of finalizeCandidates) {
+    try {
+      await markBattleFinalized(db, battleId, now);
+      finalizedCount += 1;
+    } catch (err) {
+      errors.push(`markFinalized ${battleId}: ${err instanceof Error ? err.message : String(err)}`);
+      logger.warn(
+        { battleId, err: err instanceof Error ? err.message : String(err) },
+        "battle markFinalized failed",
+      );
+    }
+  }
 
   logger.info(
     {
@@ -214,6 +265,9 @@ export async function runBattleInfoPoll(options: {
  * Fetch loot for every member of the battle's sticky MUs (deduped by userId to
  * the first MU that claims them) and append snapshot rows.
  *
+ * Returns the number of member loot requests that failed with a non-not-found
+ * error. Callers on the finalize path use this to decide whether to finalize.
+ *
  * v1 note: this issues sequential `fetchBattleLootSummary` calls (one per
  * user). The production WarEra client's rate limiter already serializes, and
  * tests mock `.request` rather than `.requestBatch`, so a sequential loop is
@@ -230,7 +284,7 @@ async function collectLoot(
   recordedAt: Date,
   errors: string[],
   logger: Logger,
-): Promise<void> {
+): Promise<number> {
   // Dedupe userId -> first sticky MU that owns it.
   const userToMu = new Map<string, string>();
   for (const muId of stickyMuIds) {
@@ -240,11 +294,13 @@ async function collectLoot(
     }
   }
 
+  let lootErrors = 0;
   for (const [userId, muId] of userToMu) {
     let loot: ParsedBattleLootSummary | null;
     try {
       loot = await fetchBattleLootSummary(warera, battleId, userId);
     } catch (err) {
+      lootErrors += 1;
       errors.push(
         `loot ${battleId}/${userId}: ${err instanceof Error ? err.message : String(err)}`,
       );
@@ -271,4 +327,5 @@ async function collectLoot(
       recordedAt,
     });
   }
+  return lootErrors;
 }

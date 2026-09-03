@@ -205,6 +205,54 @@ describe("fetchAllActiveBattles", () => {
     expect(result.pages).toBe(1);
     expect(result.battles.map((b) => b.id)).toEqual(["b1"]);
   });
+
+  it("fix3: payload not an object (string) -> malformed page, complete: false", async () => {
+    const request = vi.fn().mockResolvedValueOnce({
+      result: { data: "not-an-object" },
+    });
+    const result = await fetchAllActiveBattles({ request });
+    expect(result.complete).toBe(false);
+    expect(result.pages).toBe(1);
+    expect(result.battles).toEqual([]);
+  });
+
+  it("fix3: object missing items array -> malformed page, complete: false", async () => {
+    const request = vi.fn().mockResolvedValueOnce({
+      result: { data: { nextCursor: null } },
+    });
+    const result = await fetchAllActiveBattles({ request });
+    expect(result.complete).toBe(false);
+    expect(result.pages).toBe(1);
+    expect(result.battles).toEqual([]);
+  });
+
+  it("fix3: item that looks like a battle but has no id -> malformed, keeps valid items, complete: false", async () => {
+    const request = vi.fn().mockResolvedValueOnce({
+      result: {
+        data: {
+          items: [
+            battleListFixture,
+            { war: "w1", attacker: { muOrders: [] }, defender: { muOrders: [] } },
+          ],
+          nextCursor: null,
+        },
+      },
+    });
+    const result = await fetchAllActiveBattles({ request });
+    expect(result.complete).toBe(false);
+    expect(result.pages).toBe(1);
+    expect(result.battles.map((b) => b.id)).toEqual(["b1"]);
+  });
+
+  it("fix3: empty items [] with no nextCursor on valid shape -> complete: true (true empty)", async () => {
+    const request = vi.fn().mockResolvedValueOnce({
+      result: { data: { items: [], nextCursor: null } },
+    });
+    const result = await fetchAllActiveBattles({ request });
+    expect(result.complete).toBe(true);
+    expect(result.pages).toBe(1);
+    expect(result.battles).toEqual([]);
+  });
 });
 
 describe("fetchBattleById", () => {

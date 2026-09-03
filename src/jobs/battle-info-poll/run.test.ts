@@ -6,7 +6,12 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vite-plus/test";
 import type { Db } from "../../db/client";
-import { MANUAL_SOURCE_ID, WATCH_REASON_MANUAL, insertMuWatchReason } from "../../db/watch-reasons";
+import {
+  MANUAL_SOURCE_ID,
+  WATCH_REASON_MANUAL,
+  deleteMuWatchReason,
+  insertMuWatchReason,
+} from "../../db/watch-reasons";
 import * as schema from "../../db/schema";
 import { runBattleInfoPoll } from "./run";
 
@@ -568,5 +573,92 @@ describe("runBattleInfoPoll", () => {
     expect(result.lootSnapshotCount).toBe(1);
     const loot = await db.select().from(schema.battleLootSnapshots);
     expect(loot.map((l) => l.userId).sort()).toEqual(["u1"]);
+  });
+
+  it("fix1: finalize-path loot error (non-not-found) leaves battle active, unfinalized, but keeps succeeded loot snapshots", async () => {
+    await seedMuWatch(db, "mu-a");
+    await seedMuMembers(db, "mu-a", ["u1", "u2"]);
+    // Establish the battle.
+    await runBattleInfoPoll({
+      db,
+      warera: makeWarera({
+        activeBattles: [battleFixture({ id: "b1", attackerMuOrders: ["mu-a"] })],
+      }) as never,
+      logger: makeLogger() as never,
+      now: new Date("2026-09-03T12:00:00.000Z"),
+    });
+    // Mark ended 5 min ago (past grace).
+    await runBattleInfoPoll({
+      db,
+      warera: makeWarera({ activeBattles: [] }) as never,
+      logger: makeLogger() as never,
+      now: new Date("2026-09-03T12:10:00.000Z"),
+    });
+
+    // Finalize run: u1 loot throws a non-not-found error, u2 loot succeeds.
+    const result = await runBattleInfoPoll({
+      db,
+      warera: makeWarera({
+        activeBattles: [],
+        lootThrowFor: new Set(["b1/u1"]),
+        loot: () => lootFixture({}),
+      }) as never,
+      logger: makeLogger() as never,
+      now: new Date("2026-09-03T12:15:00.000Z"),
+    });
+    expect(result.finalizedCount).toBe(0);
+    expect(result.status).toBe("partial");
+    const [row] = await db.select().from(schema.battles).where(eq(schema.battles.id, "b1"));
+    expect(row?.isActive).toBe(true);
+    expect(row?.finalizedAt).toBeNull();
+    // The succeeded member's loot snapshot for THIS poll is still durable.
+    const pollRows = await db
+      .select()
+      .from(schema.battleLootSnapshots)
+      .where(eq(schema.battleLootSnapshots.pollId, result.pollId));
+    expect(pollRows.map((l) => l.userId).sort()).toEqual(["u2"]);
+  });
+
+  it("fix2: sticky unwatched MU still gets loot for its mu_members (roster loaded from stickyMuIds)", async () => {
+    // mu-sticky is watched initially so the battle becomes sticky for it.
+    await seedMuWatch(db, "mu-sticky");
+    await seedMuMembers(db, "mu-sticky", ["u-s"]);
+    await runBattleInfoPoll({
+      db,
+      warera: makeWarera({
+        activeBattles: [battleFixture({ id: "b1", attackerMuOrders: ["mu-sticky"] })],
+        loot: () => lootFixture({}),
+      }) as never,
+      logger: makeLogger() as never,
+      now: new Date("2026-09-03T12:00:00.000Z"),
+    });
+    const [row1] = await db.select().from(schema.battles).where(eq(schema.battles.id, "b1"));
+    expect(row1?.stickyMuIds).toEqual(["mu-sticky"]);
+
+    // Unwatch mu-sticky AND change the battle's current orders away from it.
+    await deleteMuWatchReason(db, {
+      muId: "mu-sticky",
+      reason: WATCH_REASON_MANUAL,
+      sourceId: MANUAL_SOURCE_ID,
+    });
+    const result = await runBattleInfoPoll({
+      db,
+      warera: makeWarera({
+        activeBattles: [battleFixture({ id: "b1", attackerMuOrders: [] })],
+        loot: () => lootFixture({}),
+      }) as never,
+      logger: makeLogger() as never,
+      now: new Date("2026-09-03T12:15:00.000Z"),
+    });
+    expect(result.status).toBe("success");
+    // sticky mu-sticky preserved even though no longer watched or in orders.
+    const [row2] = await db.select().from(schema.battles).where(eq(schema.battles.id, "b1"));
+    expect(row2?.stickyMuIds).toEqual(["mu-sticky"]);
+    // u-s still gets a loot snapshot because rosterByMu loaded mu-sticky.
+    const pollRows = await db
+      .select()
+      .from(schema.battleLootSnapshots)
+      .where(eq(schema.battleLootSnapshots.pollId, result.pollId));
+    expect(pollRows.map((l) => l.userId).sort()).toEqual(["u-s"]);
   });
 });
