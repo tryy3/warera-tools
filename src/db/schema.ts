@@ -245,6 +245,52 @@ export const muWatchReasons = sqliteTable(
   (t) => [primaryKey({ columns: [t.muId, t.reason, t.sourceId] })],
 );
 
+export const countryWatchReasons = sqliteTable(
+  "country_watch_reasons",
+  {
+    countryId: text("country_id").notNull(),
+    reason: text("reason").notNull(),
+    sourceId: text("source_id").notNull(),
+    lastTouchedAt: integer("last_touched_at", { mode: "timestamp_ms" }).notNull(),
+    createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.countryId, t.reason, t.sourceId] })],
+);
+
+export const donationPolls = sqliteTable(
+  "donation_polls",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    recordedAt: integer("recorded_at", { mode: "timestamp_ms" }).notNull(),
+    status: text("status").notNull(),
+    error: text("error"),
+    scopeCount: integer("scope_count").notNull().default(0),
+    rowCount: integer("row_count").notNull().default(0),
+  },
+  (t) => [index("donation_polls_status_recorded_at_idx").on(t.status, t.recordedAt)],
+);
+
+export const donationSnapshots = sqliteTable(
+  "donation_snapshots",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    pollId: integer("poll_id")
+      .notNull()
+      .references(() => donationPolls.id),
+    scopeType: text("scope_type").notNull(),
+    scopeId: text("scope_id").notNull(),
+    userId: text("user_id").notNull(),
+    donationRowId: text("donation_row_id"),
+    amount: real("amount"),
+    donationCreatedAt: integer("donation_created_at", { mode: "timestamp_ms" }),
+    donationUpdatedAt: integer("donation_updated_at", { mode: "timestamp_ms" }),
+    payload: text("payload", { mode: "json" }).$type<Record<string, unknown> | null>(),
+  },
+  (t) => [
+    index("donation_snapshots_scope_user_poll_idx").on(t.scopeType, t.scopeId, t.userId, t.pollId),
+  ],
+);
+
 export const companyWorkStats = sqliteTable(
   "company_work_stats",
   {
