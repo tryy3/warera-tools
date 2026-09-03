@@ -109,19 +109,12 @@
       "indexes": {
         "battle_loot_snapshots_battle_user_poll_idx": {
           "name": "battle_loot_snapshots_battle_user_poll_idx",
-          "columns": [
-            "battle_id",
-            "user_id",
-            "poll_id"
-          ],
+          "columns": ["battle_id", "user_id", "poll_id"],
           "isUnique": false
         },
         "battle_loot_snapshots_mu_recorded_at_idx": {
           "name": "battle_loot_snapshots_mu_recorded_at_idx",
-          "columns": [
-            "mu_id",
-            "recorded_at"
-          ],
+          "columns": ["mu_id", "recorded_at"],
           "isUnique": false
         }
       },
@@ -130,12 +123,8 @@
           "name": "battle_loot_snapshots_poll_id_battle_polls_id_fk",
           "tableFrom": "battle_loot_snapshots",
           "tableTo": "battle_polls",
-          "columnsFrom": [
-            "poll_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["poll_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -210,10 +199,7 @@
       "indexes": {
         "battle_polls_status_recorded_at_idx": {
           "name": "battle_polls_status_recorded_at_idx",
-          "columns": [
-            "status",
-            "recorded_at"
-          ],
+          "columns": ["status", "recorded_at"],
           "isUnique": false
         }
       },
@@ -341,18 +327,12 @@
       "indexes": {
         "battle_scoreboard_snapshots_battle_poll_idx": {
           "name": "battle_scoreboard_snapshots_battle_poll_idx",
-          "columns": [
-            "battle_id",
-            "poll_id"
-          ],
+          "columns": ["battle_id", "poll_id"],
           "isUnique": false
         },
         "battle_scoreboard_snapshots_battle_recorded_at_idx": {
           "name": "battle_scoreboard_snapshots_battle_recorded_at_idx",
-          "columns": [
-            "battle_id",
-            "recorded_at"
-          ],
+          "columns": ["battle_id", "recorded_at"],
           "isUnique": false
         }
       },
@@ -361,12 +341,8 @@
           "name": "battle_scoreboard_snapshots_poll_id_battle_polls_id_fk",
           "tableFrom": "battle_scoreboard_snapshots",
           "tableTo": "battle_polls",
-          "columnsFrom": [
-            "poll_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["poll_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -537,9 +513,7 @@
       "indexes": {
         "battles_is_active_idx": {
           "name": "battles_is_active_idx",
-          "columns": [
-            "is_active"
-          ],
+          "columns": ["is_active"],
           "isUnique": false
         }
       },
@@ -703,10 +677,7 @@
       "foreignKeys": {},
       "compositePrimaryKeys": {
         "company_work_stats_company_id_daily_date_pk": {
-          "columns": [
-            "company_id",
-            "daily_date"
-          ],
+          "columns": ["company_id", "daily_date"],
           "name": "company_work_stats_company_id_daily_date_pk"
         }
       },
@@ -777,9 +748,7 @@
       "indexes": {
         "countries_name_unique": {
           "name": "countries_name_unique",
-          "columns": [
-            "name"
-          ],
+          "columns": ["name"],
           "isUnique": true
         }
       },
@@ -831,11 +800,7 @@
       "foreignKeys": {},
       "compositePrimaryKeys": {
         "country_watch_reasons_country_id_reason_source_id_pk": {
-          "columns": [
-            "country_id",
-            "reason",
-            "source_id"
-          ],
+          "columns": ["country_id", "reason", "source_id"],
           "name": "country_watch_reasons_country_id_reason_source_id_pk"
         }
       },
@@ -893,10 +858,7 @@
       "indexes": {
         "donation_polls_status_recorded_at_idx": {
           "name": "donation_polls_status_recorded_at_idx",
-          "columns": [
-            "status",
-            "recorded_at"
-          ],
+          "columns": ["status", "recorded_at"],
           "isUnique": false
         }
       },
@@ -982,12 +944,7 @@
       "indexes": {
         "donation_snapshots_scope_user_poll_idx": {
           "name": "donation_snapshots_scope_user_poll_idx",
-          "columns": [
-            "scope_type",
-            "scope_id",
-            "user_id",
-            "poll_id"
-          ],
+          "columns": ["scope_type", "scope_id", "user_id", "poll_id"],
           "isUnique": false
         }
       },
@@ -996,12 +953,8 @@
           "name": "donation_snapshots_poll_id_donation_polls_id_fk",
           "tableFrom": "donation_snapshots",
           "tableTo": "donation_polls",
-          "columnsFrom": [
-            "poll_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["poll_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -1150,17 +1103,12 @@
       "indexes": {
         "item_market_tx_item_code_created_at_idx": {
           "name": "item_market_tx_item_code_created_at_idx",
-          "columns": [
-            "item_code",
-            "created_at"
-          ],
+          "columns": ["item_code", "created_at"],
           "isUnique": false
         },
         "item_market_tx_created_at_idx": {
           "name": "item_market_tx_created_at_idx",
-          "columns": [
-            "created_at"
-          ],
+          "columns": ["created_at"],
           "isUnique": false
         }
       },
@@ -1228,12 +1176,8 @@
           "name": "job_runs_job_id_jobs_id_fk",
           "tableFrom": "job_runs",
           "tableTo": "jobs",
-          "columnsFrom": [
-            "job_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["job_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -1422,11 +1366,7 @@
       "indexes": {
         "mu_member_stat_snapshots_mu_user_poll_idx": {
           "name": "mu_member_stat_snapshots_mu_user_poll_idx",
-          "columns": [
-            "mu_id",
-            "user_id",
-            "poll_id"
-          ],
+          "columns": ["mu_id", "user_id", "poll_id"],
           "isUnique": false
         }
       },
@@ -1435,12 +1375,8 @@
           "name": "mu_member_stat_snapshots_poll_id_mu_polls_id_fk",
           "tableFrom": "mu_member_stat_snapshots",
           "tableTo": "mu_polls",
-          "columnsFrom": [
-            "poll_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["poll_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -1487,22 +1423,15 @@
           "name": "mu_members_mu_id_mus_id_fk",
           "tableFrom": "mu_members",
           "tableTo": "mus",
-          "columnsFrom": [
-            "mu_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["mu_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {
         "mu_members_mu_id_user_id_pk": {
-          "columns": [
-            "mu_id",
-            "user_id"
-          ],
+          "columns": ["mu_id", "user_id"],
           "name": "mu_members_mu_id_user_id_pk"
         }
       },
@@ -1560,10 +1489,7 @@
       "indexes": {
         "mu_polls_status_recorded_at_idx": {
           "name": "mu_polls_status_recorded_at_idx",
-          "columns": [
-            "status",
-            "recorded_at"
-          ],
+          "columns": ["status", "recorded_at"],
           "isUnique": false
         }
       },
@@ -1747,10 +1673,7 @@
       "indexes": {
         "mu_stat_snapshots_mu_poll_idx": {
           "name": "mu_stat_snapshots_mu_poll_idx",
-          "columns": [
-            "mu_id",
-            "poll_id"
-          ],
+          "columns": ["mu_id", "poll_id"],
           "isUnique": false
         }
       },
@@ -1759,12 +1682,8 @@
           "name": "mu_stat_snapshots_poll_id_mu_polls_id_fk",
           "tableFrom": "mu_stat_snapshots",
           "tableTo": "mu_polls",
-          "columnsFrom": [
-            "poll_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["poll_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -1816,11 +1735,7 @@
       "foreignKeys": {},
       "compositePrimaryKeys": {
         "mu_watch_reasons_mu_id_reason_source_id_pk": {
-          "columns": [
-            "mu_id",
-            "reason",
-            "source_id"
-          ],
+          "columns": ["mu_id", "reason", "source_id"],
           "name": "mu_watch_reasons_mu_id_reason_source_id_pk"
         }
       },
@@ -1978,11 +1893,7 @@
       "foreignKeys": {},
       "compositePrimaryKeys": {
         "player_watch_reasons_player_id_reason_source_id_pk": {
-          "columns": [
-            "player_id",
-            "reason",
-            "source_id"
-          ],
+          "columns": ["player_id", "reason", "source_id"],
           "name": "player_watch_reasons_player_id_reason_source_id_pk"
         }
       },
@@ -2084,10 +1995,7 @@
       "indexes": {
         "price_polls_status_recorded_at_idx": {
           "name": "price_polls_status_recorded_at_idx",
-          "columns": [
-            "status",
-            "recorded_at"
-          ],
+          "columns": ["status", "recorded_at"],
           "isUnique": false
         }
       },
@@ -2176,12 +2084,8 @@
           "name": "price_snapshots_poll_id_price_polls_id_fk",
           "tableFrom": "price_snapshots",
           "tableTo": "price_polls",
-          "columnsFrom": [
-            "poll_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["poll_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -2358,11 +2262,7 @@
       "foreignKeys": {},
       "compositePrimaryKeys": {
         "worker_work_stats_company_id_worker_id_daily_date_pk": {
-          "columns": [
-            "company_id",
-            "worker_id",
-            "daily_date"
-          ],
+          "columns": ["company_id", "worker_id", "daily_date"],
           "name": "worker_work_stats_company_id_worker_id_daily_date_pk"
         }
       },

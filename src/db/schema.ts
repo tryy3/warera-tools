@@ -287,12 +287,7 @@ export const donationSnapshots = sqliteTable(
     payload: text("payload", { mode: "json" }).$type<Record<string, unknown> | null>(),
   },
   (t) => [
-    index("donation_snapshots_scope_user_poll_idx").on(
-      t.scopeType,
-      t.scopeId,
-      t.userId,
-      t.pollId,
-    ),
+    index("donation_snapshots_scope_user_poll_idx").on(t.scopeType, t.scopeId, t.userId, t.pollId),
   ],
 );
 

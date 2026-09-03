@@ -55,8 +55,7 @@ function resolveScope(obj: Record<string, unknown>): {
   scopeId: string;
 } | null {
   const muId = typeof obj.muId === "string" && obj.muId ? obj.muId : null;
-  const countryId =
-    typeof obj.countryId === "string" && obj.countryId ? obj.countryId : null;
+  const countryId = typeof obj.countryId === "string" && obj.countryId ? obj.countryId : null;
   const partyId = typeof obj.partyId === "string" && obj.partyId ? obj.partyId : null;
   if (muId) return { scopeType: "mu", scopeId: muId };
   if (countryId) return { scopeType: "country", scopeId: countryId };

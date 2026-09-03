@@ -64,8 +64,7 @@ export async function runDonationPoll(options: {
     }
   }
 
-  const status =
-    scopeSuccesses === 0 ? "error" : errors.length > 0 ? "partial" : "success";
+  const status = scopeSuccesses === 0 ? "error" : errors.length > 0 ? "partial" : "success";
 
   const pollId = await insertDonationPoll(db, {
     recordedAt,
