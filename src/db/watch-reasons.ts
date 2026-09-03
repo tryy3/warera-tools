@@ -1,11 +1,13 @@
 import { and, asc, eq } from "drizzle-orm";
 import type { Db, DbOrTx } from "./client";
-import { muWatchReasons, playerWatchReasons } from "./schema";
+import { muWatchReasons, playerWatchReasons, countryWatchReasons } from "./schema";
 
 export const WATCH_REASON_MANUAL = "manual";
 export const WATCH_REASON_FOLLOW_PLAYER = "follow_player";
 /** Sentinel for reasons with no source player (PK column is NOT NULL). */
 export const MANUAL_SOURCE_ID = "";
+
+export const SEED_COUNTRY_SWEDEN_ID = "6813b6d446e731854c7ac7f2";
 
 export type WatchReason = typeof WATCH_REASON_MANUAL | typeof WATCH_REASON_FOLLOW_PLAYER;
 
@@ -85,6 +87,54 @@ export async function listDistinctWatchedMuIds(db: Db): Promise<string[]> {
     .from(muWatchReasons)
     .orderBy(asc(muWatchReasons.muId));
   return rows.map((r) => r.muId);
+}
+
+export async function insertCountryWatchReason(
+  db: DbOrTx,
+  row: { countryId: string; reason: string; sourceId: string; at: Date },
+): Promise<void> {
+  await db
+    .insert(countryWatchReasons)
+    .values({
+      countryId: row.countryId,
+      reason: row.reason,
+      sourceId: row.sourceId,
+      lastTouchedAt: row.at,
+      createdAt: row.at,
+    })
+    .onConflictDoNothing();
+}
+
+export async function deleteCountryWatchReason(
+  db: Db,
+  row: { countryId: string; reason: string; sourceId: string },
+): Promise<void> {
+  await db
+    .delete(countryWatchReasons)
+    .where(
+      and(
+        eq(countryWatchReasons.countryId, row.countryId),
+        eq(countryWatchReasons.reason, row.reason),
+        eq(countryWatchReasons.sourceId, row.sourceId),
+      ),
+    );
+}
+
+export async function listDistinctWatchedCountryIds(db: Db): Promise<string[]> {
+  const rows = await db
+    .selectDistinct({ countryId: countryWatchReasons.countryId })
+    .from(countryWatchReasons)
+    .orderBy(asc(countryWatchReasons.countryId));
+  return rows.map((r) => r.countryId);
+}
+
+export async function ensureSwedenCountryWatchReason(db: DbOrTx, at: Date): Promise<void> {
+  await insertCountryWatchReason(db, {
+    countryId: SEED_COUNTRY_SWEDEN_ID,
+    reason: WATCH_REASON_MANUAL,
+    sourceId: MANUAL_SOURCE_ID,
+    at,
+  });
 }
 
 export async function listMuWatchReasons(

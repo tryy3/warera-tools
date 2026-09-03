@@ -7,17 +7,22 @@ import { join } from "node:path";
 import { beforeEach, describe, expect, it } from "vite-plus/test";
 import type { Db } from "./client";
 import * as schema from "./schema";
-import { muWatchReasons, playerWatchReasons } from "./schema";
+import { countryWatchReasons, muWatchReasons, playerWatchReasons } from "./schema";
 import {
   MANUAL_SOURCE_ID,
+  SEED_COUNTRY_SWEDEN_ID,
   WATCH_REASON_FOLLOW_PLAYER,
   WATCH_REASON_MANUAL,
+  deleteCountryWatchReason,
   deleteFollowPlayerReasonsForSource,
   deleteMuWatchReason,
   deletePlayerWatchReason,
+  ensureSwedenCountryWatchReason,
+  insertCountryWatchReason,
   insertMuWatchReason,
   insertPlayerWatchReason,
   listDistinctFollowedPlayerIds,
+  listDistinctWatchedCountryIds,
   listDistinctWatchedMuIds,
   listMuWatchReasons,
   reconcileFollowPlayerMu,
@@ -44,6 +49,16 @@ async function createDb(): Promise<Db> {
       last_touched_at INTEGER NOT NULL,
       created_at INTEGER NOT NULL,
       PRIMARY KEY (mu_id, reason, source_id)
+    )
+  `);
+  await client.execute(`
+    CREATE TABLE country_watch_reasons (
+      country_id TEXT NOT NULL,
+      reason TEXT NOT NULL,
+      source_id TEXT NOT NULL,
+      last_touched_at INTEGER NOT NULL,
+      created_at INTEGER NOT NULL,
+      PRIMARY KEY (country_id, reason, source_id)
     )
   `);
   return drizzle(client, { schema });
@@ -288,5 +303,74 @@ describe("watch-reasons db", () => {
     expect(rows).toEqual([
       { muId: "mu1", reason: WATCH_REASON_MANUAL, sourceId: MANUAL_SOURCE_ID },
     ]);
+  });
+
+  it("lists distinct watched country ids sorted by id", async () => {
+    const at = new Date("2026-09-03T00:00:00.000Z");
+    await insertCountryWatchReason(db, {
+      countryId: "cB",
+      reason: WATCH_REASON_MANUAL,
+      sourceId: MANUAL_SOURCE_ID,
+      at,
+    });
+    await insertCountryWatchReason(db, {
+      countryId: "cA",
+      reason: WATCH_REASON_MANUAL,
+      sourceId: MANUAL_SOURCE_ID,
+      at,
+    });
+    await insertCountryWatchReason(db, {
+      countryId: "cA",
+      reason: "mu_home",
+      sourceId: "mu1",
+      at,
+    });
+    expect(await listDistinctWatchedCountryIds(db)).toEqual(["cA", "cB"]);
+  });
+
+  it("country duplicate insert is idempotent", async () => {
+    const at = new Date("2026-09-03T00:00:00.000Z");
+    const row = {
+      countryId: "c1",
+      reason: WATCH_REASON_MANUAL,
+      sourceId: MANUAL_SOURCE_ID,
+      at,
+    };
+    await insertCountryWatchReason(db, row);
+    await insertCountryWatchReason(db, row);
+    const rows = await db.select().from(countryWatchReasons);
+    expect(rows).toHaveLength(1);
+  });
+
+  it("ensureSwedenCountryWatchReason inserts seed once", async () => {
+    const at = new Date("2026-09-03T00:00:00.000Z");
+    await ensureSwedenCountryWatchReason(db, at);
+    await ensureSwedenCountryWatchReason(db, at);
+    expect(await listDistinctWatchedCountryIds(db)).toEqual([SEED_COUNTRY_SWEDEN_ID]);
+  });
+
+  it("deleteCountryWatchReason removes only the matching row", async () => {
+    const at = new Date("2026-09-03T00:00:00.000Z");
+    await insertCountryWatchReason(db, {
+      countryId: "c1",
+      reason: WATCH_REASON_MANUAL,
+      sourceId: MANUAL_SOURCE_ID,
+      at,
+    });
+    await insertCountryWatchReason(db, {
+      countryId: "c1",
+      reason: "mu_home",
+      sourceId: "mu1",
+      at,
+    });
+    await deleteCountryWatchReason(db, {
+      countryId: "c1",
+      reason: WATCH_REASON_MANUAL,
+      sourceId: MANUAL_SOURCE_ID,
+    });
+    expect(await listDistinctWatchedCountryIds(db)).toEqual(["c1"]);
+    const left = await db.select().from(countryWatchReasons);
+    expect(left).toHaveLength(1);
+    expect(left[0]?.reason).toBe("mu_home");
   });
 });
