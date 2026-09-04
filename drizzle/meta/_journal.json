@@ -85,6 +85,13 @@
       "when": 1788460188961,
       "tag": "0011_unique_crusher_hogan",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "6",
+      "when": 1788547879995,
+      "tag": "0012_sad_rictor",
+      "breakpoints": true
     }
   ]
 }
