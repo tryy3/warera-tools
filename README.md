@@ -88,13 +88,13 @@ NODE_ENV=production pnpm start
 
 ## WarEra API
 
-Allowed public surface is the official tRPC API (not undocumented in-game hosts):
+Official public surface is live `api2.warera.io` (not in-game hosts such as `api5`):
 
-- Docs: https://api2.warera.io/docs/ · OpenAPI: https://api2.warera.io/openapi.json
-- Default: `https://api2.warera.io/trpc` (`WARERA_API_BASE_URL`)
-- Auth: `Authorization: Bearer` by default; some procedures use `X-API-Key` (`WARERA_API_KEY`)
+- Live API: `https://api2.warera.io/trpc` (`WARERA_API_BASE_URL`)
+- `/docs` and OpenAPI are an incomplete snapshot, not the allowlist
+- Fuller catalog: https://warera.realmarijn.nl/api-explorer · OpenAPI vs custom: https://github.com/WarEraProjects/TRPC
+- Auth: `X-API-Key` whenever `WARERA_API_KEY` is set (`Authorization: Bearer` is an explicit opt-out)
 - In-process facade: local RPM + header-aware 429 pause, tRPC batch (max 50), in-flight dedup
-- Community response docs: https://majimawrks.github.io/warera-api-docs/#/
-- Broader live explorer (some auth-required procedures missing from official OpenAPI): https://warera.realmarijn.nl/api-explorer
+- Response-shape notes: https://majimawrks.github.io/warera-api-docs/#/
 
-Prefer procedures listed in the official docs; explorer-only reads (e.g. `company.getRecommendedRegionIdsByItemCode`) are used only where designed. Agent notes: [`.agents/skills/warera-api/SKILL.md`](.agents/skills/warera-api/SKILL.md).
+Agent notes: [`.agents/skills/warera-api/SKILL.md`](.agents/skills/warera-api/SKILL.md) · catalog: [`.agents/skills/warera-api/procedures.md`](.agents/skills/warera-api/procedures.md).

@@ -51,7 +51,7 @@ Single package, one Node process: Hono API + static SPA + in-process Croner jobs
 | Server / API | `src/server/` |
 | Web SPA | `src/web/` (features under `src/web/features/`) |
 | Domain math | `src/calculator/`, `src/economy/`, `src/growth/`, `src/market/` |
-| WarEra client | `src/warera/` — allowlist + gateway prefs: `.agents/skills/warera-api/` |
+| WarEra client | `src/warera/` — api2 client + catalog: `.agents/skills/warera-api/` |
 | Game formulas | `.agents/skills/warera-game-mechanics/` |
 | Jobs | `src/jobs/<job-id>/` |
 | DB | `src/db/`, migrations in `drizzle/` |
