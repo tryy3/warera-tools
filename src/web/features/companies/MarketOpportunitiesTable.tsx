@@ -1,10 +1,11 @@
 import {
+  createSortedRowModel,
   flexRender,
-  getCoreRowModel,
-  getSortedRowModel,
-  useReactTable,
+  rowSortingFeature,
+  sortFn_alphanumeric,
+  tableFeatures,
+  useTable,
   type ColumnDef,
-  type SortingFn,
   type SortingState,
 } from "@tanstack/react-table";
 import { ArrowDown, ArrowUp, ArrowUpDown } from "lucide-react";
@@ -26,6 +27,15 @@ import { nullsLastSortingFn } from "./nullsLastSortingFn";
 import { useItemPriceBoard } from "./sessionPrices/ItemPriceBoardProvider";
 import type { Opportunity } from "./types";
 
+const features = tableFeatures({
+  rowSortingFeature,
+  sortedRowModel: createSortedRowModel(),
+  sortFns: {
+    alphanumeric: sortFn_alphanumeric,
+    nullsLast: nullsLastSortingFn,
+  },
+});
+
 function formatItem(code: string): string {
   return code.replace(/([A-Z])/g, " $1").replace(/^./, (c) => c.toUpperCase());
 }
@@ -38,8 +48,6 @@ function formatNum(value: number | null | undefined, digits = 4): string {
 function toSortableNumber(value: number | null | undefined): number | undefined {
   return value != null && Number.isFinite(value) ? value : undefined;
 }
-
-const numericSortingFn = nullsLastSortingFn as SortingFn<Opportunity>;
 
 function GoldAmount({ value, digits = 4 }: { value: number | null | undefined; digits?: number }) {
   if (value == null || !Number.isFinite(value)) return "—";
@@ -85,7 +93,7 @@ export function MarketOpportunitiesTable() {
   const [sorting, setSorting] = useState<SortingState>([{ id: "profitPerPp", desc: true }]);
   const [selectedItem, setSelectedItem] = useState<string | null>(null);
 
-  const columns = useMemo<ColumnDef<Opportunity>[]>(
+  const columns = useMemo<ColumnDef<typeof features, Opportunity>[]>(
     () => [
       {
         id: "item",
@@ -145,7 +153,7 @@ export function MarketOpportunitiesTable() {
             />
           );
         },
-        sortingFn: numericSortingFn,
+        sortFn: "nullsLast",
       },
       {
         id: "sell",
@@ -179,7 +187,7 @@ export function MarketOpportunitiesTable() {
             />
           );
         },
-        sortingFn: numericSortingFn,
+        sortFn: "nullsLast",
       },
       {
         id: "profitPerPp",
@@ -206,7 +214,7 @@ export function MarketOpportunitiesTable() {
             <GoldAmount value={row.original.profitPerPp} digits={4} />
           </span>
         ),
-        sortingFn: numericSortingFn,
+        sortFn: "nullsLast",
       },
       {
         id: "bestBonus",
@@ -238,7 +246,7 @@ export function MarketOpportunitiesTable() {
             </span>
           );
         },
-        sortingFn: numericSortingFn,
+        sortFn: "nullsLast",
       },
       {
         id: "roughDailyValue",
@@ -265,19 +273,18 @@ export function MarketOpportunitiesTable() {
             <GoldAmount value={row.original.roughDailyValue} digits={2} />
           </span>
         ),
-        sortingFn: numericSortingFn,
+        sortFn: "nullsLast",
       },
     ],
     [board],
   );
 
-  const table = useReactTable({
+  const table = useTable({
+    features,
     data: board.opportunities,
     columns,
     state: { sorting },
     onSortingChange: setSorting,
-    getCoreRowModel: getCoreRowModel(),
-    getSortedRowModel: getSortedRowModel(),
     enableMultiSort: false,
     getRowId: (row) => row.itemCode,
   });
@@ -318,7 +325,7 @@ export function MarketOpportunitiesTable() {
                 }}
                 tabIndex={0}
               >
-                {row.getVisibleCells().map((cell) => (
+                {row.getAllCells().map((cell) => (
                   <TableCell key={cell.id}>
                     {flexRender(cell.column.columnDef.cell, cell.getContext())}
                   </TableCell>
