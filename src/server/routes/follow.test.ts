@@ -9,6 +9,7 @@ import { beforeEach, describe, expect, it, vi } from "vite-plus/test";
 import type { Db } from "../../db/client";
 import { upsertMuCurrent } from "../../db/mus";
 import { upsertPlayerCurrent } from "../../db/players";
+import { insertUserProfilePoll, insertUserProfileSnapshots } from "../../db/user-profiles";
 import * as schema from "../../db/schema";
 import type { ParsedMu } from "../../warera/mu";
 import {
@@ -72,6 +73,49 @@ async function createDb(): Promise<Db> {
       last_touched_at INTEGER NOT NULL,
       created_at INTEGER NOT NULL,
       PRIMARY KEY (mu_id, reason, source_id)
+    )
+  `);
+  await client.execute(`
+    CREATE TABLE user_profile_polls (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      recorded_at INTEGER NOT NULL,
+      status TEXT NOT NULL,
+      error TEXT,
+      user_count INTEGER NOT NULL DEFAULT 0,
+      mu_count INTEGER NOT NULL DEFAULT 0
+    )
+  `);
+  await client.execute(`
+    CREATE TABLE user_profile_snapshots (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      poll_id INTEGER NOT NULL REFERENCES user_profile_polls(id),
+      user_id TEXT NOT NULL,
+      recorded_at INTEGER NOT NULL,
+      username TEXT,
+      avatar_url TEXT,
+      country_id TEXT,
+      mu_id TEXT,
+      company_id TEXT,
+      party_id TEXT,
+      is_active INTEGER,
+      last_connection_at INTEGER,
+      last_work_at INTEGER,
+      last_help_asked_at INTEGER,
+      last_daily_reward_claimed_at INTEGER,
+      last_company_joined_at INTEGER,
+      last_daily_calendar_claimed_at INTEGER,
+      last_skills_reset_at INTEGER,
+      level INTEGER,
+      total_xp INTEGER,
+      daily_xp_left INTEGER,
+      available_skill_points INTEGER,
+      spent_skill_points INTEGER,
+      total_skill_points INTEGER,
+      prestige_level INTEGER,
+      military_rank INTEGER,
+      is_premium INTEGER,
+      premium_months_count INTEGER,
+      created_at_game INTEGER
     )
   `);
   return drizzle(client, { schema });
@@ -179,6 +223,31 @@ function sampleParsedMu(overrides: Partial<ParsedMu> = {}): ParsedMu {
     ...overrides,
   };
 }
+
+const nullableProfileFields = {
+  avatarUrl: null,
+  countryId: null,
+  partyId: null,
+  isActive: null,
+  lastConnectionAt: null,
+  lastWorkAt: null,
+  lastHelpAskedAt: null,
+  lastDailyRewardClaimedAt: null,
+  lastCompanyJoinedAt: null,
+  lastDailyCalendarClaimedAt: null,
+  lastSkillsResetAt: null,
+  level: null,
+  totalXp: null,
+  dailyXpLeft: null,
+  availableSkillPoints: null,
+  spentSkillPoints: null,
+  totalSkillPoints: null,
+  prestigeLevel: null,
+  militaryRank: null,
+  isPremium: null,
+  premiumMonthsCount: null,
+  createdAtGame: null,
+};
 
 describe("followRoutes — players", () => {
   let db: Db;
@@ -331,6 +400,52 @@ describe("followRoutes — players", () => {
       const calls = request.mock.calls.map((c) => String(c[0]));
       expect(calls.some((p) => p.includes("user.getUserById"))).toBe(true);
       expect(calls.some((p) => p.includes("search."))).toBe(false);
+    });
+
+    it("adds a player from a fresh profile snapshot without calling WarEra", async () => {
+      const recordedAt = new Date();
+      const pollId = await insertUserProfilePoll(db, {
+        recordedAt,
+        status: "success",
+        userCount: 1,
+        muCount: 1,
+      });
+      await insertUserProfileSnapshots(db, pollId, [
+        {
+          ...nullableProfileFields,
+          userId: "p1",
+          recordedAt,
+          username: "snapshot-alice",
+          muId: "mu-snapshot",
+          companyId: "company-snapshot",
+        },
+      ]);
+      const request = vi.fn(async () => {
+        throw new Error("should not call warera");
+      });
+
+      const res = await appFor(db, request).request("http://localhost/players", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ playerId: "p1" }),
+      });
+
+      expect(res.status).toBe(200);
+      expect(request).not.toHaveBeenCalled();
+      const body = (await res.json()) as {
+        player: {
+          playerId: string;
+          username: string | null;
+          muId: string | null;
+          workplaceCompanyId: string | null;
+        };
+      };
+      expect(body.player).toMatchObject({
+        playerId: "p1",
+        username: "snapshot-alice",
+        muId: "mu-snapshot",
+        workplaceCompanyId: "company-snapshot",
+      });
     });
 
     it("is idempotent on duplicate POST and reconciles MU", async () => {

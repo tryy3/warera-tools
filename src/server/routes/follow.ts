@@ -2,6 +2,7 @@ import { asc, eq, inArray } from "drizzle-orm";
 import { Hono } from "hono";
 import type { Db } from "../../db/client";
 import { upsertMuCurrent } from "../../db/mus";
+import { USER_PROFILE_JOB_MAX_AGE_MS } from "../../db/user-profiles";
 import { mus, muWatchReasons, players, playerWatchReasons } from "../../db/schema";
 import {
   MANUAL_SOURCE_ID,
@@ -14,9 +15,9 @@ import {
   insertPlayerWatchReason,
 } from "../../db/watch-reasons";
 import { syncFollowedPlayers } from "../../jobs/sync-followed-players";
+import { resolveUserByIdRef } from "../../user/resolve-user-by-id";
 import { isWareraNotFoundError } from "../../warera/errors";
 import { fetchMuById } from "../../warera/mu";
-import { fetchUserById } from "../../warera/users";
 import type { WareraRequester } from "../../warera/prices";
 import { HttpError } from "../errors";
 
@@ -210,7 +211,12 @@ export function followRoutes(deps: FollowRouteDeps) {
     // Validate existence before inserting a reason (404 vs upstream).
     let ref;
     try {
-      ref = await fetchUserById(warera, playerId);
+      ref = await resolveUserByIdRef({
+        db,
+        warera,
+        userId: playerId,
+        maxAgeMs: USER_PROFILE_JOB_MAX_AGE_MS,
+      });
     } catch (err) {
       mapLookupError(err, "User");
     }
