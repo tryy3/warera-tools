@@ -291,7 +291,8 @@ export async function fetchBestRecommendedRegion(
   warera: WareraRequester,
   itemCode: string,
 ): Promise<RecommendedRegion | null> {
-  // Undocumented procedure; requires POST + X-API-Key + JSON body (Bearer does not work).
+  // Not in OpenAPI (still official on api2); requires POST + X-API-Key + JSON body
+  // (Bearer does not work). Client auto also sends X-API-Key when a key is set.
   const json = await warera.request<unknown>("company.getRecommendedRegionIdsByItemCode", {
     method: "POST",
     json: { itemCode, count: 1 },
