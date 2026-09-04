@@ -212,6 +212,65 @@ export const muMemberStatSnapshots = sqliteTable(
   (t) => [index("mu_member_stat_snapshots_mu_user_poll_idx").on(t.muId, t.userId, t.pollId)],
 );
 
+export const userProfilePolls = sqliteTable(
+  "user_profile_polls",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    recordedAt: integer("recorded_at", { mode: "timestamp_ms" }).notNull(),
+    status: text("status").notNull(),
+    error: text("error"),
+    userCount: integer("user_count").notNull().default(0),
+    muCount: integer("mu_count").notNull().default(0),
+  },
+  (t) => [index("user_profile_polls_status_recorded_at_idx").on(t.status, t.recordedAt)],
+);
+
+export const userProfileSnapshots = sqliteTable(
+  "user_profile_snapshots",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    pollId: integer("poll_id")
+      .notNull()
+      .references(() => userProfilePolls.id),
+    userId: text("user_id").notNull(),
+    recordedAt: integer("recorded_at", { mode: "timestamp_ms" }).notNull(),
+    username: text("username"),
+    avatarUrl: text("avatar_url"),
+    countryId: text("country_id"),
+    muId: text("mu_id"),
+    companyId: text("company_id"),
+    partyId: text("party_id"),
+    isActive: integer("is_active", { mode: "boolean" }),
+    lastConnectionAt: integer("last_connection_at", { mode: "timestamp_ms" }),
+    lastWorkAt: integer("last_work_at", { mode: "timestamp_ms" }),
+    lastHelpAskedAt: integer("last_help_asked_at", { mode: "timestamp_ms" }),
+    lastDailyRewardClaimedAt: integer("last_daily_reward_claimed_at", {
+      mode: "timestamp_ms",
+    }),
+    lastCompanyJoinedAt: integer("last_company_joined_at", { mode: "timestamp_ms" }),
+    lastDailyCalendarClaimedAt: integer("last_daily_calendar_claimed_at", {
+      mode: "timestamp_ms",
+    }),
+    lastSkillsResetAt: integer("last_skills_reset_at", { mode: "timestamp_ms" }),
+    level: integer("level"),
+    totalXp: integer("total_xp"),
+    dailyXpLeft: integer("daily_xp_left"),
+    availableSkillPoints: integer("available_skill_points"),
+    spentSkillPoints: integer("spent_skill_points"),
+    totalSkillPoints: integer("total_skill_points"),
+    prestigeLevel: integer("prestige_level"),
+    militaryRank: integer("military_rank"),
+    isPremium: integer("is_premium", { mode: "boolean" }),
+    premiumMonthsCount: integer("premium_months_count"),
+    createdAtGame: integer("created_at_game", { mode: "timestamp_ms" }),
+  },
+  (t) => [
+    index("user_profile_snapshots_user_recorded_at_idx").on(t.userId, t.recordedAt),
+    index("user_profile_snapshots_poll_idx").on(t.pollId),
+    index("user_profile_snapshots_mu_recorded_at_idx").on(t.muId, t.recordedAt),
+  ],
+);
+
 export const players = sqliteTable("players", {
   id: text("id").primaryKey(),
   username: text("username"),

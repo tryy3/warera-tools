@@ -6,6 +6,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vite-plus/test";
 import type { Db } from "../db/client";
+import { insertUserProfilePoll, insertUserProfileSnapshots } from "../db/user-profiles";
 import * as schema from "../db/schema";
 import { muWatchReasons, players } from "../db/schema";
 import {
@@ -52,6 +53,49 @@ async function createDb(): Promise<Db> {
       PRIMARY KEY (mu_id, reason, source_id)
     )
   `);
+  await client.execute(`
+    CREATE TABLE user_profile_polls (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      recorded_at INTEGER NOT NULL,
+      status TEXT NOT NULL,
+      error TEXT,
+      user_count INTEGER NOT NULL DEFAULT 0,
+      mu_count INTEGER NOT NULL DEFAULT 0
+    )
+  `);
+  await client.execute(`
+    CREATE TABLE user_profile_snapshots (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      poll_id INTEGER NOT NULL REFERENCES user_profile_polls(id),
+      user_id TEXT NOT NULL,
+      recorded_at INTEGER NOT NULL,
+      username TEXT,
+      avatar_url TEXT,
+      country_id TEXT,
+      mu_id TEXT,
+      company_id TEXT,
+      party_id TEXT,
+      is_active INTEGER,
+      last_connection_at INTEGER,
+      last_work_at INTEGER,
+      last_help_asked_at INTEGER,
+      last_daily_reward_claimed_at INTEGER,
+      last_company_joined_at INTEGER,
+      last_daily_calendar_claimed_at INTEGER,
+      last_skills_reset_at INTEGER,
+      level INTEGER,
+      total_xp INTEGER,
+      daily_xp_left INTEGER,
+      available_skill_points INTEGER,
+      spent_skill_points INTEGER,
+      total_skill_points INTEGER,
+      prestige_level INTEGER,
+      military_rank INTEGER,
+      is_premium INTEGER,
+      premium_months_count INTEGER,
+      created_at_game INTEGER
+    )
+  `);
   return drizzle(client, { schema });
 }
 
@@ -67,7 +111,15 @@ function makeWarera(slots: SlotMap, requestFn?: ReturnType<typeof vi.fn>): Warer
   const request =
     requestFn ??
     vi.fn(async (path: string) => {
-      throw new Error(`unexpected request call: ${path}`);
+      const query = path.split("?input=")[1];
+      const input = query
+        ? (JSON.parse(decodeURIComponent(query)) as { userId?: string })
+        : undefined;
+      const slot = slots[input?.userId ?? ""];
+      if (!slot?.ok) {
+        throw new Error(`user lookup failed: ${input?.userId ?? "unknown"}`);
+      }
+      return { result: { data: slot.data } };
     });
   return { request, requestBatch } as unknown as WareraRequester;
 }
@@ -88,6 +140,31 @@ async function playerRow(db: Db, id: string) {
   const rows = await db.select().from(players).where(eq(players.id, id));
   return rows[0] ?? null;
 }
+
+const nullableProfileFields = {
+  avatarUrl: null,
+  countryId: null,
+  partyId: null,
+  isActive: null,
+  lastConnectionAt: null,
+  lastWorkAt: null,
+  lastHelpAskedAt: null,
+  lastDailyRewardClaimedAt: null,
+  lastCompanyJoinedAt: null,
+  lastDailyCalendarClaimedAt: null,
+  lastSkillsResetAt: null,
+  level: null,
+  totalXp: null,
+  dailyXpLeft: null,
+  availableSkillPoints: null,
+  spentSkillPoints: null,
+  totalSkillPoints: null,
+  prestigeLevel: null,
+  militaryRank: null,
+  isPremium: null,
+  premiumMonthsCount: null,
+  createdAtGame: null,
+};
 
 describe("syncFollowedPlayers", () => {
   let db: Db;
@@ -123,6 +200,43 @@ describe("syncFollowedPlayers", () => {
     expect(p?.muId).toBe("mu-1");
     const mu1Rows = await muRowsForMu(db, "mu-1");
     expect(mu1Rows).toEqual([{ muId: "mu-1", reason: WATCH_REASON_FOLLOW_PLAYER, sourceId: "p1" }]);
+  });
+
+  it("uses a fresh profile snapshot without calling WarEra", async () => {
+    await insertPlayerWatchReason(db, {
+      playerId: "p1",
+      reason: WATCH_REASON_MANUAL,
+      sourceId: MANUAL_SOURCE_ID,
+      at,
+    });
+    const pollId = await insertUserProfilePoll(db, {
+      recordedAt: at,
+      status: "success",
+      userCount: 1,
+      muCount: 1,
+    });
+    await insertUserProfileSnapshots(db, pollId, [
+      {
+        ...nullableProfileFields,
+        userId: "p1",
+        recordedAt: at,
+        username: "snapshot-alice",
+        muId: "mu-snapshot",
+        companyId: "company-snapshot",
+      },
+    ]);
+    const warera = makeWarera({});
+
+    const result = await syncFollowedPlayers({ db, warera, now: at });
+
+    expect(result).toEqual({ playerCount: 1, errors: [] });
+    expect(warera.request).not.toHaveBeenCalled();
+    expect(warera.requestBatch).not.toHaveBeenCalled();
+    expect(await playerRow(db, "p1")).toMatchObject({
+      username: "snapshot-alice",
+      muId: "mu-snapshot",
+      workplaceCompanyId: "company-snapshot",
+    });
   });
 
   it("moves the follow row when the player changes MU and keeps unrelated manual rows", async () => {
@@ -205,14 +319,22 @@ describe("syncFollowedPlayers", () => {
     }
   });
 
-  it("throws when requestBatch is missing on the warera client", async () => {
+  it("falls back to a single request when requestBatch is missing", async () => {
     await insertPlayerWatchReason(db, {
       playerId: "p1",
       reason: WATCH_REASON_MANUAL,
       sourceId: MANUAL_SOURCE_ID,
       at,
     });
-    const warera = { request: vi.fn() } as unknown as WareraRequester;
-    await expect(syncFollowedPlayers({ db, warera, now: at })).rejects.toThrow(/requestBatch/);
+    const request = vi.fn(async () => ({
+      result: { data: { _id: "p1", username: "alice", mu: "mu-1" } },
+    }));
+    const warera = { request } as unknown as WareraRequester;
+
+    await expect(syncFollowedPlayers({ db, warera, now: at })).resolves.toEqual({
+      playerCount: 1,
+      errors: [],
+    });
+    expect(request).toHaveBeenCalledOnce();
   });
 });

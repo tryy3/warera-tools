@@ -29,8 +29,11 @@ export {
   fetchUserByIdBatch,
   fetchUserLite,
   fetchUserLiteBatch,
+  fetchUserProfileBatch,
   parseUserById,
   parseUserLiteSkills,
+  parseUserProfile,
+  type ParsedUserProfile,
   type UserByIdRef,
   type UserLiteSkills,
 } from "./users";

@@ -5,8 +5,10 @@ import {
   fetchUserByIdBatch,
   fetchUserLite,
   fetchUserLiteBatch,
+  fetchUserProfileBatch,
   parseUserById,
   parseUserLiteSkills,
+  parseUserProfile,
 } from "./users";
 
 describe("parseUserLiteSkills", () => {
@@ -172,6 +174,61 @@ describe("parseUserById", () => {
 
   it("throws when id field is present but empty", () => {
     expect(() => parseUserById({ _id: "" })).toThrow(/missing id/);
+  });
+});
+
+describe("parseUserProfile", () => {
+  it("extracts tier-A identity, dates, leveling, and premium", () => {
+    const parsed = parseUserProfile({
+      _id: "u1",
+      username: "Alice",
+      avatarUrl: "https://example.com/a.png",
+      country: "c1",
+      mu: "mu1",
+      company: { _id: "co1" },
+      party: "p1",
+      isActive: true,
+      militaryRank: 12,
+      createdAt: "2026-01-02T03:04:05.000Z",
+      dates: {
+        lastConnectionAt: "2026-09-04T08:00:00.000Z",
+        lastWorkAt: "2026-09-04T07:00:00.000Z",
+        lastHelpAskedAt: "2026-09-04T06:00:00.000Z",
+        lastDailyRewardClaimedAt: "2026-09-04T05:00:00.000Z",
+        lastCompanyJoinedAt: "2026-08-01T00:00:00.000Z",
+        lastDailyCalendarClaimedAt: "2026-09-03T00:00:00.000Z",
+        lastSkillsResetAt: "2026-07-01T00:00:00.000Z",
+      },
+      leveling: {
+        level: 10,
+        totalXp: 1000,
+        dailyXpLeft: 50,
+        availableSkillPoints: 1,
+        spentSkillPoints: 40,
+        totalSkillPoints: 41,
+        prestigeLevel: 2,
+      },
+      infos: { isPremium: true, premiumMonthsCount: 3 },
+    });
+    expect(parsed.userId).toBe("u1");
+    expect(parsed.username).toBe("Alice");
+    expect(parsed.muId).toBe("mu1");
+    expect(parsed.companyId).toBe("co1");
+    expect(parsed.partyId).toBe("p1");
+    expect(parsed.isActive).toBe(true);
+    expect(parsed.isPremium).toBe(true);
+    expect(parsed.premiumMonthsCount).toBe(3);
+    expect(parsed.level).toBe(10);
+    expect(parsed.lastConnectionAt?.toISOString()).toBe("2026-09-04T08:00:00.000Z");
+  });
+
+  it("defaults nullable fields when missing", () => {
+    const parsed = parseUserProfile({ _id: "u2" });
+    expect(parsed.userId).toBe("u2");
+    expect(parsed.username).toBeNull();
+    expect(parsed.isActive).toBeNull();
+    expect(parsed.lastConnectionAt).toBeNull();
+    expect(parsed.isPremium).toBeNull();
   });
 });
 
@@ -365,5 +422,28 @@ describe("fetchUserByIdBatch", () => {
     await expect(fetchUserByIdBatch({ request: vi.fn() } as never, ["u1"])).rejects.toThrow(
       /requestBatch/,
     );
+  });
+});
+
+describe("fetchUserProfileBatch", () => {
+  it("maps parsed profiles and failed slots by requested id", async () => {
+    const requestBatch = vi.fn(async (_items: WareraBatchItem[]) => [
+      {
+        ok: true as const,
+        data: { _id: "u1", username: "Alice", dates: { lastWorkAt: "2026-09-04T07:00:00Z" } },
+      },
+      { ok: false as const, error: { message: "NOT_FOUND" } },
+    ]);
+
+    const map = await fetchUserProfileBatch({ request: vi.fn(), requestBatch } as never, [
+      "u1",
+      "u2",
+      "u1",
+    ]);
+
+    expect(requestBatch.mock.calls[0]![0]).toHaveLength(2);
+    expect(map.get("u1")?.username).toBe("Alice");
+    expect(map.get("u1")?.lastWorkAt?.toISOString()).toBe("2026-09-04T07:00:00.000Z");
+    expect(map.get("u2")).toBeNull();
   });
 });

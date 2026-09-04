@@ -77,6 +77,49 @@ async function createMemoryDb(): Promise<Db> {
       ttl_seconds INTEGER NOT NULL DEFAULT 600
     )
   `);
+  await client.execute(`
+    CREATE TABLE user_profile_polls (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      recorded_at INTEGER NOT NULL,
+      status TEXT NOT NULL,
+      error TEXT,
+      user_count INTEGER NOT NULL DEFAULT 0,
+      mu_count INTEGER NOT NULL DEFAULT 0
+    )
+  `);
+  await client.execute(`
+    CREATE TABLE user_profile_snapshots (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      poll_id INTEGER NOT NULL REFERENCES user_profile_polls(id),
+      user_id TEXT NOT NULL,
+      recorded_at INTEGER NOT NULL,
+      username TEXT,
+      avatar_url TEXT,
+      country_id TEXT,
+      mu_id TEXT,
+      company_id TEXT,
+      party_id TEXT,
+      is_active INTEGER,
+      last_connection_at INTEGER,
+      last_work_at INTEGER,
+      last_help_asked_at INTEGER,
+      last_daily_reward_claimed_at INTEGER,
+      last_company_joined_at INTEGER,
+      last_daily_calendar_claimed_at INTEGER,
+      last_skills_reset_at INTEGER,
+      level INTEGER,
+      total_xp INTEGER,
+      daily_xp_left INTEGER,
+      available_skill_points INTEGER,
+      spent_skill_points INTEGER,
+      total_skill_points INTEGER,
+      prestige_level INTEGER,
+      military_rank INTEGER,
+      is_premium INTEGER,
+      premium_months_count INTEGER,
+      created_at_game INTEGER
+    )
+  `);
   return drizzle(client, { schema });
 }
 

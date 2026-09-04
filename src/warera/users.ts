@@ -21,6 +21,35 @@ export type UserByIdRef = {
   muId: string | null;
 };
 
+export type ParsedUserProfile = {
+  userId: string;
+  username: string | null;
+  avatarUrl: string | null;
+  countryId: string | null;
+  muId: string | null;
+  companyId: string | null;
+  partyId: string | null;
+  isActive: boolean | null;
+  lastConnectionAt: Date | null;
+  lastWorkAt: Date | null;
+  lastHelpAskedAt: Date | null;
+  lastDailyRewardClaimedAt: Date | null;
+  lastCompanyJoinedAt: Date | null;
+  lastDailyCalendarClaimedAt: Date | null;
+  lastSkillsResetAt: Date | null;
+  level: number | null;
+  totalXp: number | null;
+  dailyXpLeft: number | null;
+  availableSkillPoints: number | null;
+  spentSkillPoints: number | null;
+  totalSkillPoints: number | null;
+  prestigeLevel: number | null;
+  militaryRank: number | null;
+  isPremium: boolean | null;
+  premiumMonthsCount: number | null;
+  createdAtGame: Date | null;
+};
+
 function asRecord(value: unknown): Record<string, unknown> | null {
   return value != null && typeof value === "object" && !Array.isArray(value)
     ? (value as Record<string, unknown>)
@@ -37,6 +66,22 @@ function pickString(obj: Record<string, unknown>, keys: string[]): string | null
 
 function pickFiniteNumber(value: unknown, fallback = 0): number {
   return typeof value === "number" && Number.isFinite(value) ? value : fallback;
+}
+
+function pickDate(value: unknown): Date | null {
+  if (typeof value === "string" || typeof value === "number") {
+    const date = new Date(value);
+    if (!Number.isNaN(date.getTime())) return date;
+  }
+  return null;
+}
+
+function pickBool(value: unknown): boolean | null {
+  return typeof value === "boolean" ? value : null;
+}
+
+function pickInt(value: unknown): number | null {
+  return typeof value === "number" && Number.isFinite(value) ? Math.trunc(value) : null;
 }
 
 export function parseUserLiteSkills(raw: unknown): UserLiteSkills {
@@ -86,7 +131,7 @@ export function parseUserLiteSkills(raw: unknown): UserLiteSkills {
  *   - companyId: direct `companyId` / `company` string, or nested `company.{_id,id,companyId}`
  *   - muId: direct `mu` / `muId` / `militaryUnit` string, or nested `mu.{_id,id,muId}`
  */
-export function parseUserById(raw: unknown, requestedUserId?: string): UserByIdRef {
+export function parseUserProfile(raw: unknown, requestedUserId?: string): ParsedUserProfile {
   const obj = asRecord(raw) ?? {};
   const payloadUserId = pickString(obj, ["_id", "id", "userId"]);
   if (payloadUserId && requestedUserId && payloadUserId !== requestedUserId) {
@@ -98,13 +143,48 @@ export function parseUserById(raw: unknown, requestedUserId?: string): UserByIdR
   if (!userId) {
     throw new Error("user.getUserById response missing id");
   }
-  const username = pickString(obj, ["username", "name"]);
+  const dates = asRecord(obj.dates) ?? {};
+  const leveling = asRecord(obj.leveling) ?? {};
+  const infos = asRecord(obj.infos) ?? {};
 
-  const companyId = pickNestedId(obj, ["companyId", "company"], ["company"]);
+  return {
+    userId,
+    username: pickString(obj, ["username", "name"]),
+    avatarUrl: pickString(obj, ["avatarUrl"]),
+    countryId: pickNestedId(obj, ["countryId", "country"], ["country"]),
+    muId: pickNestedId(obj, ["mu", "muId", "militaryUnit"], ["mu", "militaryUnit"]),
+    companyId: pickNestedId(obj, ["companyId", "company"], ["company"]),
+    partyId: pickNestedId(obj, ["partyId", "party"], ["party"]),
+    isActive: pickBool(obj.isActive),
+    lastConnectionAt: pickDate(dates.lastConnectionAt),
+    lastWorkAt: pickDate(dates.lastWorkAt),
+    lastHelpAskedAt: pickDate(dates.lastHelpAskedAt),
+    lastDailyRewardClaimedAt: pickDate(dates.lastDailyRewardClaimedAt),
+    lastCompanyJoinedAt: pickDate(dates.lastCompanyJoinedAt),
+    lastDailyCalendarClaimedAt: pickDate(dates.lastDailyCalendarClaimedAt),
+    lastSkillsResetAt: pickDate(dates.lastSkillsResetAt),
+    level: pickInt(leveling.level),
+    totalXp: pickInt(leveling.totalXp ?? leveling.xp),
+    dailyXpLeft: pickInt(leveling.dailyXpLeft),
+    availableSkillPoints: pickInt(leveling.availableSkillPoints),
+    spentSkillPoints: pickInt(leveling.spentSkillPoints),
+    totalSkillPoints: pickInt(leveling.totalSkillPoints),
+    prestigeLevel: pickInt(leveling.prestigeLevel),
+    militaryRank: pickInt(obj.militaryRank),
+    isPremium: pickBool(infos.isPremium),
+    premiumMonthsCount: pickInt(infos.premiumMonthsCount),
+    createdAtGame: pickDate(obj.createdAt),
+  };
+}
 
-  const muId = pickNestedId(obj, ["mu", "muId", "militaryUnit"], ["mu", "militaryUnit"]);
-
-  return { userId, username, companyId, muId };
+export function parseUserById(raw: unknown, requestedUserId?: string): UserByIdRef {
+  const profile = parseUserProfile(raw, requestedUserId);
+  return {
+    userId: profile.userId,
+    username: profile.username,
+    companyId: profile.companyId,
+    muId: profile.muId,
+  };
 }
 
 /**
@@ -229,6 +309,45 @@ export async function fetchUserByIdBatch(
     for (const userId of unique) {
       out.set(userId, null);
     }
+  }
+
+  return out;
+}
+
+export async function fetchUserProfileBatch(
+  warera: WareraRequester,
+  userIds: string[],
+): Promise<Map<string, ParsedUserProfile | null>> {
+  const unique = [...new Set(userIds.filter((id) => id.length > 0))];
+  const out = new Map<string, ParsedUserProfile | null>();
+  if (unique.length === 0) return out;
+
+  if (!warera.requestBatch) {
+    throw new Error("fetchUserProfileBatch requires warera.requestBatch");
+  }
+
+  try {
+    const slots = await warera.requestBatch(
+      unique.map((userId) => ({
+        procedure: "user.getUserById",
+        input: { userId },
+      })),
+    );
+    for (let i = 0; i < unique.length; i++) {
+      const userId = unique[i]!;
+      const slot = slots[i];
+      if (!slot?.ok) {
+        out.set(userId, null);
+        continue;
+      }
+      try {
+        out.set(userId, parseUserProfile(slot.data, userId));
+      } catch {
+        out.set(userId, null);
+      }
+    }
+  } catch {
+    for (const userId of unique) out.set(userId, null);
   }
 
   return out;

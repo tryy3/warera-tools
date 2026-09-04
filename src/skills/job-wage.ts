@@ -1,3 +1,6 @@
+import type { Db } from "../db/client";
+import { USER_PROFILE_JOB_MAX_AGE_MS } from "../db/user-profiles";
+import { resolveUserByIdRef } from "../user/resolve-user-by-id";
 import { fetchCompanyById } from "../warera/companies";
 import type { WareraRequester } from "../warera/prices";
 import { unwrapTrpcData, wareraProcedurePath } from "../warera/trpc";
@@ -97,9 +100,25 @@ function workerForUser(workers: WorkerRow[], userId: string): WorkerRow | undefi
   return workers.find((w) => w.userId === userId);
 }
 
-export async function resolveJobWage(warera: WareraRequester, userId: string): Promise<SkillsJob> {
+export async function resolveJobWage(options: {
+  warera: WareraRequester;
+  userId: string;
+  db?: Db;
+  maxAgeMs?: number;
+  now?: Date;
+}): Promise<SkillsJob> {
+  const { warera, userId } = options;
+
   try {
-    const { companyId: userCompanyId } = await fetchUserById(warera, userId);
+    const { companyId: userCompanyId } = options.db
+      ? await resolveUserByIdRef({
+          db: options.db,
+          warera,
+          userId,
+          maxAgeMs: options.maxAgeMs ?? USER_PROFILE_JOB_MAX_AGE_MS,
+          now: options.now,
+        })
+      : await fetchUserById(warera, userId);
 
     let companyId = userCompanyId;
     let workers: WorkerRow[] = [];
