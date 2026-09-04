@@ -35,8 +35,8 @@ export type WareraRequestInit = RequestInit & {
   /** JSON body — sets Content-Type and stringifies (for POST procedures). */
   json?: unknown;
   /**
-   * Auth header style. `auto` = Bearer on api2 when `WARERA_API_KEY` is set; use `api-key` when
-   * a procedure requires `X-API-Key` (e.g. getRecommendedRegionIdsByItemCode).
+   * Auth header style. `auto` = `X-API-Key` when `WARERA_API_KEY` is set.
+   * Use `bearer` only as an explicit opt-out. `api-key` is the same header as `auto`.
    */
   authStyle?: WareraAuthStyle;
   /** Force a specific tRPC base URL for this call. */
@@ -44,19 +44,17 @@ export type WareraRequestInit = RequestInit & {
 };
 
 function authHeaders(
-  baseUrl: string,
+  _baseUrl: string,
   apiKey: string | undefined,
   authStyle: WareraAuthStyle = "auto",
 ): Headers {
   const headers = new Headers();
   if (!apiKey) return headers;
-  const useApiKey =
-    authStyle === "api-key" || (authStyle === "auto" && baseUrl.includes("gateway.warerastats.io"));
-  if (useApiKey) {
-    headers.set("X-API-Key", apiKey);
-  } else {
+  if (authStyle === "bearer") {
     headers.set("Authorization", `Bearer ${apiKey}`);
+    return headers;
   }
+  headers.set("X-API-Key", apiKey);
   return headers;
 }
 
