@@ -1,10 +1,17 @@
 import { describe, expect, it, vi } from "vite-plus/test";
+import type { Db } from "../db/client";
+import { USER_PROFILE_JOB_MAX_AGE_MS } from "../db/user-profiles";
+import { resolveUserByIdRef } from "../user/resolve-user-by-id";
 import {
   fetchIncomeTaxRateForCompany,
   parseIncomeTaxRate,
   parseIncomeTaxRateResult,
   resolveJobWage,
 } from "./job-wage";
+
+vi.mock("../user/resolve-user-by-id", () => ({
+  resolveUserByIdRef: vi.fn(),
+}));
 
 describe("parseIncomeTaxRate", () => {
   it("reads taxes.income percent as fraction when > 1", () => {
@@ -98,7 +105,7 @@ describe("resolveJobWage", () => {
       throw new Error(`unexpected path ${path}`);
     });
 
-    const job = await resolveJobWage({ request } as never, "u1");
+    const job = await resolveJobWage({ warera: { request } as never, userId: "u1" });
     expect(job).toEqual({
       status: "resolved",
       companyId: "co-1",
@@ -114,7 +121,7 @@ describe("resolveJobWage", () => {
       if (path.includes("worker.getWorkers")) return trpc([]);
       throw new Error(`unexpected path ${path}`);
     });
-    await expect(resolveJobWage({ request } as never, "u1")).resolves.toEqual({
+    await expect(resolveJobWage({ warera: { request } as never, userId: "u1" })).resolves.toEqual({
       status: "unemployed",
     });
   });
@@ -146,7 +153,7 @@ describe("resolveJobWage", () => {
       throw new Error(`unexpected path ${path}`);
     });
 
-    const job = await resolveJobWage({ request } as never, "u1");
+    const job = await resolveJobWage({ warera: { request } as never, userId: "u1" });
     expect(job.status).toBe("resolved");
     expect(job.grossWage).toBe(0.5);
     expect(job.netWage).toBe(0.5);
@@ -180,7 +187,7 @@ describe("resolveJobWage", () => {
       throw new Error(`unexpected path ${path}`);
     });
 
-    const job = await resolveJobWage({ request } as never, "u1");
+    const job = await resolveJobWage({ warera: { request } as never, userId: "u1" });
     expect(job).toEqual({
       status: "resolved",
       companyId: "co-7",
@@ -194,7 +201,7 @@ describe("resolveJobWage", () => {
     const request = vi.fn(async () => {
       throw new Error("network down");
     });
-    await expect(resolveJobWage({ request } as never, "u1")).resolves.toEqual({
+    await expect(resolveJobWage({ warera: { request } as never, userId: "u1" })).resolves.toEqual({
       status: "lookupFailed",
     });
   });
@@ -223,7 +230,7 @@ describe("resolveJobWage", () => {
       throw new Error(`unexpected path ${path}`);
     });
 
-    const job = await resolveJobWage({ request } as never, "u1");
+    const job = await resolveJobWage({ warera: { request } as never, userId: "u1" });
     expect(job).toEqual({
       status: "resolved",
       companyId: "co-9",
@@ -231,5 +238,50 @@ describe("resolveJobWage", () => {
       incomeTaxRate: 0.2,
       netWage: 1.6,
     });
+  });
+
+  it("uses the profile resolver with the job freshness default when db is provided", async () => {
+    const db = {} as Db;
+    const now = new Date("2026-09-04T12:00:00.000Z");
+    const request = vi.fn(async (path: string) => {
+      if (path.includes("worker.getWorkers")) {
+        return trpc([{ userId: "u1", wagePerPp: 1, companyId: "co-1" }]);
+      }
+      if (path.includes("company.getById")) {
+        return trpc({
+          _id: "co-1",
+          name: "Mine",
+          region: "reg-1",
+          itemCode: "lead",
+          activeUpgradeLevels: { automatedEngine: 1 },
+        });
+      }
+      if (path.includes("region.getById")) {
+        return trpc({ country: "country-1" });
+      }
+      if (path.includes("country.getCountryById")) {
+        return trpc({ taxes: { income: 0 } });
+      }
+      throw new Error(`unexpected path ${path}`);
+    });
+    vi.mocked(resolveUserByIdRef).mockResolvedValue({
+      userId: "u1",
+      username: "Alice",
+      muId: null,
+      companyId: "co-1",
+    });
+
+    await expect(
+      resolveJobWage({ warera: { request } as never, userId: "u1", db, now }),
+    ).resolves.toMatchObject({ status: "resolved", companyId: "co-1" });
+
+    expect(resolveUserByIdRef).toHaveBeenCalledWith({
+      db,
+      warera: { request },
+      userId: "u1",
+      maxAgeMs: USER_PROFILE_JOB_MAX_AGE_MS,
+      now,
+    });
+    expect(request).not.toHaveBeenCalledWith(expect.stringContaining("user.getUserById"));
   });
 });

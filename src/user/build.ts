@@ -22,7 +22,7 @@ export async function buildUser(options: {
     getLatestPrices(db),
     loadCompanyPackForUser({ db, warera, userId, refresh }),
     fetchUserLite(warera, userId),
-    resolveJobWage(warera, userId),
+    resolveJobWage({ db, warera, userId }),
   ]);
 
   let latest = latestInitial;
