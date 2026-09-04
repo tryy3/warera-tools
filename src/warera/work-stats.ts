@@ -87,7 +87,7 @@ const WORK_STATS_BATCH_INIT = {
 
 /**
  * Prefer GET batch; fall back to POST JSON when GET is rejected (these
- * procedures are undocumented and may require POST on api2).
+ * procedures are not in OpenAPI and may require POST on api2).
  */
 async function requestWorkStatsBatch(
   warera: NonNullable<WareraRequester["requestBatch"]>,
@@ -110,7 +110,7 @@ async function requestWorkStatsBatch(
  * Batch-fetch daily work stats via GET (POST fallback) + X-API-Key.
  *
  * Procedures `work.getStatsByCompany` and `work.getStatsByWorkerAndCompany`
- * are not on the official OpenAPI; they require `X-API-Key`
+ * are not in OpenAPI (still official on api2); they require `X-API-Key`
  * (same class as `company.getRecommendedRegionIdsByItemCode`).
  *
  * The batch layer (`requestBatch` + `parseTrpcBatchResponse`) unwraps each

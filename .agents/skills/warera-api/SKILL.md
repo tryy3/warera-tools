@@ -7,19 +7,25 @@ description: Use WarEra's allowed public tRPC API (api2), endpoint allowlist, au
 
 Game economy formulas (PP, companies, scrap tiers, tax) → [warera-game-mechanics](../warera-game-mechanics/SKILL.md).
 
-## Allowed surface (hard rule)
+Procedure catalog (source / auth / used-here) → [procedures.md](./procedures.md).
 
-The API we are **allowed** to use publicly is what is listed on the official docs:
+## Official surface (hard rule)
 
-- Docs UI: https://api2.warera.io/docs/
-- Machine-readable: https://api2.warera.io/openapi.json
+A procedure is **official** if it works on live `https://api2.warera.io/trpc`. Missing from `/docs` or `openapi.json` does **not** make it unofficial.
 
-There are differences between what the game client can do in-game and what is allowed publicly. **Only endpoints exposed there are allowed.** Do not invent, scrape, or call endpoints outside that list (including undocumented `api5` / private game paths) unless the user explicitly overrides for a private experiment.
+Do not use in-game-only hosts such as `api5` unless the user explicitly overrides for a private experiment.
 
-Community docs (response shapes, examples — not the allowlist source of truth):
+### Source ranking
 
-- https://majimawrks.github.io/warera-api-docs/#/
-- https://github.com/majimawrks/warera-api-docs
+| Rank | Source | Use for |
+| --- | --- | --- |
+| 1 | Live `api2.warera.io` | Is this allowed? (it works → yes) |
+| 2 | https://warera.realmarijn.nl/api-explorer | Params, examples, fuller list |
+| 3 | https://github.com/WarEraProjects/TRPC | OpenAPI-mapped vs `src/CustomEndpoints` |
+| 4 | https://api2.warera.io/docs/ / https://api2.warera.io/openapi.json | Incomplete snapshot |
+| 5 | https://majimawrks.github.io/warera-api-docs/#/ | Observed response shapes only |
+
+Never write “not official” or “OpenAPI override” for an api2 procedure. Say “not in OpenAPI (still official on api2)” when that is the fact.
 
 ## Base URLs (project preference)
 
@@ -30,38 +36,37 @@ tRPC base path includes `/trpc`.
 | 1 (default) | `https://api2.warera.io/trpc` | Normal operation |
 | experiment | any other `WARERA_API_BASE_URL` | Local experiments only — not a supported dual-path |
 
-Default `WARERA_API_BASE_URL` is `https://api2.warera.io/trpc`. Do not use undocumented hosts such as `api5` for public integrations.
+Default `WARERA_API_BASE_URL` is `https://api2.warera.io/trpc`.
 
 ## How to call
 
-Most public procedures work with **GET** + optional `input` query JSON (OpenAPI may show POST; GET is preferred when it works):
+Most procedures work with **GET** + optional `input` query JSON (OpenAPI may show POST; GET is preferred when it works):
 
 ```
 GET {base}/{namespace}.{method}
 GET {base}/{namespace}.{method}?input=<url-encoded JSON>
 ```
 
-**Exception:** some auth-required procedures on api2 (notably `company.getRecommendedRegionIdsByItemCode`) require:
+**Exception:** some procedures (notably `company.getRecommendedRegionIdsByItemCode`) require:
 
 - **POST** to `https://api2.warera.io/trpc/{procedure}`
 - Header **`X-API-Key`** (Bearer does **not** work for these)
 - JSON body, e.g. `{ "itemCode": "lead", "count": 1 }`
 
-Same pattern for `muMember.getByMu` (MU member stats poll): not on official OpenAPI; requires `X-API-Key`.
-
-Same pattern for `work.getStatsByCompany` and `work.getStatsByWorkerAndCompany` (followed-entity work-stats poll): not on official OpenAPI; requires **api2** + `X-API-Key`. Prefer GET batch; fall back to POST JSON body when GET is rejected. See `src/warera/work-stats.ts`.
+Same POST fallback pattern for `muMember.getByMu`, `donation.getManyPaginated`, and `work.getStatsByCompany` / `work.getStatsByWorkerAndCompany` when GET is rejected. See `src/warera/work-stats.ts`.
 
 Examples:
 
 ```bash
-# Official API (often public, no key)
-curl -G 'https://api2.warera.io/trpc/country.getAllCountries'
+# In-app we always send X-API-Key when WARERA_API_KEY is set.
+# country.getAllCountries is optional-auth (works without a key in scripts).
+curl -G 'https://api2.warera.io/trpc/country.getAllCountries' \
+  -H 'X-API-Key: <api-key>'
 
-# With input (GET)
 curl -G 'https://api2.warera.io/trpc/user.getUserLite' \
+  -H 'X-API-Key: <api-key>' \
   --data-urlencode 'input={"userId":"<id>"}'
 
-# Recommended regions (api2 POST + X-API-Key)
 curl -sS -X POST 'https://api2.warera.io/trpc/company.getRecommendedRegionIdsByItemCode' \
   -H 'X-API-Key: <api-key>' \
   -H 'Content-Type: application/json' \
@@ -72,20 +77,20 @@ Response shape is typically tRPC: `{ "result": { "data": ... } }` (or `{ "error"
 
 ## Auth
 
-| Target | Header |
-| --- | --- |
-| `api2.warera.io` | `Authorization: Bearer <token>` by default; **some procedures require `X-API-Key` instead** (recommended regions, work-stats, item-market txs) |
+In this app, `src/warera/client.ts` `authStyle: "auto"` sends **`X-API-Key`** whenever `WARERA_API_KEY` is set. No header when the key is unset. Do not send Bearer and `X-API-Key` together.
 
-Use `WARERA_API_KEY`. Never hardcode secrets.
+`authStyle: "bearer"` is an explicit opt-out. Existing `authStyle: "api-key"` call sites are equivalent to the new default.
 
-`src/warera/client.ts`: `auto` = Bearer on api2; `authStyle: "api-key"` forces `X-API-Key`. No gateway-miss fallback.
+For one-off scripts outside this repo, see [procedures.md](./procedures.md) Auth column (`required` / `optional` / `unknown`). Prefer sending the key when unsure.
+
+Never hardcode secrets.
 
 ## Rate limits & caching
 
 - Soft local limiter: `WARERA_MAX_REQUESTS_PER_MINUTE` (default 120), one HTTP call per slot.
 - api2 headers (observed): `ratelimit-limit` / `ratelimit-policy` (`500;w=60`) / `ratelimit-remaining` / `ratelimit-reset` (seconds). 429 pauses **all** in-flight sends until reset (`Retry-After` wins when present).
 - tRPC HTTP batches: max **50** procedures per request; GET URL-length chunk 2000 remains. Background singles coalesce ~400ms.
-- L1 freshness is our Turso tables / pack TTL — not a community gateway cache.
+- L1 freshness is our Turso tables / pack TTL.
 
 ## Project client
 
@@ -93,66 +98,20 @@ Use / extend `src/warera/` (`createWareraClient` facade). Do not add a parallel 
 
 Preferences:
 
-1. Call only allowlisted procedures (see index below / OpenAPI).
+1. Call procedures that work on api2 (see [procedures.md](./procedures.md) / live api2 / realmarijn / TRPC).
 2. Default base is api2 `/trpc`.
 3. Log procedure, `call_class`, status, latency, outcome.
 4. Retry GET and read-only `batch=1` POST on 5xx/network (max 3) and 429 (reset wait). Do not retry other 4xx.
-5. For response field details, consult community docs; for “is this allowed?”, consult official OpenAPI.
+5. For parameters/examples: realmarijn. For OpenAPI schemas when present: `/docs`. For “is this allowed?”: live api2.
 
-## Endpoint index (allowlist snapshot)
-
-Refresh from https://api2.warera.io/openapi.json when in doubt.
-
-Official OpenAPI is **incomplete** relative to live api2. Community explorers such as https://warera.realmarijn.nl/api-explorer document additional read procedures that work with an API key. This project may call those when explicitly needed (document the override in code/design). Prefer official OpenAPI first.
-
-| Namespace | Procedures |
-| --- | --- |
-| article | `getArticleById`, `getArticleLiteById`, `getArticlesPaginated` |
-| battle | `getBattles`, `getById`, `getLiveBattleData` |
-| battleLootSummary | `getByBattleAndUser` |
-| battleOrder | `getByBattle` |
-| battleRanking | `getRanking` |
-| company | `getById`, `getCompanies`, `getProductionBonus`†, `getRecommendedRegionIdsByItemCode`† |
-| country | `getAllCountries`, `getCountryById` |
-| donation | `getManyPaginated`‡ |
-| event | `getEventsPaginated` |
-| gameConfig | `getDates`, `getGameConfig` |
-| government | `getByCountryId` |
-| inventory | `fetchCurrentEquipment` |
-| itemOffer | `getById` |
-| itemTrading | `getPrices` |
-| mercenaryContractAuction | `getPaginatedAuctions` |
-| mu | `getById`, `getManyPaginated` |
-| muMember | `getByMu`†† |
-| ranking | `getRanking` |
-| region | `getById`, `getRegionsObject` |
-| round | `getById`, `getLastHits` |
-| search | `searchAnything` |
-| tradingOrder | `getTopOrders` |
-| transaction | `getPaginatedTransactions`††† |
-| upgrade | `getUpgradeByTypeAndEntity` |
-| user | `getUserById`, `getUserLite`, `getUsersByCountry` |
-| work | `getStatsByCompany`§, `getStatsByWorkerAndCompany`§ |
-| workOffer | `getById`, `getWorkOfferByCompanyId`, `getWorkOffersPaginated` |
-| worker | `getTotalWorkersCount`, `getWorkers` |
-
-† Auth-required; present on live api2 / explorers but not always on official OpenAPI. Used for Economy advisor (recommended regions / production bonus).
-
-†† Not on official OpenAPI; live api2 read used by MU stats poll — call api2 directly.
-
-§ Not on official OpenAPI; force **api2** + `X-API-Key` for followed-entity work-stats (daily company/worker production). Prefer GET tRPC batch; POST fallback with body `{"0":input0,"1":input1}` when GET is rejected.
-
-††† On official OpenAPI; force **api2** + `authStyle: "api-key"` for item-market ingest — gateway has had DB failures on this procedure. Requires `WARERA_API_KEY`.
-
-‡ Not on official OpenAPI; live api2 read used by donation poll — prefer GET, POST + `X-API-Key` fallback.
-
-For parameters and schemas: official OpenAPI. For observed response shapes: community `spec.md` / `spec.json` under majimawrks/warera-api-docs.
+Listing a procedure in the catalog does **not** mean this app should start calling it.
 
 ## Agent checklist
 
 When adding or changing WarEra API usage:
 
-- [ ] Procedure appears in official OpenAPI / docs
+- [ ] Procedure works on api2 (or is listed in [procedures.md](./procedures.md) / TRPC / realmarijn)
 - [ ] Base URL is api2 `/trpc` (not inventing hosts/paths)
-- [ ] Correct auth header for the chosen host
 - [ ] Goes through `src/warera` client + rate limit
+- [ ] Send `WARERA_API_KEY` as `X-API-Key` when we have one
+- [ ] Update [procedures.md](./procedures.md) `Used here` / Auth if you learned something new

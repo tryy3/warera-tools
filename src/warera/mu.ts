@@ -233,9 +233,9 @@ const MU_MEMBER_BY_MU_INIT = {
 };
 
 /**
- * Live api2 procedure; not on official OpenAPI (same class as
- * company.getRecommendedRegionIdsByItemCode). Requires X-API-Key; prefer GET,
- * fall back to POST when GET is rejected.
+ * Live api2 procedure; not in OpenAPI (still official on api2). Same class as
+ * company.getRecommendedRegionIdsByItemCode. Client sends X-API-Key by default;
+ * prefer GET, fall back to POST when GET is rejected.
  */
 export async function fetchMuMembersByMu(
   warera: WareraRequester,

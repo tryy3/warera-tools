@@ -128,7 +128,7 @@ describe("createWareraClient", () => {
     expect(headers.get("Authorization")).toBeNull();
   });
 
-  it("sends Bearer Authorization when using the official api2 base URL", async () => {
+  it("sends X-API-Key when using the official api2 base URL", async () => {
     const fetchMock = vi
       .fn()
       .mockResolvedValue(new Response(JSON.stringify({ ok: true }), { status: 200 }));
@@ -144,6 +144,28 @@ describe("createWareraClient", () => {
     });
 
     await client.request("/country.getAllCountries");
+    const init = fetchMock.mock.calls[0]![1] as RequestInit;
+    const headers = new Headers(init.headers);
+    expect(headers.get("X-API-Key")).toBe("test-key");
+    expect(headers.get("Authorization")).toBeNull();
+  });
+
+  it("sends Bearer Authorization when authStyle is bearer", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(new Response(JSON.stringify({ ok: true }), { status: 200 }));
+
+    const client = createWareraClient({
+      config: {
+        ...baseConfig,
+        wareraApiBaseUrl: "https://api2.warera.io/trpc",
+      },
+      logger: testLogger(),
+      fetchImpl: fetchMock,
+      sleep: async () => {},
+    });
+
+    await client.request("/country.getAllCountries", { authStyle: "bearer" });
     const init = fetchMock.mock.calls[0]![1] as RequestInit;
     const headers = new Headers(init.headers);
     expect(headers.get("Authorization")).toBe("Bearer test-key");
