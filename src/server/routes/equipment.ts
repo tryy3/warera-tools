@@ -14,7 +14,7 @@ import type { Logger } from "../../logging/logger";
 import type { WareraRequester } from "../../warera/prices";
 import { HttpError } from "../errors";
 
-const GEAR_TIER_IDS = new Set(GEAR_TIERS.map((t) => t.id));
+const GEAR_TIER_IDS = new Set<string>(GEAR_TIERS.map((t) => t.id));
 
 export type EquipmentRouteDeps = {
   db: Db;
