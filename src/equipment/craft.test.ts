@@ -1,10 +1,6 @@
 import { describe, expect, it } from "vite-plus/test";
 import type { ItemMarketTxRow } from "../db/item-market-tx-read";
-import {
-  buildCraftCompare,
-  craftCostForTier,
-  itemCodesForTier,
-} from "./craft";
+import { buildCraftCompare, craftCostForTier, itemCodesForTier } from "./craft";
 
 function tx(
   overrides: Partial<ItemMarketTxRow> & Pick<ItemMarketTxRow, "id" | "money" | "itemCode">,
@@ -85,16 +81,11 @@ describe("buildCraftCompare", () => {
     expect(jet.minExcl).toBeCloseTo(jetMinExcl, 10);
     expect(jet.maxExcl).toBeCloseTo(jetMaxExcl, 10);
     expect(jet.medianExcl).toBeCloseTo(jetMedExcl, 10);
-    expect(jet.medianAdvantage).toBeCloseTo(
-      jetMedExcl - 64 * 1.5 - 1460 * 0.2,
-      10,
-    );
+    expect(jet.medianAdvantage).toBeCloseTo(jetMedExcl - 64 * 1.5 - 1460 * 0.2, 10);
     expect(jet.trades).toBe(2);
 
     // unpriced specific rows still present
-    expect(result.specific.some((r) => r.itemCode === "boots6" && r.trades === 0)).toBe(
-      true,
-    );
+    expect(result.specific.some((r) => r.itemCode === "boots6" && r.trades === 0)).toBe(true);
 
     // sorted by median advantage desc; nulls last
     const medians = result.specific.map((r) => r.medianAdvantage);
@@ -123,10 +114,7 @@ describe("buildCraftCompare", () => {
     expect(result.random.medianExcl).toBeCloseTo(typical, 10);
     expect(result.random.minExcl).toBeCloseTo(Math.min(jetMed, helmMed), 10);
     expect(result.random.maxExcl).toBeCloseTo(Math.max(jetMed, helmMed), 10);
-    expect(result.random.medianAdvantage).toBeCloseTo(
-      typical - 32 * 1.5 - 1460 * 0.2,
-      10,
-    );
+    expect(result.random.medianAdvantage).toBeCloseTo(typical - 32 * 1.5 - 1460 * 0.2, 10);
     expect(result.random.trades).toBe(2);
   });
 

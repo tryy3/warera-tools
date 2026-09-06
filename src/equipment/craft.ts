@@ -35,8 +35,7 @@ export function craftCostForTier(tier: GearTierId): CraftCost {
 
 export function itemCodesForTier(tier: GearTierId): string[] {
   const digit = TIER_DIGIT[tier];
-  const weapon =
-    Object.entries(ITEM_CODE_TIER_OVERRIDES).find(([, t]) => t === tier)?.[0] ?? null;
+  const weapon = Object.entries(ITEM_CODE_TIER_OVERRIDES).find(([, t]) => t === tier)?.[0] ?? null;
   const codes: string[] = [];
   if (weapon) codes.push(weapon);
   for (const base of ARMOR_BASES) codes.push(`${base}${digit}`);
@@ -139,17 +138,11 @@ export function buildCraftCompare(input: {
   const cost = craftCostForTier(tier);
   const codes = itemCodesForTier(tier);
   const scrapValue =
-    scrapPrice != null && Number.isFinite(scrapPrice)
-      ? cost.scrapQty * scrapPrice
-      : null;
+    scrapPrice != null && Number.isFinite(scrapPrice) ? cost.scrapQty * scrapPrice : null;
   const steelCostRandom =
-    steelPrice != null && Number.isFinite(steelPrice)
-      ? cost.steelRandom * steelPrice
-      : null;
+    steelPrice != null && Number.isFinite(steelPrice) ? cost.steelRandom * steelPrice : null;
   const steelCostSpecific =
-    steelPrice != null && Number.isFinite(steelPrice)
-      ? cost.steelSpecific * steelPrice
-      : null;
+    steelPrice != null && Number.isFinite(steelPrice) ? cost.steelSpecific * steelPrice : null;
 
   const byCode = new Map<string, number[]>();
   for (const code of codes) byCode.set(code, []);
@@ -196,9 +189,7 @@ export function buildCraftCompare(input: {
   } else {
     const { min, max } = minMax(allExcls);
     const typical =
-      medians.length === 0
-        ? null
-        : medians.reduce((s, v) => s + v, 0) / medians.length;
+      medians.length === 0 ? null : medians.reduce((s, v) => s + v, 0) / medians.length;
     random = {
       minExcl: min,
       medianExcl: typical,

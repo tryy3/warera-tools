@@ -422,6 +422,19 @@ describe("GET /:itemCode", () => {
 });
 
 describe("GET /craft-compare", () => {
+  type CraftCompareBody = {
+    tier: string;
+    windowMs: number;
+    scrapQty: number;
+    steelRandom: number;
+    steelSpecific: number;
+    steelPrice: number | null;
+    steelCostRandom: number | null;
+    taxRate: number;
+    specific: Array<{ itemCode: string }>;
+    random: { medianAdvantage: number | null };
+  };
+
   let db: Db;
 
   beforeEach(async () => {
@@ -445,24 +458,20 @@ describe("GET /craft-compare", () => {
       "http://localhost/craft-compare?tier=red&countryId=sweden",
     );
     expect(res.status).toBe(200);
-    const body = await res.json();
+    const body = (await res.json()) as CraftCompareBody;
     expect(body.tier).toBe("red");
     expect(body.windowMs).toBe(MARKET_WINDOW_MS);
     expect(body.scrapQty).toBe(1460);
     expect(body.steelRandom).toBe(32);
     expect(body.steelSpecific).toBe(64);
     expect(body.taxRate).toBe(0.01);
-    expect(body.specific.some((r: { itemCode: string }) => r.itemCode === "jet")).toBe(
-      true,
-    );
+    expect(body.specific.some((r: { itemCode: string }) => r.itemCode === "jet")).toBe(true);
     expect(body.random).toBeTruthy();
   });
 
   it("returns 400 when tier is missing or unknown", async () => {
     await seedCountry(db, { id: "sweden", name: "Sweden", taxRate: 0.01 });
-    const missing = await appFor(db).request(
-      "http://localhost/craft-compare?countryId=sweden",
-    );
+    const missing = await appFor(db).request("http://localhost/craft-compare?countryId=sweden");
     expect(missing.status).toBe(400);
     const bad = await appFor(db).request(
       "http://localhost/craft-compare?tier=orange&countryId=sweden",
@@ -487,7 +496,7 @@ describe("GET /craft-compare", () => {
       "http://localhost/craft-compare?tier=red&countryId=sweden",
     );
     expect(res.status).toBe(200);
-    const body = await res.json();
+    const body = (await res.json()) as CraftCompareBody;
     expect(body.steelPrice).toBeNull();
     expect(body.steelCostRandom).toBeNull();
     expect(body.random.medianAdvantage).toBeNull();
