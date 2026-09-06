@@ -51,6 +51,11 @@ export {
   type ItemMarketTransactionsPage,
 } from "./transactions";
 export {
+  fetchCurrentEquipment,
+  parseInventoryEquipment,
+  type ParsedInventoryItem,
+} from "./inventory";
+export {
   WORK_STATS_DAYS,
   fetchWorkStatsBatch,
   parseCompanyWorkDays,
