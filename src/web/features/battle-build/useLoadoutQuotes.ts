@@ -14,7 +14,7 @@ export function createLoadoutItem(slot: LoadoutSlotId, itemCode: string): Loadou
   if (slot === "ammo" || slot === "food") return { itemCode, skills: {} };
   return {
     itemCode,
-    skills: slot === "weapon" ? { attack: 0 } : { armor: 0 },
+    skills: slot === "weapon" ? { attack: 0, criticalChance: 0 } : { armor: 0 },
   };
 }
 
@@ -52,6 +52,39 @@ type QuoteState = {
   error: string | null;
 };
 
+type ScheduleLoadoutQuoteBatchOptions = {
+  items: QuoteLineInput[];
+  request?: (items: QuoteLineInput[]) => Promise<QuoteLineResult[]>;
+  onSuccess: (quotes: QuoteLineResult[]) => void;
+  onError: (error: unknown) => void;
+  delayMs?: number;
+};
+
+export function scheduleLoadoutQuoteBatch({
+  items,
+  request = quoteBattleBuild,
+  onSuccess,
+  onError,
+  delayMs = QUOTE_DEBOUNCE_MS,
+}: ScheduleLoadoutQuoteBatchOptions): () => void {
+  let active = true;
+  const timeout = globalThis.setTimeout(() => {
+    void request(items).then(
+      (quotes) => {
+        if (active) onSuccess(quotes);
+      },
+      (error: unknown) => {
+        if (active) onError(error);
+      },
+    );
+  }, delayMs);
+
+  return () => {
+    active = false;
+    globalThis.clearTimeout(timeout);
+  };
+}
+
 export function useLoadoutQuotes(loadout: Loadout): {
   quoteBySlot: Partial<Record<LoadoutSlotId, QuoteLineResult>>;
   quotes: QuoteLineResult[];
@@ -68,27 +101,19 @@ export function useLoadoutQuotes(loadout: Loadout): {
 
   useEffect(() => {
     if (items.length === 0) return;
-    let active = true;
-    const timeout = window.setTimeout(() => {
-      void quoteBattleBuild(items).then(
-        (quotes) => {
-          if (active) setState({ key: inputKey, quotes, error: null });
-        },
-        (error: unknown) => {
-          if (!active) return;
-          setState({
-            key: inputKey,
-            quotes: [],
-            error: error instanceof Error ? error.message : "Could not load market quotes",
-          });
-        },
-      );
-    }, QUOTE_DEBOUNCE_MS);
-
-    return () => {
-      active = false;
-      window.clearTimeout(timeout);
-    };
+    return scheduleLoadoutQuoteBatch({
+      items,
+      onSuccess: (quotes) => {
+        setState({ key: inputKey, quotes, error: null });
+      },
+      onError: (error) => {
+        setState({
+          key: inputKey,
+          quotes: [],
+          error: error instanceof Error ? error.message : "Could not load market quotes",
+        });
+      },
+    });
   }, [inputKey, items]);
 
   const currentQuotes = state.key === inputKey ? state.quotes : [];

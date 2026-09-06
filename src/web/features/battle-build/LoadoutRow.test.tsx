@@ -1,14 +1,19 @@
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it } from "vite-plus/test";
+import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 import { emptyLoadout } from "@/battle-build/slots";
 import { SlotCard } from "./SlotCard";
-import { buildLoadoutQuoteItems, createLoadoutItem, sumLoadoutQuotes } from "./useLoadoutQuotes";
+import {
+  buildLoadoutQuoteItems,
+  createLoadoutItem,
+  scheduleLoadoutQuoteBatch,
+  sumLoadoutQuotes,
+} from "./useLoadoutQuotes";
 
 describe("createLoadoutItem", () => {
   it("adds the expected editable skill for gear and no skills for supplies", () => {
     expect(createLoadoutItem("weapon", "rifle")).toEqual({
       itemCode: "rifle",
-      skills: { attack: 0 },
+      skills: { attack: 0, criticalChance: 0 },
     });
     expect(createLoadoutItem("gloves", "gloves3")).toEqual({
       itemCode: "gloves3",
@@ -18,6 +23,67 @@ describe("createLoadoutItem", () => {
       itemCode: "heavyAmmo",
       skills: {},
     });
+  });
+});
+
+describe("scheduleLoadoutQuoteBatch", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("coalesces rapid loadout changes into one batched request", async () => {
+    vi.useFakeTimers();
+    const request = vi.fn(async () => []);
+    const onSuccess = vi.fn();
+    const firstItems = [{ id: "weapon", itemCode: "rifle", skills: { attack: 1 } }];
+    const latestItems = [{ id: "weapon", itemCode: "rifle", skills: { attack: 2 } }];
+
+    const cancelFirst = scheduleLoadoutQuoteBatch({
+      items: firstItems,
+      request,
+      onSuccess,
+      onError: vi.fn(),
+    });
+    cancelFirst();
+    scheduleLoadoutQuoteBatch({
+      items: latestItems,
+      request,
+      onSuccess,
+      onError: vi.fn(),
+    });
+
+    await vi.advanceTimersByTimeAsync(299);
+    expect(request).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(1);
+
+    expect(request).toHaveBeenCalledTimes(1);
+    expect(request).toHaveBeenCalledWith(latestItems);
+  });
+
+  it("ignores a stale response after the scheduled batch is cancelled", async () => {
+    vi.useFakeTimers();
+    let resolveRequest!: (quotes: []) => void;
+    const request = vi.fn(
+      () =>
+        new Promise<[]>((resolve) => {
+          resolveRequest = resolve;
+        }),
+    );
+    const onSuccess = vi.fn();
+    const cancel = scheduleLoadoutQuoteBatch({
+      items: [{ id: "weapon", itemCode: "rifle", skills: { attack: 1 } }],
+      request,
+      onSuccess,
+      onError: vi.fn(),
+    });
+
+    await vi.advanceTimersByTimeAsync(300);
+    expect(request).toHaveBeenCalledTimes(1);
+    cancel();
+    resolveRequest([]);
+    await Promise.resolve();
+
+    expect(onSuccess).not.toHaveBeenCalled();
   });
 });
 
