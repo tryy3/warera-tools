@@ -34,6 +34,9 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
     return res.json() as Promise<T>;
   } catch (err) {
     if (err instanceof ApiError) throw err;
+    if ((err instanceof DOMException || err instanceof Error) && err.name === "AbortError") {
+      throw err;
+    }
     const durationMs = Math.round(performance.now() - started);
     webLogger.error({ path, durationMs }, "api request", err);
     throw err;

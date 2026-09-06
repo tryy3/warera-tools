@@ -17,6 +17,38 @@ export type OverviewResponse = {
   items: OverviewItem[];
 };
 
+export type CraftStatBlock = {
+  minExcl: number | null;
+  medianExcl: number | null;
+  maxExcl: number | null;
+  minAdvantage: number | null;
+  medianAdvantage: number | null;
+  maxAdvantage: number | null;
+  trades: number;
+};
+
+export type CraftSpecificRow = CraftStatBlock & { itemCode: string };
+
+export type CraftCompareResponse = {
+  windowMs: number;
+  scrapedAt: string | null;
+  steelFetchedAt: string | null;
+  tier: GearTierId;
+  scrapQty: number;
+  steelRandom: number;
+  steelSpecific: number;
+  scrapPrice: number | null;
+  steelPrice: number | null;
+  scrapValue: number | null;
+  steelCostRandom: number | null;
+  steelCostSpecific: number | null;
+  taxRate: number;
+  itemCount: number;
+  pricedItemCount: number;
+  random: CraftStatBlock;
+  specific: CraftSpecificRow[];
+};
+
 export type RecommendListingDto = {
   scrapFloor: number;
   breakEvenIncl: number;

@@ -30,6 +30,7 @@ External wiki (mechanics detail):
 | Income tax / occupation | Live country/region (changes with war/laws) |
 | Market prices / Profit/PP | Hourly `price-poll` → `price_snapshots` (from `itemTrading.getPrices`); order book aggregates stored for later |
 | Gear calc in this app | `src/calculator/` ↔ [gear-economy.md](gear-economy.md) |
+| Craft vs scrap compare | `src/equipment/craft.ts` ↔ [gear-economy.md](gear-economy.md) |
 | Company advisor | `src/economy/` + `company.*` (incl. recommended regions) |
 
 Mark gaps as **unconfirmed**. Do not invent missing multipliers.

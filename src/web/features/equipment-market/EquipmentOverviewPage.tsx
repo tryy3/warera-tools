@@ -10,6 +10,7 @@ import { api } from "../../api";
 import { GoldIcon } from "../../components/GoldIcon";
 import { loadEquipmentCountryId, saveEquipmentCountryId } from "../../lib/equipmentPrefs";
 import { CountrySelect } from "../calculator/CountrySelect";
+import { CraftVsScrapPanel } from "./CraftVsScrapPanel";
 import { EquipmentItemCard } from "./EquipmentItemCard";
 import type { CountriesResponse, Country, OverviewItem, OverviewResponse } from "./types";
 
@@ -268,6 +269,8 @@ export function EquipmentOverviewPage() {
       {!loading && !hasItems && !error ? (
         <p className="text-muted-foreground">No equipment trades in the current window.</p>
       ) : null}
+
+      {countryId ? <CraftVsScrapPanel countryId={countryId} disabled={loading} /> : null}
 
       {!loading && hasItems
         ? grouped.map(({ tier, items: tierItems }) => {
