@@ -69,4 +69,18 @@ describe("api logging", () => {
       "api request",
     );
   });
+
+  it("rethrows AbortError without error logging", async () => {
+    const error = vi.spyOn(webLogger, "error");
+    const abortErr = new DOMException("The operation was aborted.", "AbortError");
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => {
+        throw abortErr;
+      }),
+    );
+
+    await expect(api("/api/equipment/craft-compare")).rejects.toBe(abortErr);
+    expect(error).not.toHaveBeenCalled();
+  });
 });

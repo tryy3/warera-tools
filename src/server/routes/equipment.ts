@@ -1,6 +1,6 @@
 import { eq } from "drizzle-orm";
 import { Hono } from "hono";
-import type { GearTierId } from "../../calculator";
+import { GEAR_TIERS, type GearTierId } from "../../calculator";
 import type { Db } from "../../db/client";
 import { listItemMarketTxSince } from "../../db/item-market-tx-read";
 import { getLatestItemMarketPrice } from "../../db/prices";
@@ -14,7 +14,7 @@ import type { Logger } from "../../logging/logger";
 import type { WareraRequester } from "../../warera/prices";
 import { HttpError } from "../errors";
 
-const GEAR_TIERS = new Set(["gray", "green", "blue", "purple", "yellow", "red"]);
+const GEAR_TIER_IDS = new Set(GEAR_TIERS.map((t) => t.id));
 
 export type EquipmentRouteDeps = {
   db: Db;
@@ -60,7 +60,7 @@ export function equipmentRoutes(deps: EquipmentRouteDeps) {
   app.get("/craft-compare", async (c) => {
     const tierRaw = c.req.query("tier")?.trim() ?? "";
     const countryId = c.req.query("countryId")?.trim() ?? "";
-    if (!GEAR_TIERS.has(tierRaw)) {
+    if (!GEAR_TIER_IDS.has(tierRaw)) {
       throw new HttpError(400, "bad_request", "tier must be a gear tier id");
     }
     if (!countryId) {
