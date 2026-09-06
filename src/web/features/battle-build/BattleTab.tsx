@@ -1,5 +1,8 @@
+import { useEffect, useRef, useState } from "react";
+import { emptyLoadout, type Loadout } from "@/battle-build/slots";
 import type { useBattleBuildImportQuery } from "../../query/useBattleBuildImportQuery";
 import type { UserResponse } from "../skills/types";
+import { LoadoutRow } from "./LoadoutRow";
 
 type BattleTabProps = {
   user: UserResponse | null;
@@ -8,9 +11,28 @@ type BattleTabProps = {
   userError: string | null;
 };
 
-const LOADOUT_SLOTS = ["Weapon", "Helmet", "Chest", "Legs", "Boots", "Ammo", "Food"];
+const EMPTY_LOADOUT = emptyLoadout();
 
 export function BattleTab({ user, userId, importQuery, userError }: BattleTabProps) {
+  const [loadoutState, setLoadoutState] = useState<{
+    userId: string | null;
+    value: Loadout;
+  }>(() => ({ userId: null, value: EMPTY_LOADOUT }));
+  const appliedImportKeyRef = useRef<string | null>(null);
+  const loadout = loadoutState.userId === userId ? loadoutState.value : EMPTY_LOADOUT;
+
+  useEffect(() => {
+    if (!userId) {
+      appliedImportKeyRef.current = null;
+      return;
+    }
+    if (!importQuery.data) return;
+    const key = `${userId}:${importQuery.dataUpdatedAt}`;
+    if (appliedImportKeyRef.current === key) return;
+    appliedImportKeyRef.current = key;
+    setLoadoutState({ userId, value: importQuery.data.slots });
+  }, [importQuery.data, importQuery.dataUpdatedAt, userId]);
+
   return (
     <div className="space-y-5" aria-busy={importQuery.isFetching}>
       <header className="rounded-2xl border border-border bg-card px-5 py-5">
@@ -35,34 +57,17 @@ export function BattleTab({ user, userId, importQuery, userError }: BattleTabPro
         <p className="text-destructive">Current equipment could not be imported.</p>
       ) : null}
 
+      {importQuery.data?.error ? (
+        <p className="text-sm text-destructive">{importQuery.data.error}</p>
+      ) : null}
+
       {userId ? (
         <>
-          <section className="rounded-xl border border-border bg-card p-4">
-            <div className="mb-4 flex items-end justify-between gap-4">
-              <div>
-                <p className="text-xs tracking-[0.14em] text-muted-foreground uppercase">
-                  Current loadout
-                </p>
-                <h2 className="text-lg font-semibold">Equipment and supplies</h2>
-              </div>
-              <span className="text-sm text-muted-foreground">
-                {importQuery.isFetching ? "Importing…" : "Price total pending"}
-              </span>
-            </div>
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              {LOADOUT_SLOTS.map((slot) => (
-                <div
-                  key={slot}
-                  className="min-h-28 rounded-lg border border-dashed border-border bg-background/40 p-3"
-                >
-                  <p className="text-xs tracking-[0.12em] text-muted-foreground uppercase">
-                    {slot}
-                  </p>
-                  <p className="mt-5 text-sm text-muted-foreground">Slot controls coming next</p>
-                </div>
-              ))}
-            </div>
-          </section>
+          <LoadoutRow
+            loadout={loadout}
+            importing={importQuery.isFetching && !importQuery.data}
+            onChange={(value) => setLoadoutState({ userId, value })}
+          />
 
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(300px,380px)_1fr]">
             <section className="min-h-64 rounded-xl border border-border bg-card p-4">
