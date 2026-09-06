@@ -8,6 +8,7 @@ import { httpAccess } from "../logging/httpAccess";
 import type { Logger } from "../logging/logger";
 import { errorPayload, HttpError } from "./errors";
 import { authPlaceholder } from "./middleware/auth-placeholder";
+import { battleBuildRoutes } from "./routes/battle-build";
 import { countriesRoutes } from "./routes/countries";
 import { economyRoutes } from "./routes/economy";
 import { equipmentRoutes } from "./routes/equipment";
@@ -57,6 +58,10 @@ export function createApp(deps: CreateAppDeps): Hono {
   app.route(
     "/api/equipment",
     equipmentRoutes({ db: deps.db, warera: deps.warera, logger: deps.logger }),
+  );
+  app.route(
+    "/api/battle-build",
+    battleBuildRoutes({ db: deps.db, warera: deps.warera, logger: deps.logger }),
   );
   app.route(
     "/api/economy",
