@@ -82,28 +82,33 @@ export function SkillsPage() {
       </div>
 
       <div
-        id={`${activeTab}-skills-panel`}
+        id="economy-skills-panel"
         role="tabpanel"
-        aria-labelledby={`${activeTab}-skills-tab`}
+        aria-labelledby="economy-skills-tab"
+        hidden={activeTab !== "economy"}
       >
-        {activeTab === "battle" ? (
-          <BattleTab
-            user={userQuery.data ?? null}
-            userId={userId}
-            userApplyKey={userQuery.dataUpdatedAt}
-            importQuery={importQuery}
-            userError={queryError}
-          />
-        ) : (
-          <EconomyTab
-            key={`${userId ?? "none"}:${userQuery.dataUpdatedAt}`}
-            userData={userQuery.data ?? null}
-            userId={userId}
-            username={player?.username ?? null}
-            isFetching={userQuery.isFetching}
-            queryError={queryError}
-          />
-        )}
+        <EconomyTab
+          key={userId ?? "none"}
+          userData={userQuery.data ?? null}
+          userId={userId}
+          username={player?.username ?? null}
+          isFetching={userQuery.isFetching}
+          queryError={queryError}
+        />
+      </div>
+      <div
+        id="battle-skills-panel"
+        role="tabpanel"
+        aria-labelledby="battle-skills-tab"
+        hidden={activeTab !== "battle"}
+      >
+        <BattleTab
+          user={userQuery.data ?? null}
+          userId={userId}
+          userApplyKey={userQuery.dataUpdatedAt}
+          importQuery={importQuery}
+          userError={queryError}
+        />
       </div>
     </div>
   );

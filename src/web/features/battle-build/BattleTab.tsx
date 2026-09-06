@@ -99,7 +99,7 @@ export function BattleTab({ user, userId, userApplyKey, importQuery, userError }
         <p className="mb-1 text-xs font-medium tracking-[0.14em] text-primary uppercase">
           Battle objective
         </p>
-        <h1 className="mb-1 text-2xl font-semibold tracking-tight">Battle — loading…</h1>
+        <h1 className="mb-1 text-2xl font-semibold tracking-tight">Battle build</h1>
         <p className="m-0 max-w-xl text-sm text-muted-foreground">
           Build a loadout, tune fight skills, and compare tax-included market prices.
         </p>

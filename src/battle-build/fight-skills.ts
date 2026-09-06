@@ -23,6 +23,16 @@ export const FIGHT_SKILL_IDS: FightSkillId[] = [
   "hunger",
 ];
 
+const FIGHT_SKILL_ID_SET = new Set<string>(FIGHT_SKILL_IDS);
+
+const FIGHT_SKILL_ALIASES: Record<string, FightSkillId> = {
+  critChance: "criticalChance",
+  criticalDamage: "criticalDamages",
+  critDamages: "criticalDamages",
+  critDamage: "criticalDamages",
+  loot: "lootChance",
+};
+
 export const FIGHT_SKILL_LABELS: Record<FightSkillId, string> = {
   attack: "Attack",
   precision: "Precision",
@@ -55,8 +65,11 @@ export function emptyFightLevels(): FightLevels {
 
 export function fightLevelsFromUserSkills(skills: Record<string, { level: number }>): FightLevels {
   const out = emptyFightLevels();
-  for (const id of FIGHT_SKILL_IDS) {
-    const level = skills[id]?.level;
+  for (const [key, skill] of Object.entries(skills)) {
+    const id = FIGHT_SKILL_ID_SET.has(key) ? (key as FightSkillId) : FIGHT_SKILL_ALIASES[key];
+    if (!id || (id !== key && Object.hasOwn(skills, id))) continue;
+
+    const level = skill.level;
     if (typeof level === "number" && Number.isFinite(level)) {
       out[id] = Math.max(0, Math.floor(level));
     }
