@@ -1,4 +1,4 @@
-import { and, eq, gte } from "drizzle-orm";
+import { and, eq, gte, inArray } from "drizzle-orm";
 import type { Db } from "./client";
 import { itemMarketTransactions } from "./schema";
 
@@ -31,6 +31,28 @@ export async function listItemMarketTxSince(
     })
     .from(itemMarketTransactions)
     .where(cond);
+  return rows.map((r) => ({
+    ...r,
+    skills: r.skills ?? null,
+  }));
+}
+
+export async function listItemMarketTxForItemCodes(
+  db: Db,
+  itemCodes: string[],
+): Promise<ItemMarketTxRow[]> {
+  if (itemCodes.length === 0) return [];
+  const unique = [...new Set(itemCodes)];
+  const rows = await db
+    .select({
+      id: itemMarketTransactions.id,
+      money: itemMarketTransactions.money,
+      itemCode: itemMarketTransactions.itemCode,
+      skills: itemMarketTransactions.skills,
+      createdAt: itemMarketTransactions.createdAt,
+    })
+    .from(itemMarketTransactions)
+    .where(inArray(itemMarketTransactions.itemCode, unique));
   return rows.map((r) => ({
     ...r,
     skills: r.skills ?? null,
