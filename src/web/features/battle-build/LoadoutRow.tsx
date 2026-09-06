@@ -7,16 +7,17 @@ import {
 import { formatDisplayNumber } from "@/lib/formatDisplayNumber";
 import { GoldIcon } from "../../components/GoldIcon";
 import { SlotCard } from "./SlotCard";
-import { sumLoadoutQuotes, useLoadoutQuotes } from "./useLoadoutQuotes";
+import { sumLoadoutQuotes, type useLoadoutQuotes } from "./useLoadoutQuotes";
 
 type LoadoutRowProps = {
   loadout: Loadout;
   importing: boolean;
+  quoteState: ReturnType<typeof useLoadoutQuotes>;
   onChange: (loadout: Loadout) => void;
 };
 
-export function LoadoutRow({ loadout, importing, onChange }: LoadoutRowProps) {
-  const { quoteBySlot, quotes, pending, error } = useLoadoutQuotes(loadout);
+export function LoadoutRow({ loadout, importing, quoteState, onChange }: LoadoutRowProps) {
+  const { quoteBySlot, quotes, pending, error } = quoteState;
   const { total, quotedCount } = sumLoadoutQuotes(quotes);
 
   function changeSlot(slot: LoadoutSlotId, item: LoadoutItem | null) {

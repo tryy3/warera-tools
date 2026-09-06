@@ -1,4 +1,4 @@
-import { totalSpToReachLevel } from "../skills/sp";
+import { totalSpForLevels, totalSpToReachLevel } from "../skills/sp";
 
 export type FightSkillId =
   | "attack"
@@ -53,9 +53,7 @@ export function emptyFightLevels(): FightLevels {
   };
 }
 
-export function fightLevelsFromUserSkills(
-  skills: Record<string, { level: number }>,
-): FightLevels {
+export function fightLevelsFromUserSkills(skills: Record<string, { level: number }>): FightLevels {
   const out = emptyFightLevels();
   for (const id of FIGHT_SKILL_IDS) {
     const level = skills[id]?.level;
@@ -74,4 +72,15 @@ export function spentNonFightSp(skills: Record<string, { level: number }>): numb
     sum += totalSpToReachLevel(skill.level);
   }
   return sum;
+}
+
+export function updateFightLevel(
+  levels: FightLevels,
+  skill: FightSkillId,
+  nextLevel: number,
+  fightPool: number,
+): FightLevels {
+  const clamped = Math.max(0, Math.min(MAX_FIGHT_SKILL_LEVEL, Math.round(nextLevel)));
+  const next = { ...levels, [skill]: clamped };
+  return totalSpForLevels(next) <= fightPool ? next : levels;
 }

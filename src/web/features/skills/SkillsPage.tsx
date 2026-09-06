@@ -90,6 +90,7 @@ export function SkillsPage() {
           <BattleTab
             user={userQuery.data ?? null}
             userId={userId}
+            userApplyKey={userQuery.dataUpdatedAt}
             importQuery={importQuery}
             userError={queryError}
           />
