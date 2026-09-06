@@ -117,6 +117,26 @@ async function seedCountry(
   });
 }
 
+async function seedSteel(db: Db, marketPrice: number, recordedAt = new Date()): Promise<void> {
+  const pollId = await insertPricePoll(db, {
+    recordedAt,
+    status: "success",
+    itemCount: 1,
+  });
+  await insertPriceSnapshots(db, pollId, [
+    {
+      itemCode: "steel",
+      marketPrice,
+      buyMin: null,
+      buyMax: null,
+      buyAvg: null,
+      sellMin: null,
+      sellMax: null,
+      sellAvg: null,
+    },
+  ]);
+}
+
 async function seedScrap(db: Db, marketPrice: number, recordedAt = new Date()): Promise<void> {
   const pollId = await insertPricePoll(db, {
     recordedAt,
@@ -398,5 +418,78 @@ describe("GET /:itemCode", () => {
     const body = (await res.json()) as { error: { code: string; message: string } };
     expect(body.error.code).toBe("bad_request");
     expect(body.error.message).toContain("skills");
+  });
+});
+
+describe("GET /craft-compare", () => {
+  let db: Db;
+
+  beforeEach(async () => {
+    db = await createMemoryDb();
+  });
+
+  it("returns craft compare for a tier", async () => {
+    await seedCountry(db, { id: "sweden", name: "Sweden", taxRate: 0.01 });
+    await seedScrap(db, 0.2);
+    await seedSteel(db, 1.5);
+    await insertItemMarketTransactionsIgnoreConflicts(db, [
+      makeTx({
+        id: "j1",
+        itemCode: "jet",
+        money: 500,
+        createdAt: new Date(),
+      }),
+    ]);
+
+    const res = await appFor(db).request(
+      "http://localhost/craft-compare?tier=red&countryId=sweden",
+    );
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.tier).toBe("red");
+    expect(body.windowMs).toBe(MARKET_WINDOW_MS);
+    expect(body.scrapQty).toBe(1460);
+    expect(body.steelRandom).toBe(32);
+    expect(body.steelSpecific).toBe(64);
+    expect(body.taxRate).toBe(0.01);
+    expect(body.specific.some((r: { itemCode: string }) => r.itemCode === "jet")).toBe(
+      true,
+    );
+    expect(body.random).toBeTruthy();
+  });
+
+  it("returns 400 when tier is missing or unknown", async () => {
+    await seedCountry(db, { id: "sweden", name: "Sweden", taxRate: 0.01 });
+    const missing = await appFor(db).request(
+      "http://localhost/craft-compare?countryId=sweden",
+    );
+    expect(missing.status).toBe(400);
+    const bad = await appFor(db).request(
+      "http://localhost/craft-compare?tier=orange&countryId=sweden",
+    );
+    expect(bad.status).toBe(400);
+  });
+
+  it("returns 400 when countryId is missing or unknown", async () => {
+    const missing = await appFor(db).request("http://localhost/craft-compare?tier=red");
+    expect(missing.status).toBe(400);
+    const unknown = await appFor(db).request(
+      "http://localhost/craft-compare?tier=red&countryId=nope",
+    );
+    expect(unknown.status).toBe(400);
+  });
+
+  it("returns null cost fields when scrap or steel price missing", async () => {
+    await seedCountry(db, { id: "sweden", name: "Sweden", taxRate: 0.01 });
+    await seedScrap(db, 0.2);
+    // no steel
+    const res = await appFor(db).request(
+      "http://localhost/craft-compare?tier=red&countryId=sweden",
+    );
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.steelPrice).toBeNull();
+    expect(body.steelCostRandom).toBeNull();
+    expect(body.random.medianAdvantage).toBeNull();
   });
 });
