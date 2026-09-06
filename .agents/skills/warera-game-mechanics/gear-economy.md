@@ -21,6 +21,21 @@ Yield depends on **tier only** (not helmet/weapon/etc.):
 
 Pattern: each tier is **×3** the previous scrap amount (6 → 18 → 54 → …).
 
+## Craft costs (factory craft)
+
+Craft **consumes** scraps + steel. Scrap qty is close to but not always identical to dismantle yield (mythic craft 1460 vs dismantle 1458). Random craft uses **half** the steel of a specific item; scrap qty is the same.
+
+| Tier | Scrap | Steel (random / specific) |
+| --- | --- | --- |
+| Mythic (red) | 1460 | 32 / 64 |
+| Legendary (yellow) | 486 | 16 / 32 |
+| Epic (purple) | 162 | 8 / 16 |
+| Rare (blue) | 54 | 4 / 8 |
+| Uncommon (green) | 18 | 2 / 4 |
+| Common (gray) | 6 | 1 / 2 |
+
+App: `src/equipment/craft.ts` (`CRAFT_COSTS`, craft-vs-scrap compare).
+
 ## What is taxed
 
 | Value | Taxed? | Notes |
