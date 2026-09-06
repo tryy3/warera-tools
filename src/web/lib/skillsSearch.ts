@@ -37,7 +37,10 @@ export function buildSkillsSearch(input: {
   username: string | null;
   tab?: SkillsTab | null;
 }): SkillsSearch {
-  if (!input.userId) return {};
+  if (!input.userId) {
+    if (input.tab === "battle") return { tab: "battle" };
+    return {};
+  }
   const out: SkillsSearch = { userId: input.userId };
   if (input.username) out.username = input.username;
   if (input.tab === "battle") out.tab = "battle";
