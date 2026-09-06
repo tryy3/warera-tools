@@ -1,6 +1,5 @@
 import { getRouteApi, Link } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
-import { Button } from "@/components/ui/button";
 import { equipmentTierShortLabel, formatEquipmentItem } from "@/equipment/catalog";
 import type { SkillBand } from "@/equipment/skills";
 import { formatDisplayNumber } from "@/lib/formatDisplayNumber";
@@ -12,7 +11,9 @@ import { loadStats, saveStoredEquipmentStats } from "../../lib/equipmentStats";
 import { CountrySelect } from "../calculator/CountrySelect";
 import { EquipmentLadderChart } from "./EquipmentLadderChart";
 import { EquipmentTrendChart } from "./EquipmentTrendChart";
+import { EQUIPMENT_GOLD_DIGITS, GoldInclExclBox } from "./GoldInclExclBox";
 import { SkillBandControls } from "./SkillBandControls";
+import { exclFromIncl } from "./taxExcl";
 import type { CountriesResponse, Country, DetailResponse } from "./types";
 
 const equipmentDetailRoute = getRouteApi("/equipment_/$itemCode");
@@ -30,7 +31,7 @@ function GoldAmount({ value }: { value: number | null | undefined }) {
   return (
     <span className="inline-flex items-center gap-1 font-mono">
       <GoldIcon />
-      {formatDisplayNumber(value)}
+      {formatDisplayNumber(value, EQUIPMENT_GOLD_DIGITS)}
     </span>
   );
 }
@@ -61,12 +62,12 @@ function marketVsRecommend(
   const vsBreakEven = marketMedian - recommend.breakEvenIncl;
   if (Math.abs(vsAttractive) < 1e-9) return "Market equals attractive list";
   if (vsAttractive > 0) {
-    return `Market ${formatDisplayNumber(vsAttractive)} above attractive`;
+    return `Market ${formatDisplayNumber(vsAttractive, EQUIPMENT_GOLD_DIGITS)} above attractive`;
   }
   if (vsBreakEven >= 0) {
-    return `Market ${formatDisplayNumber(-vsAttractive)} below attractive (above break-even)`;
+    return `Market ${formatDisplayNumber(-vsAttractive, EQUIPMENT_GOLD_DIGITS)} below attractive (above break-even)`;
   }
-  return `Market ${formatDisplayNumber(-vsBreakEven)} below break-even`;
+  return `Market ${formatDisplayNumber(-vsBreakEven, EQUIPMENT_GOLD_DIGITS)} below break-even`;
 }
 
 export function EquipmentDetailPage() {
@@ -76,7 +77,6 @@ export function EquipmentDetailPage() {
   const [bands, setBands] = useState<SkillBand[]>([]);
   const [countries, setCountries] = useState<Country[]>([]);
   const [countryId, setCountryId] = useState("");
-  const [showSellerNet, setShowSellerNet] = useState(true);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -251,18 +251,7 @@ export function EquipmentDetailPage() {
           </section>
 
           <section className="mt-5">
-            <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-              <h2 className="m-0 text-[1.05rem] font-semibold">Price triad</h2>
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                onClick={() => setShowSellerNet((v) => !v)}
-                disabled={taxMissing}
-              >
-                {showSellerNet ? "Hide seller excl" : "Show seller excl"}
-              </Button>
-            </div>
+            <h2 className="mt-0 mb-2 text-[1.05rem] font-semibold">Price triad</h2>
 
             {taxMissing ? (
               <p className="mb-2 text-sm text-amber-200/90">
@@ -276,34 +265,21 @@ export function EquipmentDetailPage() {
               </p>
             ) : null}
 
-            <dl className="grid gap-3 sm:grid-cols-3">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <GoldInclExclBox
+                label="Market"
+                incl={detail?.marketMedian}
+                excl={detail?.sellerNet}
+              />
               <div className="rounded-md border border-border/60 bg-background/40 px-3 py-2">
-                <dt className="m-0 text-[0.75em] tracking-wide text-muted-foreground uppercase">
-                  Market incl
-                </dt>
-                <dd className="mt-1 mb-0">
-                  <GoldAmount value={detail?.marketMedian} />
-                </dd>
-              </div>
-              {showSellerNet && !taxMissing ? (
-                <div className="rounded-md border border-border/60 bg-background/40 px-3 py-2">
-                  <dt className="m-0 text-[0.75em] tracking-wide text-muted-foreground uppercase">
-                    Seller excl
-                  </dt>
-                  <dd className="mt-1 mb-0">
-                    <GoldAmount value={detail?.sellerNet} />
-                  </dd>
-                </div>
-              ) : null}
-              <div className="rounded-md border border-border/60 bg-background/40 px-3 py-2">
-                <dt className="m-0 text-[0.75em] tracking-wide text-muted-foreground uppercase">
+                <div className="m-0 text-[0.75em] tracking-wide text-muted-foreground uppercase">
                   Scrap price
-                </dt>
-                <dd className="mt-1 mb-0">
+                </div>
+                <div className="mt-1">
                   <GoldAmount value={detail?.scrapFloor} />
-                </dd>
+                </div>
               </div>
-            </dl>
+            </div>
           </section>
 
           <section className="mt-5">
@@ -317,40 +293,26 @@ export function EquipmentDetailPage() {
                 Recommend unavailable (need tier + scrap price).
               </p>
             ) : (
-              <dl className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                <div className="rounded-md border border-border/60 bg-background/40 px-3 py-2">
-                  <dt className="m-0 text-[0.75em] tracking-wide text-muted-foreground uppercase">
-                    Break-even incl
-                  </dt>
-                  <dd className="mt-1 mb-0">
-                    <GoldAmount value={detail.recommend.breakEvenIncl} />
-                  </dd>
-                </div>
-                <div className="rounded-md border border-border/60 bg-background/40 px-3 py-2">
-                  <dt className="m-0 text-[0.75em] tracking-wide text-muted-foreground uppercase">
-                    Attractive (+5%)
-                  </dt>
-                  <dd className="mt-1 mb-0">
-                    <GoldAmount value={detail.recommend.attractiveIncl} />
-                  </dd>
-                </div>
-                <div className="rounded-md border border-border/60 bg-background/40 px-3 py-2">
-                  <dt className="m-0 text-[0.75em] tracking-wide text-muted-foreground uppercase">
-                    Market incl
-                  </dt>
-                  <dd className="mt-1 mb-0">
-                    <GoldAmount value={detail.marketMedian} />
-                  </dd>
-                </div>
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                <GoldInclExclBox
+                  label="Break-even"
+                  incl={detail.recommend.breakEvenIncl}
+                  excl={exclFromIncl(detail.recommend.breakEvenIncl, taxRate)}
+                />
+                <GoldInclExclBox
+                  label="Attractive (+5%)"
+                  incl={detail.recommend.attractiveIncl}
+                  excl={exclFromIncl(detail.recommend.attractiveIncl, taxRate)}
+                />
                 <div className="rounded-md border border-border/60 bg-background/40 px-3 py-2 sm:col-span-2 lg:col-span-1">
-                  <dt className="m-0 text-[0.75em] tracking-wide text-muted-foreground uppercase">
+                  <div className="m-0 text-[0.75em] tracking-wide text-muted-foreground uppercase">
                     Vs market
-                  </dt>
-                  <dd className="mt-1 mb-0 text-sm">
+                  </div>
+                  <div className="mt-1 text-sm">
                     {vsMarket ?? <span className="text-muted-foreground">—</span>}
-                  </dd>
+                  </div>
                 </div>
-              </dl>
+              </div>
             )}
           </section>
 
