@@ -47,7 +47,7 @@ Custom vs OpenAPI: https://github.com/WarEraProjects/TRPC/tree/main/src/CustomEn
 | gameStat.getWorldDevelopment | explorer | unknown | no |
 | giveaway.getManyPaginated | explorer | unknown | no |
 | government.getByCountryId | openapi | unknown | no |
-| inventory.fetchCurrentEquipment | openapi | unknown | no |
+| inventory.fetchCurrentEquipment | openapi | unknown | yes |
 | itemOffer.getById | openapi | unknown | no |
 | itemTrading.getPrices | openapi | unknown | yes |
 | mercenaryContractAuction.getPaginatedAuctions | openapi | unknown | no |

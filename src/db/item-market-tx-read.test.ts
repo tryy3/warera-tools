@@ -7,7 +7,10 @@ import { beforeEach, describe, expect, it } from "vite-plus/test";
 import type { ItemMarketTransaction } from "../warera/transactions";
 import type { Db } from "./client";
 import { insertItemMarketTransactionsIgnoreConflicts } from "./item-market-transactions";
-import { listItemMarketTxSince } from "./item-market-tx-read";
+import {
+  listItemMarketTxForItemCodes,
+  listItemMarketTxSince,
+} from "./item-market-tx-read";
 import * as schema from "./schema";
 
 async function createDb(): Promise<Db> {
@@ -91,5 +94,33 @@ describe("listItemMarketTxSince", () => {
     expect(all.map((r) => r.id).sort()).toEqual(["b", "c"]);
     const chest = await listItemMarketTxSince(db, since, "chest4");
     expect(chest.map((r) => r.id)).toEqual(["b"]);
+  });
+});
+
+describe("listItemMarketTxForItemCodes", () => {
+  let db: Db;
+
+  beforeEach(async () => {
+    db = await createDb();
+  });
+
+  it("returns empty array for empty itemCodes", async () => {
+    await insertItemMarketTransactionsIgnoreConflicts(db, [
+      makeTx({ id: "a", itemCode: "chest4" }),
+    ]);
+    expect(await listItemMarketTxForItemCodes(db, [])).toEqual([]);
+  });
+
+  it("returns txs only for requested item codes", async () => {
+    await insertItemMarketTransactionsIgnoreConflicts(db, [
+      makeTx({ id: "a", itemCode: "chest4", money: 40 }),
+      makeTx({ id: "b", itemCode: "helmet4", money: 30 }),
+      makeTx({ id: "c", itemCode: "boots4", money: 20 }),
+    ]);
+    const rows = await listItemMarketTxForItemCodes(db, ["chest4", "helmet4"]);
+    expect(rows.map((r) => r.id).sort()).toEqual(["a", "b"]);
+    expect(rows.every((r) => r.itemCode === "chest4" || r.itemCode === "helmet4")).toBe(
+      true,
+    );
   });
 });

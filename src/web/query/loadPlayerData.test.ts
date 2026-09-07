@@ -67,9 +67,12 @@ describe("loadPlayerData", () => {
     expect(companiesCall.queryKey).toEqual(queryKeys.companies("u1"));
     expect(fetchAdvisorMock).toHaveBeenCalledWith("u1", false);
 
-    expect(invalidateQueries).toHaveBeenCalledTimes(1);
+    expect(invalidateQueries).toHaveBeenCalledTimes(2);
     expect(invalidateQueries).toHaveBeenCalledWith({
       queryKey: queryKeys.growthBootstrap("u1"),
+    });
+    expect(invalidateQueries).toHaveBeenCalledWith({
+      queryKey: queryKeys.battleBuildImport("u1"),
     });
   });
 });

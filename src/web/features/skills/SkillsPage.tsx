@@ -1,42 +1,20 @@
 import { getRouteApi } from "@tanstack/react-router";
-import { Sparkles } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
-import { calculateDailyIncome, type SkillsLevels } from "@/skills/income";
-import { optimizeEcoSkills } from "@/skills/optimize";
-import { MAX_ECO_SKILL_LEVEL, totalSpForLevels, totalSpToReachLevel } from "@/skills/sp";
-import { ECO_SKILL_IDS, type EcoSkillId } from "@/skills/values";
+import { useCallback } from "react";
+import { BattleTab } from "../battle-build/BattleTab";
 import { buildSkillsSearch } from "../../lib/skillsSearch";
 import { usePlayerSelection } from "../../player/PlayerSelectionContext";
 import { useSyncPlayerSearch } from "../../player/useSyncPlayerSearch";
+import { useBattleBuildImportQuery } from "../../query/useBattleBuildImportQuery";
 import { useUserQuery } from "../../query/useUserQuery";
-import { IncomeStack } from "./IncomeStack";
-import { SkillRail } from "./SkillRail";
-import type { UserResponse } from "./types";
+import { EconomyTab } from "./EconomyTab";
 
 const skillsRoute = getRouteApi("/skills");
-
-function ecoLevelsFromUser(data: UserResponse): SkillsLevels {
-  return {
-    energy: data.skills.energy?.level ?? 0,
-    entrepreneurship: data.skills.entrepreneurship?.level ?? 0,
-    production: data.skills.production?.level ?? 0,
-    companies: data.skills.companies?.level ?? 0,
-  };
-}
-
-function spentNonEcoSp(skills: UserResponse["skills"]): number {
-  let sum = 0;
-  for (const [id, skill] of Object.entries(skills)) {
-    if ((ECO_SKILL_IDS as string[]).includes(id)) continue;
-    sum += totalSpToReachLevel(skill.level);
-  }
-  return sum;
-}
 
 export function SkillsPage() {
   const search = skillsRoute.useSearch();
   const navigate = skillsRoute.useNavigate();
   const { player } = usePlayerSelection();
+  const activeTab = search.tab === "battle" ? "battle" : "economy";
 
   const syncNavigate = useCallback(
     (opts: { search: { userId?: string; username?: string }; replace: boolean }) =>
@@ -44,10 +22,11 @@ export function SkillsPage() {
         search: buildSkillsSearch({
           userId: opts.search.userId ?? null,
           username: opts.search.username ?? null,
+          tab: activeTab,
         }),
         replace: opts.replace,
       }),
-    [navigate],
+    [activeTab, navigate],
   );
 
   useSyncPlayerSearch({
@@ -56,22 +35,9 @@ export function SkillsPage() {
     navigate: syncNavigate,
   });
 
-  const userQuery = useUserQuery(player?.userId ?? null);
-
-  const [user, setUser] = useState<UserResponse | null>(null);
-  const appliedKeyRef = useRef<string | null>(null);
-
-  const [levels, setLevels] = useState<SkillsLevels>({
-    energy: 0,
-    entrepreneurship: 0,
-    production: 0,
-    companies: 0,
-  });
-  const [netWage, setNetWage] = useState(0);
-  const [selfWorkCompanyId, setSelfWorkCompanyId] = useState("");
-  /** After full eco reset, draft may use all totalSkillPoints (non-eco treated as 0). */
-  const [fullResetDraft, setFullResetDraft] = useState(false);
-
+  const userId = player?.userId ?? null;
+  const userQuery = useUserQuery(userId);
+  const importQuery = useBattleBuildImportQuery(activeTab === "battle" ? userId : null);
   const queryError =
     userQuery.error instanceof Error
       ? userQuery.error.message
@@ -79,166 +45,71 @@ export function SkillsPage() {
         ? String(userQuery.error)
         : null;
 
-  function applyUser(data: UserResponse) {
-    setUser(data);
-    setLevels(ecoLevelsFromUser(data));
-    setNetWage(data.job.netWage ?? 0);
-    setSelfWorkCompanyId("");
-    setFullResetDraft(false);
-  }
-
-  useEffect(() => {
-    const data = userQuery.data;
-    const userId = player?.userId;
-    if (!data || !userId) {
-      if (!userId) {
-        setUser(null);
-        appliedKeyRef.current = null;
-        setFullResetDraft(false);
-      } else if (!data) {
-        setUser(null);
-        appliedKeyRef.current = null;
-      }
-      return;
-    }
-    const key = `${userId}:${userQuery.dataUpdatedAt}`;
-    if (appliedKeyRef.current === key) return;
-    appliedKeyRef.current = key;
-    applyUser(data);
-  }, [userQuery.data, userQuery.dataUpdatedAt, player?.userId]);
-
-  const loading = userQuery.isFetching && !user;
-
-  const nonEcoSpend = user ? spentNonEcoSp(user.skills) : 0;
-  const totalSkillPoints = user?.leveling.totalSkillPoints ?? 0;
-  const ecoPool = fullResetDraft ? totalSkillPoints : Math.max(0, totalSkillPoints - nonEcoSpend);
-  const spentEco = totalSpForLevels(levels);
-  const availableDraft = Math.max(0, ecoPool - spentEco);
-
-  const companies = user?.companies ?? [];
-
-  const income = calculateDailyIncome({
-    levels,
-    netWage,
-    companies,
-    selfWorkCompanyId: selfWorkCompanyId || null,
-  });
-
-  const loadedIncome = user?.income ?? null;
-
-  function setEcoLevel(skill: EcoSkillId, nextLevel: number) {
-    const clamped = Math.max(0, Math.min(MAX_ECO_SKILL_LEVEL, Math.round(nextLevel)));
-    setLevels((prev) => {
-      const next = { ...prev, [skill]: clamped };
-      if (totalSpForLevels(next) > ecoPool) return prev;
-      return next;
+  function selectTab(tab: "economy" | "battle") {
+    void navigate({
+      search: buildSkillsSearch({
+        userId,
+        username: player?.username ?? null,
+        tab,
+      }),
     });
-  }
-
-  function handleReset() {
-    setLevels({
-      energy: 0,
-      entrepreneurship: 0,
-      production: 0,
-      companies: 0,
-    });
-  }
-
-  function handleRestore() {
-    if (!user) return;
-    setLevels(ecoLevelsFromUser(user));
-    setNetWage(user.job.netWage ?? 0);
-    setSelfWorkCompanyId("");
-    setFullResetDraft(false);
-  }
-
-  function handleOptimize(mode: "unspent" | "full_eco_reset") {
-    if (!user) return;
-    const currentLevels = ecoLevelsFromUser(user);
-    const result = optimizeEcoSkills({
-      mode,
-      currentLevels,
-      availableSkillPoints: user.leveling.availableSkillPoints,
-      totalSkillPoints: user.leveling.totalSkillPoints,
-      netWage,
-      companies,
-      selfWorkCompanyId: selfWorkCompanyId || null,
-    });
-    setLevels(result.levels);
-    setFullResetDraft(mode === "full_eco_reset");
   }
 
   return (
     <div className="mx-auto max-w-[1200px] space-y-5 pb-8">
-      <header className="relative overflow-hidden rounded-2xl border border-border bg-card px-5 py-5">
-        <div
-          className="pointer-events-none absolute inset-0 opacity-70"
-          style={{
-            background:
-              "radial-gradient(ellipse 50% 80% at 0% 0%, rgba(251,191,36,0.12), transparent 55%), radial-gradient(ellipse 45% 70% at 100% 0%, rgba(45,212,191,0.12), transparent 50%)",
-          }}
-          aria-hidden
+      <div className="flex border-b border-border" role="tablist" aria-label="Skills planner">
+        {(["economy", "battle"] as const).map((tab) => {
+          const active = activeTab === tab;
+          return (
+            <button
+              key={tab}
+              type="button"
+              role="tab"
+              id={`${tab}-skills-tab`}
+              aria-selected={active}
+              aria-controls={`${tab}-skills-panel`}
+              className={`-mb-px border-t-2 border-b px-5 py-3 text-xs font-semibold tracking-[0.16em] uppercase transition-colors ${
+                active
+                  ? "border-x border-t-primary border-b-card bg-card text-foreground"
+                  : "border-x border-t-transparent border-b-border text-muted-foreground hover:bg-card/60 hover:text-foreground"
+              }`}
+              onClick={() => selectTab(tab)}
+            >
+              {tab}
+            </button>
+          );
+        })}
+      </div>
+
+      <div
+        id="economy-skills-panel"
+        role="tabpanel"
+        aria-labelledby="economy-skills-tab"
+        hidden={activeTab !== "economy"}
+      >
+        <EconomyTab
+          key={userId ?? "none"}
+          userData={userQuery.data ?? null}
+          userId={userId}
+          username={player?.username ?? null}
+          isFetching={userQuery.isFetching}
+          queryError={queryError}
         />
-        <div className="relative">
-          <p className="mb-1 inline-flex items-center gap-1.5 text-xs font-medium tracking-[0.14em] text-muted-foreground uppercase">
-            <Sparkles className="size-3.5 text-amber-200" aria-hidden />
-            Economy objective
-          </p>
-          <h1 className="mb-1 text-2xl font-semibold tracking-tight">Skills optimizer</h1>
-          <p className="m-0 max-w-xl text-sm text-muted-foreground">
-            Place skill points for work, self-work, and AE daily gold. Draft levels update income
-            live; optimize buttons apply a plan (not to the game).
-          </p>
-        </div>
-      </header>
-
-      {queryError ? <p className="text-destructive">{queryError}</p> : null}
-
-      {player ? (
-        <p className="text-sm text-muted-foreground">
-          Planning for <strong className="text-foreground">{player.username}</strong>
-          {user ? <span> · character level {user.leveling.level}</span> : null}
-        </p>
-      ) : null}
-
-      {loading ? <p className="text-muted-foreground">Loading skills…</p> : null}
-
-      {!player && !loading ? (
-        <p className="rounded-xl border border-dashed border-border px-4 py-8 text-center text-muted-foreground">
-          Load a player in the header.
-        </p>
-      ) : null}
-
-      {user && !loading ? (
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(300px,380px)_1fr]">
-          <SkillRail
-            levels={levels}
-            loadedSkills={user.skills}
-            ecoPool={ecoPool}
-            availableDraft={availableDraft}
-            spentEco={spentEco}
-            totalSkillPoints={user.leveling.totalSkillPoints}
-            availableSkillPoints={user.leveling.availableSkillPoints}
-            spentSkillPoints={user.leveling.spentSkillPoints}
-            onLevelChange={setEcoLevel}
-            onReset={handleReset}
-            onRestore={handleRestore}
-            onOptimizeUnspent={() => handleOptimize("unspent")}
-            onFullOptimize={() => handleOptimize("full_eco_reset")}
-          />
-          <IncomeStack
-            income={income}
-            loadedTotal={loadedIncome?.totalGPerDay ?? income.totalGPerDay}
-            levels={levels}
-            netWage={netWage}
-            onNetWageChange={setNetWage}
-            job={user.job}
-            companies={companies}
-            selfWorkCompanyId={selfWorkCompanyId}
-            onSelfWorkCompanyChange={setSelfWorkCompanyId}
-          />
-        </div>
-      ) : null}
+      </div>
+      <div
+        id="battle-skills-panel"
+        role="tabpanel"
+        aria-labelledby="battle-skills-tab"
+        hidden={activeTab !== "battle"}
+      >
+        <BattleTab
+          user={userQuery.data ?? null}
+          userId={userId}
+          userApplyKey={userQuery.dataUpdatedAt}
+          importQuery={importQuery}
+          userError={queryError}
+        />
+      </div>
     </div>
   );
 }
