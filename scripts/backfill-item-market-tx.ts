@@ -100,10 +100,11 @@ async function main() {
         limit: args.limit,
         signal: ac.signal,
         fetchPage: (opts) =>
-          fetchItemMarketTransactionsPage(warera, {
-            ...opts,
-            transactionType: apiType,
-          }),
+          fetchItemMarketTransactionsPage(
+            warera,
+            { ...opts, transactionType: apiType },
+            { callClass: "background" },
+          ),
       });
 
       summaries.push(
@@ -112,9 +113,11 @@ async function main() {
       console.log(summaries.at(-1));
 
       if (result.stoppedReason === "aborted") {
-        console.error(
-          `Resume with: --type ${transactionType} --cursor ${JSON.stringify(result.resumeCursor)} --until ${args.until.toISOString()}`,
-        );
+        const resumeHint =
+          result.resumeCursor != null
+            ? `Resume with: --type ${transactionType} --cursor ${JSON.stringify(result.resumeCursor)} --until ${args.until.toISOString()}`
+            : `Stopped early. Restart from tip (omit --cursor) with: --type ${transactionType} --until ${args.until.toISOString()}`;
+        console.error(resumeHint);
         process.exitCode = 130;
         break;
       }

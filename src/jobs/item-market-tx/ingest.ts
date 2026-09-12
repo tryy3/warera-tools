@@ -13,7 +13,7 @@ export type WalkItemMarketTransactionsResult = {
   pages: number;
   inserted: number;
   stoppedReason: string;
-  /** Set when stopped with `page_budget` so the caller can resume. */
+  /** Set when stopped with `page_budget` or `aborted` so the caller can resume. */
   resumeCursor: string | null;
 };
 
@@ -115,7 +115,8 @@ export async function walkItemMarketTransactions(opts: {
       enableItemMarketTxPoll();
     }
 
-    logger.debug(
+    const logPage = untilMs != null ? logger.info.bind(logger) : logger.debug.bind(logger);
+    logPage(
       {
         mode,
         pages,
