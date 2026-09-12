@@ -82,16 +82,44 @@ async function fetchMyTrades(
   );
 }
 
+function formatChunkClock(iso: string): string {
+  return new Date(iso).toLocaleTimeString(undefined, {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
+}
+
+function formatChunkTimeSpan(startAt: string, endAt: string): string {
+  const start = new Date(startAt);
+  const end = new Date(endAt);
+  const startClock = formatChunkClock(startAt);
+  const endClock = formatChunkClock(endAt);
+  if (start.toDateString() === end.toDateString()) {
+    return startClock === endClock ? startClock : `${startClock}–${endClock}`;
+  }
+  const dateOpts: Intl.DateTimeFormatOptions = {
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  };
+  return `${start.toLocaleString(undefined, dateOpts)}–${end.toLocaleString(undefined, dateOpts)}`;
+}
+
 function chunksToTradeDots(chunks: MyTradesResponse["chunks"]): TradeDot[] {
   return chunks.map((chunk) => {
     const startMs = Date.parse(chunk.startAt);
     const endMs = Date.parse(chunk.endAt);
     const midMs = (startMs + endMs) / 2;
+    const sideLabel = chunk.side === "buy" ? "Buy" : "Sell";
+    const fillLabel = chunk.fillCount === 1 ? "1 fill" : `${chunk.fillCount} fills`;
     return {
       date: new Date(midMs),
       price: chunk.unitPrice,
       side: chunk.side,
-      label: `${chunk.side} ${chunk.totalQty} @ ${chunk.unitPrice}`,
+      label: `${sideLabel} ${chunk.totalQty} @ ${chunk.unitPrice} · ${fillLabel} · ${formatChunkTimeSpan(chunk.startAt, chunk.endAt)}`,
     };
   });
 }
@@ -150,6 +178,7 @@ export function MarketItemPage() {
     let cancelled = false;
     setTradesLoading(true);
     setTradesError(null);
+    setTrades(null);
 
     void fetchMyTrades(itemCode, playerId, range)
       .then((result) => {
@@ -277,16 +306,16 @@ export function MarketItemPage() {
           ) : null}
 
           <MarketPriceChart points={data.points} itemLabel={itemLabel} tradeDots={tradeDots} />
-
-          <MyTradesStrip
-            noPlayer={!playerId}
-            loading={Boolean(playerId) && tradesLoading}
-            error={playerId ? tradesError : null}
-            onRetry={() => setTradesReloadToken((token) => token + 1)}
-            data={activeTrades}
-          />
         </>
       ) : null}
+
+      <MyTradesStrip
+        noPlayer={!playerId}
+        loading={Boolean(playerId) && tradesLoading}
+        error={playerId ? tradesError : null}
+        onRetry={() => setTradesReloadToken((token) => token + 1)}
+        data={activeTrades}
+      />
     </div>
   );
 }

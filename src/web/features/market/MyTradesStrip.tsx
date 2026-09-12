@@ -24,6 +24,14 @@ function RealizedPnl({ value }: { value: number | null }) {
   );
 }
 
+function IncompleteWarning() {
+  return (
+    <p className="mt-2 mb-0 text-sm text-amber-200/90">
+      Trade history looks incomplete — earlier buys may be missing, so P/L can be wrong.
+    </p>
+  );
+}
+
 export function MyTradesStrip({
   noPlayer,
   loading,
@@ -70,10 +78,31 @@ export function MyTradesStrip({
     );
   }
 
-  if (!data || data.chunks.length === 0) {
+  if (!data) {
+    return null;
+  }
+
+  const empty = data.chunks.length === 0;
+  const showPnl =
+    !empty || data.realized.sellQty > 0 || (data.realized.pnl != null && data.realized.pnl !== 0);
+
+  if (empty) {
     return (
       <section className="mt-4 rounded-md border border-border/60 bg-background/40 px-3 py-2.5">
         <p className="m-0 text-sm text-muted-foreground">No trades in this range.</p>
+        {showPnl ? (
+          <dl className="mt-2 mb-0 grid grid-cols-2 gap-3 sm:grid-cols-3">
+            <div>
+              <dt className="m-0 text-[0.75em] tracking-wide text-muted-foreground uppercase">
+                Realized P/L
+              </dt>
+              <dd className="mt-0.5 mb-0">
+                <RealizedPnl value={data.realized.pnl} />
+              </dd>
+            </div>
+          </dl>
+        ) : null}
+        {data.historyIncomplete ? <IncompleteWarning /> : null}
       </section>
     );
   }
@@ -110,11 +139,7 @@ export function MyTradesStrip({
           <dd className="mt-0.5 mb-0 font-mono">{sellChunks}</dd>
         </div>
       </dl>
-      {data.historyIncomplete ? (
-        <p className="mt-2 mb-0 text-sm text-amber-200/90">
-          Trade history looks incomplete — earlier buys may be missing, so P/L can be wrong.
-        </p>
-      ) : null}
+      {data.historyIncomplete ? <IncompleteWarning /> : null}
     </section>
   );
 }
