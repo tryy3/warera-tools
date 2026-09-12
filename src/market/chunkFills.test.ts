@@ -69,4 +69,31 @@ describe("chunkFills", () => {
     ]);
     expect(chunks).toHaveLength(2);
   });
+
+  it("merges buys across interleaved sell when gap from prior buy <= 1h", () => {
+    const t0 = new Date("2026-09-01T10:00:00Z");
+    const tSell = new Date("2026-09-01T10:30:00Z");
+    const tBuy2 = new Date("2026-09-01T10:45:00Z");
+    const price = 0.04;
+
+    const chunks = chunkFills([
+      fill({ id: "1", side: "buy", money: 40, quantity: 1000, createdAt: t0 }),
+      fill({ id: "2", side: "sell", money: 40, quantity: 1000, createdAt: tSell }),
+      fill({ id: "3", side: "buy", money: 20, quantity: 500, createdAt: tBuy2 }),
+    ]);
+
+    expect(chunks).toHaveLength(2);
+
+    const buyChunk = chunks.find((chunk) => chunk.side === "buy");
+    const sellChunk = chunks.find((chunk) => chunk.side === "sell");
+
+    expect(buyChunk).toBeDefined();
+    expect(sellChunk).toBeDefined();
+    expect(buyChunk!.totalQty).toBe(1500);
+    expect(buyChunk!.totalMoney).toBe(60);
+    expect(buyChunk!.fillCount).toBe(2);
+    expect(buyChunk!.unitPrice).toBeCloseTo(price, 10);
+    expect(sellChunk!.totalQty).toBe(1000);
+    expect(sellChunk!.fillCount).toBe(1);
+  });
 });

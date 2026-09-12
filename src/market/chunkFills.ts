@@ -64,7 +64,7 @@ function startChunk(fill: PlayerFill, priceKey: number): OpenChunk {
   };
 }
 
-export function chunkFills(fills: PlayerFill[]): TradeChunk[] {
+function chunkSideStream(fills: PlayerFill[]): TradeChunk[] {
   if (fills.length === 0) {
     return [];
   }
@@ -83,7 +83,6 @@ export function chunkFills(fills: PlayerFill[]): TradeChunk[] {
 
     const canAppend =
       open !== null &&
-      fill.side === open.side &&
       priceKey === open.priceKey &&
       prev !== null &&
       fill.createdAt.getTime() - prev.createdAt.getTime() <= CHUNK_GAP_MS;
@@ -106,4 +105,17 @@ export function chunkFills(fills: PlayerFill[]): TradeChunk[] {
   }
 
   return chunks;
+}
+
+export function chunkFills(fills: PlayerFill[]): TradeChunk[] {
+  if (fills.length === 0) {
+    return [];
+  }
+
+  const buys = fills.filter((fill) => fill.side === "buy");
+  const sells = fills.filter((fill) => fill.side === "sell");
+
+  return [...chunkSideStream(buys), ...chunkSideStream(sells)].sort(
+    (a, b) => a.startAt.getTime() - b.startAt.getTime(),
+  );
 }
