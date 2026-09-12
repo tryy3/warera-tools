@@ -1,3 +1,5 @@
+import type { PriceHistoryRange } from "@/market/ranges";
+
 export type LatestPricesResponse = {
   pollId: number;
   recordedAt: string;
@@ -25,7 +27,7 @@ export type PriceChangeDto = { absolute: number; percent: number };
 
 export type PriceHistoryResponse = {
   itemCode: string;
-  range: "24h" | "7d" | "30d";
+  range: PriceHistoryRange;
   latest: PriceHistoryPointDto | null;
   change24h: PriceChangeDto | null;
   change7d: PriceChangeDto | null;
@@ -33,3 +35,23 @@ export type PriceHistoryResponse = {
 };
 
 export type LatestPriceItem = LatestPricesResponse["items"][number];
+
+export type MyTradesChunkDto = {
+  side: "buy" | "sell";
+  unitPrice: number;
+  totalQty: number;
+  totalMoney: number;
+  startAt: string;
+  endAt: string;
+  fillCount: number;
+};
+
+export type MyTradesResponse = {
+  itemCode: string;
+  playerId: string;
+  range: PriceHistoryRange;
+  chunks: MyTradesChunkDto[];
+  realized: { pnl: number | null; sellQty: number; buyQty: number };
+  historyIncomplete: boolean;
+  fillCount: number;
+};

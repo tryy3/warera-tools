@@ -1,14 +1,16 @@
 import { getRouteApi, Link } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { formatDisplayNumber } from "@/lib/formatDisplayNumber";
 import { PRICE_HISTORY_RANGES, type PriceHistoryRange } from "@/market/ranges";
 import { ApiError, api } from "../../api";
 import { GoldIcon } from "../../components/GoldIcon";
 import { ItemIcon } from "../../components/ItemIcon";
+import { usePlayerSelection } from "../../player/PlayerSelectionContext";
 import { formatItem } from "./formatItem";
-import { MarketPriceChart } from "./MarketPriceChart";
-import type { PriceChangeDto, PriceHistoryResponse } from "./types";
+import { MarketPriceChart, type TradeDot } from "./MarketPriceChart";
+import { MyTradesStrip } from "./MyTradesStrip";
+import type { MyTradesResponse, PriceChangeDto, PriceHistoryResponse } from "./types";
 
 const marketItemRoute = getRouteApi("/market_/$itemCode");
 
@@ -70,16 +72,47 @@ async function fetchPriceHistory(
   );
 }
 
+async function fetchMyTrades(
+  itemCode: string,
+  playerId: string,
+  range: PriceHistoryRange,
+): Promise<MyTradesResponse> {
+  return api<MyTradesResponse>(
+    `/api/market/${encodeURIComponent(itemCode)}/my-trades?playerId=${encodeURIComponent(playerId)}&range=${encodeURIComponent(range)}`,
+  );
+}
+
+function chunksToTradeDots(chunks: MyTradesResponse["chunks"]): TradeDot[] {
+  return chunks.map((chunk) => {
+    const startMs = Date.parse(chunk.startAt);
+    const endMs = Date.parse(chunk.endAt);
+    const midMs = (startMs + endMs) / 2;
+    return {
+      date: new Date(midMs),
+      price: chunk.unitPrice,
+      side: chunk.side,
+      label: `${chunk.side} ${chunk.totalQty} @ ${chunk.unitPrice}`,
+    };
+  });
+}
+
 export function MarketItemPage() {
   const { itemCode } = marketItemRoute.useParams();
   const { range } = marketItemRoute.useSearch();
   const navigate = marketItemRoute.useNavigate();
+  const { player } = usePlayerSelection();
+  const playerId = player?.userId ?? null;
 
   const [data, setData] = useState<PriceHistoryResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [reloadToken, setReloadToken] = useState(0);
+
+  const [trades, setTrades] = useState<MyTradesResponse | null>(null);
+  const [tradesLoading, setTradesLoading] = useState(false);
+  const [tradesError, setTradesError] = useState<string | null>(null);
+  const [tradesReloadToken, setTradesReloadToken] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -110,6 +143,38 @@ export function MarketItemPage() {
       cancelled = true;
     };
   }, [itemCode, range, reloadToken]);
+
+  useEffect(() => {
+    if (!playerId) return;
+
+    let cancelled = false;
+    setTradesLoading(true);
+    setTradesError(null);
+
+    void fetchMyTrades(itemCode, playerId, range)
+      .then((result) => {
+        if (cancelled) return;
+        setTrades(result);
+      })
+      .catch((err: unknown) => {
+        if (cancelled) return;
+        setTradesError(err instanceof Error ? err.message : String(err));
+        setTrades(null);
+      })
+      .finally(() => {
+        if (!cancelled) setTradesLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [itemCode, range, playerId, tradesReloadToken]);
+
+  const activeTrades = playerId ? trades : null;
+  const tradeDots = useMemo(
+    () => (activeTrades?.chunks.length ? chunksToTradeDots(activeTrades.chunks) : undefined),
+    [activeTrades],
+  );
 
   function setRange(next: PriceHistoryRange) {
     void navigate({ search: { range: next }, replace: true });
@@ -211,7 +276,15 @@ export function MarketItemPage() {
             </p>
           ) : null}
 
-          <MarketPriceChart points={data.points} itemLabel={itemLabel} />
+          <MarketPriceChart points={data.points} itemLabel={itemLabel} tradeDots={tradeDots} />
+
+          <MyTradesStrip
+            noPlayer={!playerId}
+            loading={Boolean(playerId) && tradesLoading}
+            error={playerId ? tradesError : null}
+            onRetry={() => setTradesReloadToken((token) => token + 1)}
+            data={activeTrades}
+          />
         </>
       ) : null}
     </div>
