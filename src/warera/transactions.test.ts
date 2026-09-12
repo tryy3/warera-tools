@@ -94,4 +94,23 @@ describe("fetchItemMarketTransactionsPage", () => {
     expect(decodeURIComponent(called)).toContain('"limit":100');
     expect(page.items[0].id).toBe(equipmentTx._id);
   });
+
+  it("defaults transactionType to itemMarket", async () => {
+    const request = vi.fn().mockResolvedValue({
+      result: { data: { items: [], cursor: null } },
+    });
+    await fetchItemMarketTransactionsPage({ request }, { limit: 10 });
+    expect(String(request.mock.calls[0]![0])).toContain("itemMarket");
+  });
+
+  it("passes custom transactionType", async () => {
+    const request = vi.fn().mockResolvedValue({
+      result: { data: { items: [], cursor: null } },
+    });
+    await fetchItemMarketTransactionsPage({ request }, {
+      limit: 10,
+      transactionType: "trading",
+    });
+    expect(String(request.mock.calls[0]![0])).toContain("trading");
+  });
 });

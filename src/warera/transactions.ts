@@ -149,17 +149,20 @@ export function parseItemMarketTransactionsPage(data: unknown): ItemMarketTransa
   return { items, nextCursor };
 }
 
+/** Provisional commodity market type for Task 2 ingest; verify via live API when possible. */
+export const COMMODITY_TRANSACTION_TYPE = "trading";
+
 /**
  * Official input uses `limit` (max 100), not `perPage`:
  * https://api2.warera.io/docs/#/transaction/transaction.getPaginatedTransactions
  */
 export async function fetchItemMarketTransactionsPage(
   warera: WareraRequester,
-  opts: { cursor?: string; limit?: number } = {},
+  opts: { cursor?: string; limit?: number; transactionType?: string } = {},
   init?: WareraRequestInit,
 ): Promise<ItemMarketTransactionsPage> {
   const input: Record<string, unknown> = {
-    transactionType: "itemMarket",
+    transactionType: opts.transactionType ?? "itemMarket",
     limit: opts.limit ?? 100,
   };
   if (opts.cursor) input.cursor = opts.cursor;
