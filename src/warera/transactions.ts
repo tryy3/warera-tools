@@ -73,7 +73,8 @@ function parseOne(raw: unknown): ItemMarketTransaction | null {
   const transactionType = pickString(obj, ["transactionType", "transaction_type"]);
   const createdAt = pickDate(obj, ["createdAt", "created_at"]);
   const item = asRecord(obj.item);
-  const itemId = item ? pickString(item, ["_id", "id"]) : null;
+  // Commodity/trading rows omit nested `item`; use transaction id as stable itemId.
+  const itemId = (item ? pickString(item, ["_id", "id"]) : null) ?? id;
   if (
     !id ||
     money == null ||

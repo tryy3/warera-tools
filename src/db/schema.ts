@@ -407,6 +407,8 @@ export const itemMarketTransactions = sqliteTable(
   (t) => [
     index("item_market_tx_item_code_created_at_idx").on(t.itemCode, t.createdAt),
     index("item_market_tx_created_at_idx").on(t.createdAt),
+    index("item_market_tx_buyer_item_created_at_idx").on(t.buyerId, t.itemCode, t.createdAt),
+    index("item_market_tx_seller_item_created_at_idx").on(t.sellerId, t.itemCode, t.createdAt),
   ],
 );
 

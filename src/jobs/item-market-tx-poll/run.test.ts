@@ -151,8 +151,13 @@ describe("runItemMarketTxPoll", () => {
     });
 
     const msg = await runItemMarketTxPoll(makeCtx(db, { request }));
-    expect(msg).toBe("poll: 1 inserted, 1 pages (known_id)");
-    expect(request).toHaveBeenCalledTimes(1);
+    expect(msg).toBe(
+      "poll: itemMarket: 1 inserted, 1 pages (known_id); trading: 0 inserted, 1 pages (known_id)",
+    );
+    expect(request).toHaveBeenCalledTimes(2);
+    const urls = request.mock.calls.map((c) => String(c[0]));
+    expect(urls.some((u) => u.includes("itemMarket"))).toBe(true);
+    expect(urls.some((u) => u.includes("trading"))).toBe(true);
 
     const rows = await db.select().from(schema.itemMarketTransactions);
     expect(rows).toHaveLength(2);

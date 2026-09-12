@@ -75,6 +75,38 @@ describe("parseItemMarketTransactionsPage", () => {
     const page = parseItemMarketTransactionsPage({ items: [], nextCursor: "n2" });
     expect(page.nextCursor).toBe("n2");
   });
+
+  it("parses trading rows without nested item", () => {
+    const tradingTx = {
+      _id: "trading-tx-1",
+      money: 12.5,
+      itemCode: "food",
+      quantity: 10,
+      sellerId: "seller-t",
+      buyerId: "buyer-t",
+      transactionType: "trading",
+      createdAt: "2026-09-12T10:00:00.000Z",
+    };
+    const page = parseItemMarketTransactionsPage({ items: [tradingTx], nextCursor: null });
+    expect(page.items).toHaveLength(1);
+    expect(page.items[0]).toMatchObject({
+      id: "trading-tx-1",
+      money: 12.5,
+      itemCode: "food",
+      quantity: 10,
+      sellerId: "seller-t",
+      buyerId: "buyer-t",
+      transactionType: "trading",
+      itemId: "trading-tx-1",
+      itemType: null,
+      itemState: null,
+      itemMaxState: null,
+      itemQuantity: null,
+      itemLastAcquisitionAt: null,
+      skills: null,
+    });
+    expect(page.items[0]!.createdAt.toISOString()).toBe("2026-09-12T10:00:00.000Z");
+  });
 });
 
 describe("fetchItemMarketTransactionsPage", () => {
