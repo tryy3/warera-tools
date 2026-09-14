@@ -82,16 +82,12 @@ export async function listRegionsForSync(
 ): Promise<RegionRow[]> {
   const now = opts?.now ?? new Date();
   const maxAgeMs = opts?.maxAgeMs ?? REGION_SYNC_MAX_AGE_MS;
-  const cutoff =
-    maxAgeMs === Number.POSITIVE_INFINITY ? null : new Date(now.getTime() - maxAgeMs);
+  const cutoff = maxAgeMs === Number.POSITIVE_INFINITY ? null : new Date(now.getTime() - maxAgeMs);
   const rows = await db.select().from(regions);
   return rows
     .map(mapRow)
     .filter(
-      (r) =>
-        cutoff == null ||
-        r.fetchedAt == null ||
-        r.fetchedAt.getTime() <= cutoff.getTime(),
+      (r) => cutoff == null || r.fetchedAt == null || r.fetchedAt.getTime() <= cutoff.getTime(),
     )
     .toSorted((a, b) => {
       if (a.fetchedAt == null && b.fetchedAt != null) return -1;

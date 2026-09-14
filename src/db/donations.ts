@@ -2,11 +2,7 @@ import { and, desc, eq } from "drizzle-orm";
 import type { Db } from "./client";
 import { donationPolls, donationSnapshots } from "./schema";
 
-export function donationFingerprintKey(
-  scopeType: string,
-  scopeId: string,
-  userId: string,
-): string {
+export function donationFingerprintKey(scopeType: string, scopeId: string, userId: string): string {
   return `${scopeType}:${scopeId}:${userId}`;
 }
 

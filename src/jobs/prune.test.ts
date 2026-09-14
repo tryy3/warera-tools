@@ -55,9 +55,9 @@ describe("pruneJobRuns", () => {
       { jobId: "j1", startedAt: new Date(t0.getTime() + 1000), status: "success" },
     ]);
     await pruneJobRuns(db, "j1", 50);
-    expect(await db.select().from(schema.jobRuns).where(eq(schema.jobRuns.jobId, "j1"))).toHaveLength(
-      2,
-    );
+    expect(
+      await db.select().from(schema.jobRuns).where(eq(schema.jobRuns.jobId, "j1")),
+    ).toHaveLength(2);
   });
 
   it("keeps the newest keep rows and deletes older ones", async () => {
@@ -70,15 +70,9 @@ describe("pruneJobRuns", () => {
       });
     }
     await pruneJobRuns(db, "j1", 2);
-    const remaining = await db
-      .select()
-      .from(schema.jobRuns)
-      .where(eq(schema.jobRuns.jobId, "j1"));
+    const remaining = await db.select().from(schema.jobRuns).where(eq(schema.jobRuns.jobId, "j1"));
     expect(remaining).toHaveLength(2);
-    expect(remaining.map((r) => r.startedAt.getTime()).sort()).toEqual([
-      base + 3000,
-      base + 4000,
-    ]);
+    expect(remaining.map((r) => r.startedAt.getTime()).sort()).toEqual([base + 3000, base + 4000]);
   });
 
   it("deletes all rows when keep is 0", async () => {
