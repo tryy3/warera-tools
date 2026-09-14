@@ -11,6 +11,7 @@ import type { Logger } from "../../logging/logger";
 import type { ItemMarketTransaction } from "../../warera/transactions";
 import {
   enableItemMarketTxPoll,
+  isCommodityDeepenDone,
   resetItemMarketTxHandoffForTests,
 } from "../item-market-tx/handoff";
 import type { JobContext } from "../types";
@@ -80,13 +81,17 @@ function makeTx(overrides: Partial<ItemMarketTransaction> = {}): ItemMarketTrans
   };
 }
 
-function makeCtx(db: Db, warera: JobContext["warera"]): JobContext {
+function makeCtx(
+  db: Db,
+  warera: JobContext["warera"],
+  opts: { state?: Record<string, unknown> | null; setState?: JobContext["setState"] } = {},
+): JobContext {
   return {
     db,
     logger: silentLogger,
     warera,
-    state: null,
-    setState: async () => {},
+    state: opts.state ?? null,
+    setState: opts.setState ?? (async () => {}),
   };
 }
 
@@ -140,27 +145,148 @@ describe("runItemMarketTxPoll", () => {
       id: "known",
       createdAt: new Date("2026-08-04T16:00:00.000Z"),
     });
+    const ancientTrading = makeTx({
+      id: "ancient-trading",
+      transactionType: "trading",
+      createdAt: new Date("2026-07-01T12:00:00.000Z"),
+    });
 
-    const request = vi.fn().mockResolvedValue({
+    const tipPayload = {
       result: {
         data: {
           items: [toApiItem(fresh), toApiItem(known)],
           nextCursor: "should-not-follow",
         },
       },
-    });
+    };
+    const deepenPayload = {
+      result: {
+        data: {
+          items: [toApiItem(ancientTrading)],
+          nextCursor: null,
+        },
+      },
+    };
+
+    const request = vi
+      .fn()
+      .mockResolvedValueOnce(tipPayload) // itemMarket tip
+      .mockResolvedValueOnce(tipPayload) // trading tip
+      .mockResolvedValueOnce(deepenPayload); // trading deepen
 
     const msg = await runItemMarketTxPoll(makeCtx(db, { request }));
-    expect(msg).toBe(
-      "poll: itemMarket: 1 inserted, 1 pages (known_id); trading: 0 inserted, 1 pages (known_id)",
-    );
-    expect(request).toHaveBeenCalledTimes(2);
+    expect(msg).toContain("itemMarket: 1 inserted, 1 pages (known_id)");
+    expect(msg).toContain("trading: 0 inserted, 1 pages (known_id)");
+    expect(msg).toContain("trading-deepen: 1 inserted, 1 pages (lookback)");
+    expect(request).toHaveBeenCalledTimes(3);
+    expect(isCommodityDeepenDone()).toBe(true);
     const urls = request.mock.calls.map((c) => String(c[0]));
     expect(urls.some((u) => u.includes("itemMarket"))).toBe(true);
-    expect(urls.some((u) => u.includes("trading"))).toBe(true);
+    expect(urls.filter((u) => u.includes("trading")).length).toBe(2);
 
     const rows = await db.select().from(schema.itemMarketTransactions);
-    expect(rows).toHaveLength(2);
-    expect(rows.map((r) => r.id).toSorted()).toEqual(["fresh", "known"]);
+    expect(rows.map((r) => r.id).toSorted()).toEqual(["ancient-trading", "fresh", "known"]);
+  });
+
+  it("marks commodity deepen done after lookback stop", async () => {
+    enableItemMarketTxPoll();
+    const oldEnough = makeTx({
+      id: "ancient",
+      transactionType: "trading",
+      createdAt: new Date(Date.now() - 31 * 24 * 60 * 60 * 1000),
+    });
+    const request = vi.fn().mockResolvedValue({
+      result: {
+        data: {
+          items: [toApiItem(oldEnough)],
+          nextCursor: null,
+        },
+      },
+    });
+
+    expect(isCommodityDeepenDone()).toBe(false);
+    const msg = await runItemMarketTxPoll(makeCtx(db, { request }));
+    expect(msg).toContain("trading-deepen:");
+    expect(isCommodityDeepenDone()).toBe(true);
+
+    const callsAfterFirst = request.mock.calls.length;
+    await runItemMarketTxPoll(makeCtx(db, { request }));
+    // Second run: tip polls only (no deepen)
+    expect(request.mock.calls.length).toBe(callsAfterFirst + 2);
+  });
+
+  it("skips deepen when trading history already covers 30d", async () => {
+    enableItemMarketTxPoll();
+    await insertItemMarketTransactionsIgnoreConflicts(db, [
+      makeTx({
+        id: "already-old",
+        transactionType: "trading",
+        createdAt: new Date(Date.now() - 31 * 24 * 60 * 60 * 1000),
+      }),
+    ]);
+    const tipPayload = {
+      result: {
+        data: {
+          items: [
+            toApiItem(
+              makeTx({
+                id: "already-old",
+                transactionType: "trading",
+                createdAt: new Date(Date.now() - 31 * 24 * 60 * 60 * 1000),
+              }),
+            ),
+          ],
+          nextCursor: null,
+        },
+      },
+    };
+    const request = vi.fn().mockResolvedValue(tipPayload);
+    const msg = await runItemMarketTxPoll(makeCtx(db, { request }));
+    expect(msg).toContain("trading-deepen: skipped (already covers 30d)");
+    expect(isCommodityDeepenDone()).toBe(true);
+    // tip polls only (itemMarket + trading)
+    expect(request).toHaveBeenCalledTimes(2);
+  });
+
+  it("persists deepen resume cursor on page_budget", async () => {
+    enableItemMarketTxPoll();
+    const recent = makeTx({
+      id: "recent",
+      transactionType: "trading",
+      createdAt: new Date(),
+    });
+    const tipStop = {
+      result: {
+        data: {
+          items: [toApiItem(makeTx({ id: "tip-known" }))],
+          nextCursor: null,
+        },
+      },
+    };
+    const deepenPage = {
+      result: {
+        data: {
+          items: [toApiItem(recent)],
+          nextCursor: "resume-me",
+        },
+      },
+    };
+    const request = vi.fn(async (url: string) => {
+      if (String(url).includes("trading") && request.mock.calls.length > 2) {
+        return deepenPage;
+      }
+      return tipStop;
+    });
+
+    const states: Array<Record<string, unknown> | null> = [];
+    const setState = async (s: Record<string, unknown> | null) => {
+      states.push(s);
+    };
+
+    const msg = await runItemMarketTxPoll(makeCtx(db, { request }, { setState }));
+    expect(msg).toContain("trading-deepen:");
+    expect(msg).toContain("page_budget");
+    expect(isCommodityDeepenDone()).toBe(false);
+    expect(states.at(-1)).toMatchObject({ tradingDeepenCursor: "resume-me" });
   });
 });

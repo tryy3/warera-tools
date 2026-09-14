@@ -5,7 +5,7 @@ export const itemMarketTxPollJob: JobDefinition = {
   id: "item-market-tx-poll",
   name: "Item Market TX Poll",
   description:
-    "Every minute: walk new itemMarket and trading sales until known ids; waits for backfill handoff before any API calls",
+    "Every minute: tip catch-up for itemMarket + trading; deepen trading toward Market chart max (30d) in ~40-page budgets with job-state resume; waits for backfill handoff before any API calls",
   defaultCron: "0 * * * * *",
   defaultEnabled: true,
   async run(ctx) {

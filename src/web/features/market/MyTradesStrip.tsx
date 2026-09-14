@@ -89,7 +89,9 @@ export function MyTradesStrip({
   if (empty) {
     return (
       <section className="mt-4 rounded-md border border-border/60 bg-background/40 px-3 py-2.5">
-        <p className="m-0 text-sm text-muted-foreground">No trades in this range.</p>
+        <p className="m-0 text-sm text-muted-foreground">
+          No trades for this player in this range.
+        </p>
         {showPnl ? (
           <dl className="mt-2 mb-0 grid grid-cols-2 gap-3 sm:grid-cols-3">
             <div>

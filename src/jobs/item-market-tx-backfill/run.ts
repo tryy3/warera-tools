@@ -1,3 +1,4 @@
+import { PRICE_HISTORY_MAX_MS } from "../../market/ranges";
 import {
   COMMODITY_TRANSACTION_TYPE,
   fetchItemMarketTransactionsPage,
@@ -6,7 +7,6 @@ import { walkItemMarketTransactions } from "../item-market-tx/ingest";
 import type { JobContext } from "../types";
 
 const PAGE_DELAY_MS = 300;
-const LOOKBACK_MS = 24 * 60 * 60 * 1000;
 const TRANSACTION_TYPES = ["itemMarket", COMMODITY_TRANSACTION_TYPE] as const;
 
 export async function runItemMarketTxBackfill(ctx: JobContext) {
@@ -17,7 +17,7 @@ export async function runItemMarketTxBackfill(ctx: JobContext) {
       logger: ctx.logger,
       mode: "backfill",
       pageDelayMs: PAGE_DELAY_MS,
-      lookbackMs: LOOKBACK_MS,
+      lookbackMs: PRICE_HISTORY_MAX_MS,
       fetchPage: (opts) =>
         fetchItemMarketTransactionsPage(ctx.warera, { ...opts, transactionType }),
     });
