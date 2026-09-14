@@ -5,6 +5,54 @@ import { listDistinctWatchedMuIds } from "./watch-reasons";
 
 export const USER_PROFILE_JOB_MAX_AGE_MS = 10 * 60 * 1000;
 
+function dateFp(d: Date | null): string {
+  return d == null ? "null" : String(d.getTime());
+}
+
+export function userProfileContentFingerprint(row: UserProfileSnapshotRow): string {
+  return [
+    row.userId,
+    row.username,
+    row.avatarUrl,
+    row.countryId,
+    row.muId,
+    row.companyId,
+    row.partyId,
+    String(row.isActive),
+    dateFp(row.lastConnectionAt),
+    dateFp(row.lastWorkAt),
+    dateFp(row.lastHelpAskedAt),
+    dateFp(row.lastDailyRewardClaimedAt),
+    dateFp(row.lastCompanyJoinedAt),
+    dateFp(row.lastDailyCalendarClaimedAt),
+    dateFp(row.lastSkillsResetAt),
+    String(row.level),
+    String(row.totalXp),
+    String(row.dailyXpLeft),
+    String(row.availableSkillPoints),
+    String(row.spentSkillPoints),
+    String(row.totalSkillPoints),
+    String(row.prestigeLevel),
+    String(row.militaryRank),
+    String(row.isPremium),
+    String(row.premiumMonthsCount),
+    dateFp(row.createdAtGame),
+  ].join("|");
+}
+
+export async function loadLatestUserProfileFingerprints(
+  db: Db,
+  userIds: string[],
+): Promise<Map<string, string>> {
+  const out = new Map<string, string>();
+  const unique = [...new Set(userIds.filter((id) => id.length > 0))];
+  for (const userId of unique) {
+    const latest = await getLatestUserProfile(db, userId);
+    if (latest) out.set(userId, userProfileContentFingerprint(latest));
+  }
+  return out;
+}
+
 export type UserProfileSnapshotRow = {
   userId: string;
   recordedAt: Date;
