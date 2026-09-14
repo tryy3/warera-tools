@@ -1,7 +1,10 @@
 import type { Db } from "../../db/client";
 import {
+  donationAmountFingerprint,
+  donationFingerprintKey,
   insertDonationPoll,
   insertDonationSnapshots,
+  loadLatestDonationAmountFingerprints,
   type DonationSnapshotRow,
 } from "../../db/donations";
 import {
@@ -12,6 +15,9 @@ import {
 import type { Logger } from "../../logging/logger";
 import { drainDonations } from "../../warera/donations";
 import type { WareraRequester } from "../../warera/prices";
+import { createFingerprintCache } from "../snapshot-fingerprint-cache";
+
+export const donationFingerprintCache = createFingerprintCache();
 
 export async function runDonationPoll(options: {
   db: Db;
@@ -66,25 +72,42 @@ export async function runDonationPoll(options: {
 
   const status = scopeSuccesses === 0 ? "error" : errors.length > 0 ? "partial" : "success";
 
+  const keys = rows.map((r) => donationFingerprintKey(r.scopeType, r.scopeId, r.userId));
+  await donationFingerprintCache.ensureWarmed(keys, (missing) =>
+    loadLatestDonationAmountFingerprints(db, missing),
+  );
+
+  const deltas = rows.filter((r) => {
+    const key = donationFingerprintKey(r.scopeType, r.scopeId, r.userId);
+    const fp = donationAmountFingerprint(r.amount);
+    return donationFingerprintCache.get(key) !== fp;
+  });
+
   const pollId = await insertDonationPoll(db, {
     recordedAt,
     status,
     error: errors.length > 0 ? errors.join("; ").slice(0, 2000) : null,
     scopeCount: scopeSuccesses,
-    rowCount: rows.length,
+    rowCount: deltas.length,
   });
-  await insertDonationSnapshots(db, pollId, rows);
+  await insertDonationSnapshots(db, pollId, deltas);
+  donationFingerprintCache.setMany(
+    deltas.map((r) => [
+      donationFingerprintKey(r.scopeType, r.scopeId, r.userId),
+      donationAmountFingerprint(r.amount),
+    ]),
+  );
 
   logger.info(
     {
       poll_id: pollId,
       scope_count: scopeSuccesses,
-      row_count: rows.length,
+      row_count: deltas.length,
       status,
       errors: errors.length,
     },
     "donation poll complete",
   );
 
-  return { pollId, scopeCount: scopeSuccesses, rowCount: rows.length, status };
+  return { pollId, scopeCount: scopeSuccesses, rowCount: deltas.length, status };
 }
