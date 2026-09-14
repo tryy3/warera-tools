@@ -1,5 +1,5 @@
 import { createClient } from "@libsql/client";
-import { eq } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/libsql";
 import { beforeEach, describe, expect, it } from "vite-plus/test";
 import type { Db } from "../db/client";
@@ -89,5 +89,29 @@ describe("pruneJobRuns", () => {
     });
     await pruneJobRuns(db, "j1", 0);
     expect(await db.select().from(schema.jobRuns)).toHaveLength(0);
+  });
+
+  it("uses id DESC tiebreaker when started_at is equal", async () => {
+    const sameTime = new Date("2026-09-01T00:00:00.000Z");
+    const ids: number[] = [];
+    for (let i = 0; i < 4; i++) {
+      const [row] = await db
+        .insert(schema.jobRuns)
+        .values({ jobId: "j1", startedAt: sameTime, status: "success" })
+        .returning({ id: schema.jobRuns.id });
+      ids.push(row!.id);
+    }
+
+    await pruneJobRuns(db, "j1", 2);
+
+    const remainingIds = (
+      await db
+        .select({ id: schema.jobRuns.id })
+        .from(schema.jobRuns)
+        .where(eq(schema.jobRuns.jobId, "j1"))
+        .orderBy(desc(schema.jobRuns.id))
+    ).map((r) => r.id);
+
+    expect(remainingIds).toEqual([ids[3], ids[2]]);
   });
 });
