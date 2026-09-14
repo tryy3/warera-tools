@@ -50,7 +50,10 @@ export function SimWorkerModal({ open, mode, initial, onClose, onSubmit }: SimWo
   const formId = useId();
   const wasOpenRef = useRef(false);
   const initialRef = useRef(initial);
-  initialRef.current = initial;
+
+  useEffect(() => {
+    initialRef.current = initial;
+  });
 
   const [name, setName] = useState(initial.name);
   const [wagePerPp, setWagePerPp] = useState(String(initial.wagePerPp));

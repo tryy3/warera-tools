@@ -75,6 +75,38 @@ describe("parseItemMarketTransactionsPage", () => {
     const page = parseItemMarketTransactionsPage({ items: [], nextCursor: "n2" });
     expect(page.nextCursor).toBe("n2");
   });
+
+  it("parses trading rows without nested item", () => {
+    const tradingTx = {
+      _id: "trading-tx-1",
+      money: 12.5,
+      itemCode: "food",
+      quantity: 10,
+      sellerId: "seller-t",
+      buyerId: "buyer-t",
+      transactionType: "trading",
+      createdAt: "2026-09-12T10:00:00.000Z",
+    };
+    const page = parseItemMarketTransactionsPage({ items: [tradingTx], nextCursor: null });
+    expect(page.items).toHaveLength(1);
+    expect(page.items[0]).toMatchObject({
+      id: "trading-tx-1",
+      money: 12.5,
+      itemCode: "food",
+      quantity: 10,
+      sellerId: "seller-t",
+      buyerId: "buyer-t",
+      transactionType: "trading",
+      itemId: "trading-tx-1",
+      itemType: null,
+      itemState: null,
+      itemMaxState: null,
+      itemQuantity: null,
+      itemLastAcquisitionAt: null,
+      skills: null,
+    });
+    expect(page.items[0]!.createdAt.toISOString()).toBe("2026-09-12T10:00:00.000Z");
+  });
 });
 
 describe("fetchItemMarketTransactionsPage", () => {
@@ -93,5 +125,27 @@ describe("fetchItemMarketTransactionsPage", () => {
     expect(called).toContain("itemMarket");
     expect(decodeURIComponent(called)).toContain('"limit":100');
     expect(page.items[0].id).toBe(equipmentTx._id);
+  });
+
+  it("defaults transactionType to itemMarket", async () => {
+    const request = vi.fn().mockResolvedValue({
+      result: { data: { items: [], cursor: null } },
+    });
+    await fetchItemMarketTransactionsPage({ request }, { limit: 10 });
+    expect(String(request.mock.calls[0]![0])).toContain("itemMarket");
+  });
+
+  it("passes custom transactionType", async () => {
+    const request = vi.fn().mockResolvedValue({
+      result: { data: { items: [], cursor: null } },
+    });
+    await fetchItemMarketTransactionsPage(
+      { request },
+      {
+        limit: 10,
+        transactionType: "trading",
+      },
+    );
+    expect(String(request.mock.calls[0]![0])).toContain("trading");
   });
 });

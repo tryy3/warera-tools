@@ -24,8 +24,9 @@ export function JobsPage() {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [runs, setRuns] = useState<JobRun[]>([]);
-  const [runsLoading, setRunsLoading] = useState(false);
+  const [runsJobId, setRunsJobId] = useState<string | null>(null);
   const [runsError, setRunsError] = useState<string | null>(null);
+  const runsLoading = selectedId != null && runsJobId !== selectedId;
 
   async function loadJobs() {
     setLoading(true);
@@ -41,7 +42,7 @@ export function JobsPage() {
   }
 
   async function loadRuns(jobId: string) {
-    setRunsLoading(true);
+    setRunsJobId(null);
     setRunsError(null);
     try {
       const data = await api<JobRunsResponse>(`/api/jobs/${encodeURIComponent(jobId)}/runs`);
@@ -50,21 +51,50 @@ export function JobsPage() {
       setRuns([]);
       setRunsError(err instanceof Error ? err.message : String(err));
     } finally {
-      setRunsLoading(false);
+      setRunsJobId(jobId);
     }
   }
 
   useEffect(() => {
-    void loadJobs();
+    let cancelled = false;
+    void (async () => {
+      try {
+        const data = await api<JobsResponse>("/api/jobs");
+        if (cancelled) return;
+        setJobs(data.jobs);
+        setError(null);
+      } catch (err) {
+        if (cancelled) return;
+        setError(err instanceof Error ? err.message : String(err));
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {
-    if (selectedId) {
-      void loadRuns(selectedId);
-    } else {
-      setRuns([]);
-      setRunsError(null);
-    }
+    if (!selectedId) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const data = await api<JobRunsResponse>(`/api/jobs/${encodeURIComponent(selectedId)}/runs`);
+        if (cancelled) return;
+        setRuns(data.runs);
+        setRunsError(null);
+        setRunsJobId(selectedId);
+      } catch (err) {
+        if (cancelled) return;
+        setRuns([]);
+        setRunsError(err instanceof Error ? err.message : String(err));
+        setRunsJobId(selectedId);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [selectedId]);
 
   function upsertJob(job: Job) {
@@ -218,7 +248,7 @@ export function JobsPage() {
           {!runsLoading && runs.length === 0 && !runsError ? (
             <p className="text-muted-foreground">No runs yet.</p>
           ) : null}
-          {runs.length > 0 ? (
+          {!runsLoading && runs.length > 0 ? (
             <Table>
               <TableHeader>
                 <TableRow>

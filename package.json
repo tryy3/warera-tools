@@ -12,6 +12,7 @@
     "start": "node dist/server/index.js",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx src/db/migrate-cli.ts",
+    "backfill:item-market-tx": "tsx scripts/backfill-item-market-tx.ts",
     "check": "vp check",
     "test": "vp test"
   },

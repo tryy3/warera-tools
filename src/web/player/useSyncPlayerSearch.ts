@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { usePlayerSelection } from "./PlayerSelectionContext";
+import { usePlayerSelection } from "./player-selection";
 import { nextPlayerFromRoute } from "./syncPlayerSearch";
 
 type SyncArgs = {

@@ -1,0 +1,2 @@
+CREATE INDEX `item_market_tx_buyer_item_created_at_idx` ON `item_market_transactions` (`buyer_id`,`item_code`,`created_at`);--> statement-breakpoint
+CREATE INDEX `item_market_tx_seller_item_created_at_idx` ON `item_market_transactions` (`seller_id`,`item_code`,`created_at`);

@@ -14,4 +14,5 @@ export async function loadPlayerData(queryClient: QueryClient, userId: string): 
     queryFn: () => fetchAdvisor(userId, false),
   });
   await queryClient.invalidateQueries({ queryKey: queryKeys.growthBootstrap(userId) });
+  await queryClient.invalidateQueries({ queryKey: queryKeys.battleBuildImport(userId) });
 }

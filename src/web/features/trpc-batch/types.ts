@@ -1,8 +1,8 @@
 export type BatchRow = {
   index: number;
   procedure: string;
-  input: unknown | null;
-  response: unknown | null;
+  input: unknown;
+  response: unknown;
 };
 
 export type ParseBatchResult = {

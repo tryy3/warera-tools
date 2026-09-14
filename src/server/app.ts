@@ -8,6 +8,7 @@ import { httpAccess } from "../logging/httpAccess";
 import type { Logger } from "../logging/logger";
 import { errorPayload, HttpError } from "./errors";
 import { authPlaceholder } from "./middleware/auth-placeholder";
+import { battleBuildRoutes } from "./routes/battle-build";
 import { countriesRoutes } from "./routes/countries";
 import { economyRoutes } from "./routes/economy";
 import { equipmentRoutes } from "./routes/equipment";
@@ -16,6 +17,7 @@ import { muRoutes } from "./routes/mu";
 import { growthRoutes } from "./routes/growth";
 import { healthRoutes } from "./routes/health";
 import { jobsRoutes } from "./routes/jobs";
+import { marketRoutes } from "./routes/market";
 import { pricesRoutes } from "./routes/prices";
 import { scrapsRoutes } from "./routes/scraps";
 import { userRoutes } from "./routes/user";
@@ -54,9 +56,14 @@ export function createApp(deps: CreateAppDeps): Hono {
   app.route("/api/countries", countriesRoutes({ db: deps.db }));
   app.route("/api/scraps", scrapsRoutes({ db: deps.db, warera: deps.warera, logger: deps.logger }));
   app.route("/api/prices", pricesRoutes({ db: deps.db, warera: deps.warera, logger: deps.logger }));
+  app.route("/api/market", marketRoutes({ db: deps.db }));
   app.route(
     "/api/equipment",
     equipmentRoutes({ db: deps.db, warera: deps.warera, logger: deps.logger }),
+  );
+  app.route(
+    "/api/battle-build",
+    battleBuildRoutes({ db: deps.db, warera: deps.warera, logger: deps.logger }),
   );
   app.route(
     "/api/economy",

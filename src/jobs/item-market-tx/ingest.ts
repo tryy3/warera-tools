@@ -13,24 +13,47 @@ export type WalkItemMarketTransactionsResult = {
   pages: number;
   inserted: number;
   stoppedReason: string;
+  /** Set when stopped with `page_budget` or `aborted` so the caller can resume. */
+  resumeCursor: string | null;
 };
 
 const DEFAULT_PAGE_DELAY_MS = 300;
-const DEFAULT_LOOKBACK_MS = 24 * 60 * 60 * 1000;
+/** Default matches longest Market chart range (30d). */
+const DEFAULT_LOOKBACK_MS = 30 * 24 * 60 * 60 * 1000;
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+function pageOldestMs(items: { createdAt: Date }[]): number {
+  let oldestMs = items[0]!.createdAt.getTime();
+  for (let i = 1; i < items.length; i++) {
+    const t = items[i]!.createdAt.getTime();
+    if (t < oldestMs) oldestMs = t;
+  }
+  return oldestMs;
+}
+
 export async function walkItemMarketTransactions(opts: {
   db: Db;
   logger: Logger;
-  mode: "backfill" | "poll";
+  /**
+   * - `backfill` / `poll`: stop at first known id (catch-up to tip).
+   * - `deepen`: keep paging through known ids until lookback (fill older history).
+   */
+  mode: "backfill" | "poll" | "deepen";
   fetchPage: FetchItemMarketPage;
   pageDelayMs?: number;
   lookbackMs?: number;
+  /** Absolute stop: page oldest < untilMs (preferred over lookback for long runs). */
+  untilMs?: number;
   now?: Date;
   limit?: number;
+  /** Resume deepen/backfill from this cursor (newest→older API). */
+  startCursor?: string;
+  /** Cap pages this invocation (deepen spreads work across poll ticks). */
+  maxPages?: number;
+  signal?: AbortSignal;
 }): Promise<WalkItemMarketTransactionsResult> {
   const {
     db,
@@ -39,16 +62,48 @@ export async function walkItemMarketTransactions(opts: {
     fetchPage,
     pageDelayMs = DEFAULT_PAGE_DELAY_MS,
     lookbackMs = DEFAULT_LOOKBACK_MS,
+    untilMs,
     now = new Date(),
     limit,
+    startCursor,
+    maxPages,
+    signal,
   } = opts;
 
   let pages = 0;
   let inserted = 0;
-  let cursor: string | undefined;
+  let cursor: string | undefined = startCursor;
+  const useLookback = mode === "backfill" || mode === "deepen";
+  const stopOnKnownId = mode !== "deepen";
 
   for (;;) {
+    if (signal?.aborted) {
+      return {
+        pages,
+        inserted,
+        stoppedReason: "aborted",
+        resumeCursor: cursor ?? null,
+      };
+    }
+
+    if (maxPages != null && pages >= maxPages) {
+      return {
+        pages,
+        inserted,
+        stoppedReason: "page_budget",
+        resumeCursor: cursor ?? null,
+      };
+    }
+
     const page = await fetchPage({ cursor, limit });
+    if (signal?.aborted) {
+      return {
+        pages,
+        inserted,
+        stoppedReason: "aborted",
+        resumeCursor: cursor ?? null,
+      };
+    }
     pages += 1;
 
     const { inserted: pageInserted, existingIds } =
@@ -60,7 +115,8 @@ export async function walkItemMarketTransactions(opts: {
       enableItemMarketTxPoll();
     }
 
-    logger.debug(
+    const logPage = untilMs != null ? logger.info.bind(logger) : logger.debug.bind(logger);
+    logPage(
       {
         mode,
         pages,
@@ -72,32 +128,53 @@ export async function walkItemMarketTransactions(opts: {
       "item market tx page ingested",
     );
 
-    if (existingIds.length > 0) {
-      return { pages, inserted, stoppedReason: "known_id" };
+    if (stopOnKnownId && existingIds.length > 0) {
+      return { pages, inserted, stoppedReason: "known_id", resumeCursor: null };
     }
 
-    if (mode === "backfill" && page.items.length > 0) {
-      let oldestMs = page.items[0]!.createdAt.getTime();
-      for (let i = 1; i < page.items.length; i++) {
-        const t = page.items[i]!.createdAt.getTime();
-        if (t < oldestMs) oldestMs = t;
-      }
-      if (oldestMs < now.getTime() - lookbackMs) {
-        return { pages, inserted, stoppedReason: "lookback" };
+    if (useLookback && page.items.length > 0) {
+      const boundMs = untilMs ?? now.getTime() - lookbackMs;
+      if (pageOldestMs(page.items) < boundMs) {
+        return {
+          pages,
+          inserted,
+          stoppedReason: untilMs != null ? "until" : "lookback",
+          resumeCursor: null,
+        };
       }
     }
 
     if (page.items.length === 0) {
-      return { pages, inserted, stoppedReason: "empty" };
+      return { pages, inserted, stoppedReason: "empty", resumeCursor: null };
     }
 
     if (page.nextCursor == null) {
-      return { pages, inserted, stoppedReason: "no_cursor" };
+      return { pages, inserted, stoppedReason: "no_cursor", resumeCursor: null };
     }
 
     cursor = page.nextCursor;
-    if (mode === "backfill" && pageDelayMs > 0) {
+
+    if (signal?.aborted) {
+      return {
+        pages,
+        inserted,
+        stoppedReason: "aborted",
+        resumeCursor: cursor,
+      };
+    }
+
+    // Only throttle when we inserted new rows; skip delay while skipping known pages.
+    if (useLookback && pageDelayMs > 0 && pageInserted > 0) {
       await sleep(pageDelayMs);
+    }
+
+    if (maxPages != null && pages >= maxPages) {
+      return {
+        pages,
+        inserted,
+        stoppedReason: "page_budget",
+        resumeCursor: cursor,
+      };
     }
   }
 }

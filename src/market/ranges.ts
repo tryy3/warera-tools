@@ -17,3 +17,6 @@ export function parsePriceHistoryRange(value: unknown): PriceHistoryRange {
 export function rangeToMs(range: PriceHistoryRange): number {
   return RANGE_MS[range];
 }
+
+/** Longest Market chart range — commodity tx ingest lookback matches this. */
+export const PRICE_HISTORY_MAX_MS = RANGE_MS["30d"];

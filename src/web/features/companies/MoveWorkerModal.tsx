@@ -33,7 +33,10 @@ export function MoveWorkerModal({
 
   const wasOpenRef = useRef(false);
   const assignmentRef = useRef(currentAssignment);
-  assignmentRef.current = currentAssignment;
+
+  useEffect(() => {
+    assignmentRef.current = currentAssignment;
+  });
 
   useEffect(() => {
     const dialog = dialogRef.current;

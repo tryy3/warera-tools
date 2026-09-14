@@ -63,37 +63,35 @@ export function CraftVsScrapPanel({
   disabled?: boolean;
 }) {
   const [tier, setTier] = useState<GearTierId>("red");
-  const [data, setData] = useState<CraftCompareResponse | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [fetched, setFetched] = useState<CraftCompareResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const enabled = Boolean(countryId) && !disabled;
+  const requestKey = enabled ? `${countryId}:${tier}` : null;
+  const [readyKey, setReadyKey] = useState<string | null>(null);
+  const loading = requestKey != null && readyKey !== requestKey;
+  const data = enabled && !loading ? fetched : null;
 
   useEffect(() => {
-    if (!countryId || disabled) {
-      setData(null);
-      setLoading(false);
-      setError(null);
-      return;
-    }
+    if (!requestKey) return;
 
     const controller = new AbortController();
     let cancelled = false;
 
     async function load() {
-      setData(null);
-      setLoading(true);
-      setError(null);
       try {
         const result = await api<CraftCompareResponse>(
           `/api/equipment/craft-compare?tier=${tier}&countryId=${encodeURIComponent(countryId)}`,
           { signal: controller.signal },
         );
-        if (!cancelled) setData(result);
+        if (cancelled) return;
+        setFetched(result);
+        setError(null);
+        setReadyKey(requestKey);
       } catch (err) {
-        if (!cancelled && !controller.signal.aborted) {
-          setError(err instanceof Error ? err.message : String(err));
-        }
-      } finally {
-        if (!cancelled) setLoading(false);
+        if (cancelled || controller.signal.aborted) return;
+        setError(err instanceof Error ? err.message : String(err));
+        setFetched(null);
+        setReadyKey(requestKey);
       }
     }
 
@@ -102,7 +100,7 @@ export function CraftVsScrapPanel({
       cancelled = true;
       controller.abort();
     };
-  }, [countryId, disabled, tier]);
+  }, [countryId, requestKey, tier]);
 
   return (
     <section className="mt-4 mb-2 rounded-md border border-border bg-secondary/35 p-3.5">
@@ -137,7 +135,7 @@ export function CraftVsScrapPanel({
           Select a country above to compare crafting.
         </p>
       ) : null}
-      {error ? <p className="my-2 text-sm text-destructive">{error}</p> : null}
+      {!loading && error ? <p className="my-2 text-sm text-destructive">{error}</p> : null}
       {loading ? (
         <p className="my-2 text-sm text-muted-foreground">Loading craft comparison…</p>
       ) : null}

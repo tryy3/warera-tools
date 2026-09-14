@@ -83,9 +83,12 @@ export function EquipmentDetailPage() {
   const [notFound, setNotFound] = useState(false);
 
   const countryIdRef = useRef(countryId);
-  countryIdRef.current = countryId;
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const fetchGenRef = useRef(0);
+
+  useEffect(() => {
+    countryIdRef.current = countryId;
+  });
 
   useEffect(() => {
     let cancelled = false;

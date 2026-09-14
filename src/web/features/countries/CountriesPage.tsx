@@ -50,7 +50,23 @@ export function CountriesPage() {
   }
 
   useEffect(() => {
-    void loadCountries();
+    let cancelled = false;
+    void (async () => {
+      try {
+        const data = await api<CountriesResponse>("/api/countries");
+        if (cancelled) return;
+        setCountries(data.countries);
+        setError(null);
+      } catch (err) {
+        if (cancelled) return;
+        setError(err instanceof Error ? err.message : String(err));
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   function startEdit(country: Country) {

@@ -5,8 +5,8 @@ import {
   NavigationMenuItem,
   NavigationMenuLink,
   NavigationMenuList,
-  navigationMenuTriggerStyle,
 } from "@/components/ui/navigation-menu";
+import { navigationMenuTriggerStyle } from "@/components/ui/navigation-menu-trigger-style";
 import { cn } from "@/lib/utils";
 import { ShellPlayerBar } from "./ShellPlayerBar";
 

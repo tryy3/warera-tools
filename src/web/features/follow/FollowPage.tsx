@@ -47,7 +47,27 @@ export function FollowPage() {
   }
 
   useEffect(() => {
-    void load();
+    let cancelled = false;
+    void (async () => {
+      try {
+        const [p, m] = await Promise.all([
+          api<FollowPlayersResponse>("/api/follow/players"),
+          api<FollowMusResponse>("/api/follow/mus"),
+        ]);
+        if (cancelled) return;
+        setPlayers(p.players);
+        setMus(m.mus);
+        setError(null);
+      } catch (err) {
+        if (cancelled) return;
+        setError(err instanceof Error ? err.message : String(err));
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   async function addPlayer(e: FormEvent) {

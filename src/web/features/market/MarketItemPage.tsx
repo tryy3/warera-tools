@@ -1,14 +1,16 @@
 import { getRouteApi, Link } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { formatDisplayNumber } from "@/lib/formatDisplayNumber";
 import { PRICE_HISTORY_RANGES, type PriceHistoryRange } from "@/market/ranges";
 import { ApiError, api } from "../../api";
 import { GoldIcon } from "../../components/GoldIcon";
 import { ItemIcon } from "../../components/ItemIcon";
+import { usePlayerSelection } from "../../player/player-selection";
 import { formatItem } from "./formatItem";
-import { MarketPriceChart } from "./MarketPriceChart";
-import type { PriceChangeDto, PriceHistoryResponse } from "./types";
+import { MarketPriceChart, type TradeDot } from "./MarketPriceChart";
+import { MyTradesStrip } from "./MyTradesStrip";
+import type { MyTradesResponse, PriceChangeDto, PriceHistoryResponse } from "./types";
 
 const marketItemRoute = getRouteApi("/market_/$itemCode");
 
@@ -70,46 +72,140 @@ async function fetchPriceHistory(
   );
 }
 
+async function fetchMyTrades(
+  itemCode: string,
+  playerId: string,
+  range: PriceHistoryRange,
+): Promise<MyTradesResponse> {
+  return api<MyTradesResponse>(
+    `/api/market/${encodeURIComponent(itemCode)}/my-trades?playerId=${encodeURIComponent(playerId)}&range=${encodeURIComponent(range)}`,
+  );
+}
+
+function formatChunkClock(iso: string): string {
+  return new Date(iso).toLocaleTimeString(undefined, {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
+}
+
+function formatChunkTimeSpan(startAt: string, endAt: string): string {
+  const start = new Date(startAt);
+  const end = new Date(endAt);
+  const startClock = formatChunkClock(startAt);
+  const endClock = formatChunkClock(endAt);
+  if (start.toDateString() === end.toDateString()) {
+    return startClock === endClock ? startClock : `${startClock}–${endClock}`;
+  }
+  const dateOpts: Intl.DateTimeFormatOptions = {
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  };
+  return `${start.toLocaleString(undefined, dateOpts)}–${end.toLocaleString(undefined, dateOpts)}`;
+}
+
+function chunksToTradeDots(chunks: MyTradesResponse["chunks"]): TradeDot[] {
+  return chunks.map((chunk) => {
+    const startMs = Date.parse(chunk.startAt);
+    const endMs = Date.parse(chunk.endAt);
+    const midMs = (startMs + endMs) / 2;
+    const sideLabel = chunk.side === "buy" ? "Buy" : "Sell";
+    const fillLabel = chunk.fillCount === 1 ? "1 fill" : `${chunk.fillCount} fills`;
+    return {
+      date: new Date(midMs),
+      price: chunk.unitPrice,
+      side: chunk.side,
+      label: `${sideLabel} ${chunk.totalQty} @ ${chunk.unitPrice} · ${fillLabel} · ${formatChunkTimeSpan(chunk.startAt, chunk.endAt)}`,
+    };
+  });
+}
+
 export function MarketItemPage() {
   const { itemCode } = marketItemRoute.useParams();
   const { range } = marketItemRoute.useSearch();
   const navigate = marketItemRoute.useNavigate();
+  const { player } = usePlayerSelection();
+  const playerId = player?.userId ?? null;
 
   const [data, setData] = useState<PriceHistoryResponse | null>(null);
-  const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [reloadToken, setReloadToken] = useState(0);
+  const historyKey = `${itemCode}:${range}:${reloadToken}`;
+  const [readyHistoryKey, setReadyHistoryKey] = useState<string | null>(null);
+  const loading = readyHistoryKey !== historyKey;
+
+  const [trades, setTrades] = useState<MyTradesResponse | null>(null);
+  const [tradesError, setTradesError] = useState<string | null>(null);
+  const [tradesReloadToken, setTradesReloadToken] = useState(0);
+  const tradesKey = playerId ? `${itemCode}:${range}:${playerId}:${tradesReloadToken}` : null;
+  const [readyTradesKey, setReadyTradesKey] = useState<string | null>(null);
+  const tradesLoading = tradesKey != null && readyTradesKey !== tradesKey;
 
   useEffect(() => {
     let cancelled = false;
-    setLoading(true);
-    setError(null);
-    setNotFound(false);
 
     void fetchPriceHistory(itemCode, range)
       .then((result) => {
         if (cancelled) return;
         setData(result);
+        setError(null);
+        setNotFound(false);
+        setReadyHistoryKey(historyKey);
       })
       .catch((err: unknown) => {
         if (cancelled) return;
         if (err instanceof ApiError && (err.status === 404 || err.code === "not_found")) {
           setNotFound(true);
+          setError(null);
           setData(null);
+          setReadyHistoryKey(historyKey);
           return;
         }
         setError(err instanceof Error ? err.message : String(err));
+        setNotFound(false);
         setData(null);
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
+        setReadyHistoryKey(historyKey);
       });
 
     return () => {
       cancelled = true;
     };
-  }, [itemCode, range, reloadToken]);
+  }, [itemCode, range, reloadToken, historyKey]);
+
+  useEffect(() => {
+    if (!playerId || !tradesKey) return;
+
+    let cancelled = false;
+
+    void fetchMyTrades(itemCode, playerId, range)
+      .then((result) => {
+        if (cancelled) return;
+        setTrades(result);
+        setTradesError(null);
+        setReadyTradesKey(tradesKey);
+      })
+      .catch((err: unknown) => {
+        if (cancelled) return;
+        setTradesError(err instanceof Error ? err.message : String(err));
+        setTrades(null);
+        setReadyTradesKey(tradesKey);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [itemCode, range, playerId, tradesReloadToken, tradesKey]);
+
+  const activeTrades = playerId ? trades : null;
+  const tradeDots = useMemo(
+    () => (activeTrades?.chunks.length ? chunksToTradeDots(activeTrades.chunks) : undefined),
+    [activeTrades],
+  );
 
   function setRange(next: PriceHistoryRange) {
     void navigate({ search: { range: next }, replace: true });
@@ -158,11 +254,11 @@ export function MarketItemPage() {
 
       {loading ? <p className="text-muted-foreground">Loading price history…</p> : null}
 
-      {notFound ? (
+      {!loading && notFound ? (
         <p className="text-muted-foreground">Item not found or no price history yet.</p>
       ) : null}
 
-      {error ? (
+      {!loading && error ? (
         <div className="my-2 flex flex-wrap items-center gap-3">
           <p className="m-0 text-destructive">{error}</p>
           <Button
@@ -211,9 +307,17 @@ export function MarketItemPage() {
             </p>
           ) : null}
 
-          <MarketPriceChart points={data.points} itemLabel={itemLabel} />
+          <MarketPriceChart points={data.points} itemLabel={itemLabel} tradeDots={tradeDots} />
         </>
       ) : null}
+
+      <MyTradesStrip
+        noPlayer={!playerId}
+        loading={Boolean(playerId) && tradesLoading}
+        error={playerId ? tradesError : null}
+        onRetry={() => setTradesReloadToken((token) => token + 1)}
+        data={activeTrades}
+      />
     </div>
   );
 }

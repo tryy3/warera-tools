@@ -1,4 +1,4 @@
-import { areaY, defineChart, lineY } from "@tanstack/charts";
+import { areaY, defineChart, dot, lineY } from "@tanstack/charts";
 import { scaleLinear } from "@tanstack/charts/scales/linear";
 import { tooltip } from "@tanstack/charts/tooltip";
 import { Chart } from "@tanstack/react-charts";
@@ -13,12 +13,24 @@ type ChartRow = {
   topSell: number | null;
 };
 
+export type TradeDot = {
+  date: Date;
+  price: number;
+  side: "buy" | "sell";
+  label: string;
+};
+
+const BUY_DOT_FILL = "#60a5fa";
+const SELL_DOT_FILL = "#f87171";
+
 export function MarketPriceChart({
   points,
   itemLabel,
+  tradeDots,
 }: {
   points: PriceHistoryPointDto[];
   itemLabel: string;
+  tradeDots?: TradeDot[];
 }) {
   const rows = useMemo<ChartRow[]>(
     () =>
@@ -48,6 +60,10 @@ export function MarketPriceChart({
     [rows],
   );
 
+  const buyDots = useMemo(() => (tradeDots ?? []).filter((d) => d.side === "buy"), [tradeDots]);
+
+  const sellDots = useMemo(() => (tradeDots ?? []).filter((d) => d.side === "sell"), [tradeDots]);
+
   const definition = useMemo(
     () =>
       defineChart({
@@ -63,14 +79,47 @@ export function MarketPriceChart({
             y: "marketPrice",
             strokeWidth: 2,
           }),
+          ...(buyDots.length > 0
+            ? [
+                dot(buyDots, {
+                  x: "date",
+                  y: "price",
+                  fill: BUY_DOT_FILL,
+                  r: 5,
+                }),
+              ]
+            : []),
+          ...(sellDots.length > 0
+            ? [
+                dot(sellDots, {
+                  x: "date",
+                  y: "price",
+                  fill: SELL_DOT_FILL,
+                  r: 5,
+                }),
+              ]
+            : []),
         ],
         scales: {
           x: { scale: scaleUtc, nice: true, axis: { label: "Time" } },
           y: { scale: scaleLinear, nice: true, grid: true, axis: { label: "Price" } },
         },
-        tooltip,
+        tooltip: {
+          use: tooltip,
+          items: [
+            {
+              id: "trade-label",
+              text: (point) => {
+                const label = (point.datum as { label?: unknown }).label;
+                return typeof label === "string" ? label : null;
+              },
+            },
+            "y",
+            "x",
+          ],
+        },
       }),
-    [ribbon, market],
+    [ribbon, market, buyDots, sellDots],
   );
 
   if (market.length === 0 && ribbon.length === 0) {

@@ -37,7 +37,6 @@ export function CalculatorPage() {
 
   const [countries, setCountries] = useState<Country[]>([]);
   const [scraps, setScraps] = useState<ScrapsResponse | null>(null);
-  const [countryId, setCountryIdState] = useState(search.country ?? "");
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -54,30 +53,6 @@ export function CalculatorPage() {
     });
   }
 
-  async function loadData() {
-    setLoading(true);
-    setError(null);
-    try {
-      const [scrapsData, countriesData] = await Promise.all([
-        api<ScrapsResponse>("/api/scraps"),
-        api<CountriesResponse>("/api/countries"),
-      ]);
-      setScraps(scrapsData);
-      setCountries(countriesData.countries);
-      setCountryIdState((prev) => {
-        if (search.country && countriesData.countries.some((c) => c.id === search.country)) {
-          return search.country;
-        }
-        if (prev && countriesData.countries.some((c) => c.id === prev)) return prev;
-        return pickDefaultCountryId(countriesData.countries);
-      });
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-    } finally {
-      setLoading(false);
-    }
-  }
-
   async function refreshScrapPrice() {
     setRefreshing(true);
     setError(null);
@@ -92,20 +67,33 @@ export function CalculatorPage() {
   }
 
   useEffect(() => {
-    void loadData();
+    let cancelled = false;
+    void (async () => {
+      try {
+        const [scrapsData, countriesData] = await Promise.all([
+          api<ScrapsResponse>("/api/scraps"),
+          api<CountriesResponse>("/api/countries"),
+        ]);
+        if (cancelled) return;
+        setScraps(scrapsData);
+        setCountries(countriesData.countries);
+        setError(null);
+      } catch (err) {
+        if (cancelled) return;
+        setError(err instanceof Error ? err.message : String(err));
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
-  // Keep local country in sync with URL on Back/Forward without writing defaults into the URL.
-  useEffect(() => {
-    if (countries.length === 0) return;
-
-    if (search.country && countries.some((c) => c.id === search.country)) {
-      setCountryIdState(search.country);
-      return;
-    }
-    setCountryIdState(pickDefaultCountryId(countries));
-  }, [search.country, countries]);
-
+  const countryId =
+    search.country && countries.some((c) => c.id === search.country)
+      ? search.country
+      : pickDefaultCountryId(countries);
   const selectedCountry = countries.find((c) => c.id === countryId) ?? null;
   const taxRate = selectedCountry?.taxRate ?? 0;
   const scrapAmount = scrapAmountForTier(tier);
@@ -169,7 +157,6 @@ export function CalculatorPage() {
                 countries={countries}
                 value={countryId}
                 onChange={(next) => {
-                  setCountryIdState(next);
                   syncSearch({
                     tier,
                     countryId: next,

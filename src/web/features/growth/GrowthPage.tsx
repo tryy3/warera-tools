@@ -11,7 +11,7 @@ import {
   TrendingUp,
   Wallet,
 } from "lucide-react";
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { useCallback, useState, type ReactNode } from "react";
 import { goldPerAePerDayFromProfit } from "@/growth/income";
 import { DEFAULT_MAX_ITERATIONS, planGrowthPath } from "@/growth/plan";
 import type { UserCompany, UserResponse } from "@/user";
@@ -21,7 +21,7 @@ import { cn } from "@/lib/utils";
 import { GoldIcon } from "../../components/GoldIcon";
 import { ItemIcon } from "../../components/ItemIcon";
 import { buildGrowthSearch } from "../../lib/growthSearch";
-import { usePlayerSelection } from "../../player/PlayerSelectionContext";
+import { usePlayerSelection } from "../../player/player-selection";
 import { useSyncPlayerSearch } from "../../player/useSyncPlayerSearch";
 import { useGrowthBootstrapQuery } from "../../query/useGrowthBootstrapQuery";
 import { useUserQuery } from "../../query/useUserQuery";
@@ -115,8 +115,6 @@ export function GrowthPage() {
 
   const [user, setUser] = useState<UserResponse | null>(null);
   const [bootstrap, setBootstrap] = useState<GrowthBootstrapResponse | null>(null);
-  const appliedUserKeyRef = useRef<string | null>(null);
-  const appliedBootstrapKeyRef = useRef<string | null>(null);
 
   const [goalN, setGoalN] = useState(6);
   const [startBalance, setStartBalance] = useState(0);
@@ -152,47 +150,43 @@ export function GrowthPage() {
     setMaxIterations(DEFAULT_MAX_ITERATIONS);
   }
 
-  useEffect(() => {
-    const data = userQuery.data;
-    const userId = player?.userId;
-    if (!data || !userId) {
-      if (!userId) {
-        setUser(null);
-        setFactories([]);
-        setFocusedOverride(null);
-        appliedUserKeyRef.current = null;
-      } else if (!data) {
-        setUser(null);
-        setFactories([]);
-        appliedUserKeyRef.current = null;
-      }
-      return;
+  const userApplyKey = !player?.userId
+    ? ""
+    : userQuery.data
+      ? `${player.userId}:${userQuery.dataUpdatedAt}`
+      : `pending:${player.userId}`;
+  const [appliedUserKey, setAppliedUserKey] = useState<string | null>(null);
+  if (userApplyKey !== appliedUserKey) {
+    setAppliedUserKey(userApplyKey);
+    if (!player?.userId) {
+      setUser(null);
+      setFactories([]);
+      setFocusedOverride(null);
+    } else if (userQuery.data) {
+      applyUser(userQuery.data);
+    } else {
+      setUser(null);
+      setFactories([]);
     }
-    const key = `${userId}:${userQuery.dataUpdatedAt}`;
-    if (appliedUserKeyRef.current === key) return;
-    appliedUserKeyRef.current = key;
-    applyUser(data);
-  }, [userQuery.data, userQuery.dataUpdatedAt, player?.userId]);
+  }
 
-  useEffect(() => {
-    const data = bootstrapQuery.data;
-    const userId = player?.userId;
-    if (!data || !userId) {
-      if (!userId) {
-        setBootstrap(null);
-        setFocusedOverride(null);
-        appliedBootstrapKeyRef.current = null;
-      } else if (!data) {
-        setBootstrap(null);
-        appliedBootstrapKeyRef.current = null;
-      }
-      return;
+  const bootstrapApplyKey = !player?.userId
+    ? ""
+    : bootstrapQuery.data
+      ? `${player.userId}:${bootstrapQuery.dataUpdatedAt}`
+      : `pending:${player.userId}`;
+  const [appliedBootstrapKey, setAppliedBootstrapKey] = useState<string | null>(null);
+  if (bootstrapApplyKey !== appliedBootstrapKey) {
+    setAppliedBootstrapKey(bootstrapApplyKey);
+    if (!player?.userId) {
+      setBootstrap(null);
+      setFocusedOverride(null);
+    } else if (bootstrapQuery.data) {
+      applyBootstrap(bootstrapQuery.data);
+    } else {
+      setBootstrap(null);
     }
-    const key = `${userId}:${bootstrapQuery.dataUpdatedAt}`;
-    if (appliedBootstrapKeyRef.current === key) return;
-    appliedBootstrapKeyRef.current = key;
-    applyBootstrap(data);
-  }, [bootstrapQuery.data, bootstrapQuery.dataUpdatedAt, player?.userId]);
+  }
 
   const loading = (userQuery.isFetching && !user) || (bootstrapQuery.isFetching && !bootstrap);
 

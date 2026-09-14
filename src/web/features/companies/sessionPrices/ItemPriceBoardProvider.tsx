@@ -1,5 +1,4 @@
-import { createContext, use, useMemo, useState, type ReactNode } from "react";
-import type { BookPrices } from "../../../../economy/profit";
+import { useMemo, useState, type ReactNode } from "react";
 import type { Opportunity } from "../types";
 import {
   bookFromOpportunities,
@@ -9,23 +8,8 @@ import {
   pruneOverrides,
   recomputeOpportunities,
 } from "./effective";
+import { ItemPriceBoardContext, type ItemPriceBoardContextValue } from "./item-price-board-context";
 import type { ItemPriceOverrides } from "./types";
-
-export type ItemPriceBoardContextValue = {
-  overrides: ItemPriceOverrides;
-  liveBook: BookPrices;
-  effectiveBook: BookPrices;
-  opportunities: Opportunity[];
-  setItemPrices: (
-    itemCode: string,
-    prices: { buy?: number | undefined; sell?: number | undefined },
-  ) => void;
-  resetItem: (itemCode: string) => void;
-  isDirty: (itemCode: string, side?: "buy" | "sell") => boolean;
-  liveOpportunity: (itemCode: string) => Opportunity | undefined;
-};
-
-const ItemPriceBoardContext = createContext<ItemPriceBoardContextValue | null>(null);
 
 export function ItemPriceBoardProvider({
   liveOpportunities,
@@ -91,12 +75,4 @@ export function ItemPriceBoardProvider({
   );
 
   return <ItemPriceBoardContext value={value}>{children}</ItemPriceBoardContext>;
-}
-
-export function useItemPriceBoard(): ItemPriceBoardContextValue {
-  const value = use(ItemPriceBoardContext);
-  if (!value) {
-    throw new Error("useItemPriceBoard must be used within ItemPriceBoardProvider");
-  }
-  return value;
 }

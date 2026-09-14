@@ -226,4 +226,132 @@ describe("walkItemMarketTransactions", () => {
     expect(result.inserted).toBe(1);
     expect(result.stoppedReason).toBe("no_cursor");
   });
+
+  it("deepen continues past known ids until lookback", async () => {
+    await insertItemMarketTransactionsIgnoreConflicts(db, [
+      makeTx({ id: "known", createdAt: new Date("2026-08-04T17:00:00.000Z") }),
+    ]);
+
+    const now = new Date("2026-08-04T18:00:00.000Z");
+    const fetchPage = vi
+      .fn()
+      .mockResolvedValueOnce({
+        items: [
+          makeTx({ id: "known", createdAt: new Date("2026-08-04T17:00:00.000Z") }),
+          makeTx({ id: "mid", createdAt: new Date("2026-08-04T12:00:00.000Z") }),
+        ],
+        nextCursor: "page2",
+      } satisfies ItemMarketTransactionsPage)
+      .mockResolvedValueOnce({
+        items: [
+          makeTx({
+            id: "old",
+            createdAt: new Date("2026-07-01T18:00:00.000Z"),
+          }),
+        ],
+        nextCursor: "page3",
+      } satisfies ItemMarketTransactionsPage);
+
+    const result = await walkItemMarketTransactions({
+      db,
+      logger: silentLogger,
+      mode: "deepen",
+      fetchPage,
+      pageDelayMs: 0,
+      lookbackMs: 24 * 60 * 60 * 1000,
+      now,
+    });
+
+    expect(result.stoppedReason).toBe("lookback");
+    expect(result.pages).toBe(2);
+    expect(result.inserted).toBe(2);
+    expect(result.resumeCursor).toBeNull();
+    expect(fetchPage).toHaveBeenCalledTimes(2);
+    expect(isItemMarketTxPollEnabled()).toBe(false);
+  });
+
+  it("deepen respects maxPages and returns resumeCursor", async () => {
+    const now = new Date("2026-08-04T18:00:00.000Z");
+    const fetchPage = vi.fn(async (): Promise<ItemMarketTransactionsPage> => ({
+      items: [makeTx({ id: `p-${fetchPage.mock.calls.length}`, createdAt: now })],
+      nextCursor: `cursor-${fetchPage.mock.calls.length}`,
+    }));
+
+    const result = await walkItemMarketTransactions({
+      db,
+      logger: silentLogger,
+      mode: "deepen",
+      fetchPage,
+      pageDelayMs: 0,
+      lookbackMs: 30 * 24 * 60 * 60 * 1000,
+      maxPages: 2,
+      now,
+    });
+
+    expect(result.stoppedReason).toBe("page_budget");
+    expect(result.pages).toBe(2);
+    expect(result.resumeCursor).toBe("cursor-2");
+    expect(fetchPage).toHaveBeenCalledTimes(2);
+  });
+
+  it("deepen stops on untilMs with reason until", async () => {
+    const until = new Date("2026-08-01T00:00:00.000Z");
+    const fetchPage = vi
+      .fn()
+      .mockResolvedValueOnce({
+        items: [makeTx({ id: "a", createdAt: new Date("2026-08-10T12:00:00.000Z") })],
+        nextCursor: "c2",
+      } satisfies ItemMarketTransactionsPage)
+      .mockResolvedValueOnce({
+        items: [makeTx({ id: "b", createdAt: new Date("2026-07-15T12:00:00.000Z") })],
+        nextCursor: "c3",
+      } satisfies ItemMarketTransactionsPage);
+
+    const result = await walkItemMarketTransactions({
+      db,
+      logger: silentLogger,
+      mode: "deepen",
+      fetchPage,
+      pageDelayMs: 0,
+      untilMs: until.getTime(),
+    });
+
+    expect(result.stoppedReason).toBe("until");
+    expect(result.pages).toBe(2);
+    expect(result.inserted).toBe(2);
+    expect(result.resumeCursor).toBeNull();
+    expect(fetchPage).toHaveBeenCalledTimes(2);
+  });
+
+  it("aborts between pages and returns resumeCursor", async () => {
+    const ac = new AbortController();
+    const fetchPage = vi.fn(async (): Promise<ItemMarketTransactionsPage> => {
+      if (fetchPage.mock.calls.length === 1) {
+        return {
+          items: [makeTx({ id: "p1", createdAt: new Date("2026-08-10T12:00:00.000Z") })],
+          nextCursor: "resume-here",
+        };
+      }
+      ac.abort();
+      return {
+        items: [makeTx({ id: "p2", createdAt: new Date("2026-08-09T12:00:00.000Z") })],
+        nextCursor: "later",
+      };
+    });
+
+    const result = await walkItemMarketTransactions({
+      db,
+      logger: silentLogger,
+      mode: "deepen",
+      fetchPage,
+      pageDelayMs: 0,
+      untilMs: new Date("2026-01-01T00:00:00.000Z").getTime(),
+      signal: ac.signal,
+      maxPages: 10,
+    });
+
+    expect(result.stoppedReason).toBe("aborted");
+    expect(result.resumeCursor).toBe("resume-here");
+    expect(result.pages).toBeGreaterThanOrEqual(1);
+  });
 });
