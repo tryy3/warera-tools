@@ -41,13 +41,12 @@ export function CompaniesPlayerSearch({ selectedUserId, onSelect }: Props) {
   const [results, setResults] = useState<SearchUsersResponse["users"]>([]);
   const [searching, setSearching] = useState(false);
 
+  const q = inputValue.trim();
+  const canSearch = q.length >= 2;
+  const displaySearching = canSearch && searching;
+
   useEffect(() => {
-    const q = inputValue.trim();
-    if (q.length < 2) {
-      setResults([]);
-      setSearching(false);
-      return;
-    }
+    if (!canSearch) return;
     const handle = window.setTimeout(() => {
       void (async () => {
         setSearching(true);
@@ -64,7 +63,7 @@ export function CompaniesPlayerSearch({ selectedUserId, onSelect }: Props) {
       })();
     }, 300);
     return () => window.clearTimeout(handle);
-  }, [inputValue]);
+  }, [canSearch, q]);
 
   const recentIds = useMemo(() => new Set(recent.map((p) => p.userId)), [recent]);
 
@@ -80,14 +79,14 @@ export function CompaniesPlayerSearch({ selectedUserId, onSelect }: Props) {
 
   const resultOptions: CompaniesPlayerOption[] = useMemo(
     () =>
-      results
+      (canSearch ? results : [])
         .filter((u) => !recentIds.has(u.userId))
         .map((u) => ({
           userId: u.userId,
           username: u.username,
           source: "result" as const,
         })),
-    [results, recentIds],
+    [canSearch, recentIds, results],
   );
 
   const items: PlayerGroup[] = useMemo(() => {
@@ -109,7 +108,7 @@ export function CompaniesPlayerSearch({ selectedUserId, onSelect }: Props) {
     setResults([]);
   }
 
-  const emptyMessage = searching
+  const emptyMessage = displaySearching
     ? "Searching…"
     : inputValue.trim().length < 2
       ? recent.length === 0

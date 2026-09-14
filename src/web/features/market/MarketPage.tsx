@@ -35,7 +35,26 @@ export function MarketPage() {
   }
 
   useEffect(() => {
-    void loadLatest();
+    let cancelled = false;
+    void (async () => {
+      try {
+        const data = await api<LatestPricesResponse>("/api/prices/latest");
+        if (cancelled) return;
+        setItems(data.items);
+        setRecordedAt(data.recordedAt);
+        setError(null);
+      } catch (err) {
+        if (cancelled) return;
+        setError(err instanceof Error ? err.message : String(err));
+        setItems([]);
+        setRecordedAt(null);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   async function refreshPrices() {

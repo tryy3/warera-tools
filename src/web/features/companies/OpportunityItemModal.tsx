@@ -5,7 +5,7 @@ import { Label } from "@/components/ui/label";
 import { formatDisplayNumber } from "@/lib/formatDisplayNumber";
 import { GoldIcon } from "../../components/GoldIcon";
 import { ItemIcon } from "../../components/ItemIcon";
-import { useItemPriceBoard } from "./sessionPrices/ItemPriceBoardProvider";
+import { useItemPriceBoard } from "./sessionPrices/item-price-board-context";
 import type { Opportunity } from "./types";
 
 function formatItem(code: string): string {
@@ -15,6 +15,10 @@ function formatItem(code: string): string {
 function formatNum(value: number | null | undefined, digits = 4): string {
   if (value == null || !Number.isFinite(value)) return "—";
   return formatDisplayNumber(value, digits);
+}
+
+function priceDraft(price: number | null | undefined): string {
+  return price != null && Number.isFinite(price) ? String(price) : "";
 }
 
 type OpportunityItemModalProps = {
@@ -32,8 +36,15 @@ export function OpportunityItemModal({ open, opportunity, onClose }: Opportunity
   const buyDirty = itemCode != null && board.isDirty(itemCode, "buy");
   const sellDirty = itemCode != null && board.isDirty(itemCode, "sell");
 
-  const [buyDraft, setBuyDraft] = useState("");
-  const [sellDraft, setSellDraft] = useState("");
+  const draftKey = open && opportunity ? opportunity.itemCode : "";
+  const [appliedDraftKey, setAppliedDraftKey] = useState(draftKey);
+  const [buyDraft, setBuyDraft] = useState(() => priceDraft(opportunity?.buyPrice));
+  const [sellDraft, setSellDraft] = useState(() => priceDraft(opportunity?.sellPrice));
+  if (draftKey !== appliedDraftKey) {
+    setAppliedDraftKey(draftKey);
+    setBuyDraft(priceDraft(opportunity?.buyPrice));
+    setSellDraft(priceDraft(opportunity?.sellPrice));
+  }
 
   useEffect(() => {
     const dialog = dialogRef.current;
@@ -44,20 +55,6 @@ export function OpportunityItemModal({ open, opportunity, onClose }: Opportunity
       dialog.close();
     }
   }, [open]);
-
-  useEffect(() => {
-    if (!open || !opportunity) return;
-    setBuyDraft(
-      opportunity.buyPrice != null && Number.isFinite(opportunity.buyPrice)
-        ? String(opportunity.buyPrice)
-        : "",
-    );
-    setSellDraft(
-      opportunity.sellPrice != null && Number.isFinite(opportunity.sellPrice)
-        ? String(opportunity.sellPrice)
-        : "",
-    );
-  }, [open, opportunity]);
 
   function handleApply(event: FormEvent) {
     event.preventDefault();

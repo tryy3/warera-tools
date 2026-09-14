@@ -83,13 +83,13 @@ function makeTx(overrides: Partial<ItemMarketTransaction> = {}): ItemMarketTrans
 
 function makeCtx(
   db: Db,
-  warera: JobContext["warera"],
+  warera: { request: ReturnType<typeof vi.fn> },
   opts: { state?: Record<string, unknown> | null; setState?: JobContext["setState"] } = {},
 ): JobContext {
   return {
     db,
     logger: silentLogger,
-    warera,
+    warera: warera as JobContext["warera"],
     state: opts.state ?? null,
     setState: opts.setState ?? (async () => {}),
   };

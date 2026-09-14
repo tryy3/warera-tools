@@ -1,19 +1,12 @@
-import {
-  createContext,
-  use,
-  useEffect,
-  useReducer,
-  useRef,
-  type Dispatch,
-  type ReactNode,
-} from "react";
+import { useEffect, useReducer, useRef, type ReactNode } from "react";
 import type { BookPrices } from "../../../../economy/profit";
 import { webLogger } from "../../../logger";
 import type { CompanyAdvisorRow } from "../types";
-import { derivePortfolioCards, type DerivedCompanyCard } from "./derive";
+import { CompanySimContext } from "./company-sim-context";
+import { derivePortfolioCards } from "./derive";
 import { toHydratePayload } from "./hydrate";
 import { companySimReducer, initialCompanySimState } from "./reducer";
-import type { CompanySimAction, CompanySimState, SimWorker } from "./types";
+import type { CompanySimState, SimWorker } from "./types";
 
 function simWorkerFieldSources(worker: SimWorker) {
   const assumed = new Set(worker.assumedFields);
@@ -54,20 +47,6 @@ export type OwnerDefaults = {
   entrepreneurshipLevel: number;
   productionSkillLevel: number;
 };
-
-export type CompanySimContextValue = {
-  state: CompanySimState;
-  dispatch: Dispatch<CompanySimAction>;
-  cards: DerivedCompanyCard[];
-  /** Portfolio actual profit (internal transfers valued at transfer, not market). */
-  portfolioActual: number;
-  /** Portfolio mark-to-market profit (all outputs/inputs at book prices). */
-  portfolioMarkToMarket: number;
-  /** Alias of `portfolioActual` for backward compatibility. */
-  portfolioNet: number;
-};
-
-const CompanySimContext = createContext<CompanySimContextValue | null>(null);
 
 function hydrateState(companies: CompanyAdvisorRow[], keepOverrides: boolean): CompanySimState {
   return companySimReducer(initialCompanySimState, {
@@ -129,12 +108,4 @@ export function CompanySimProvider({
       {children}
     </CompanySimContext>
   );
-}
-
-export function useCompanySim(): CompanySimContextValue {
-  const value = use(CompanySimContext);
-  if (!value) {
-    throw new Error("useCompanySim must be used within CompanySimProvider");
-  }
-  return value;
 }

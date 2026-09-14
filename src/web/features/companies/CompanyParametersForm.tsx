@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { skillValueFromLevel } from "@/skills/values";
-import { useCompanySim } from "./sim/CompanySimProvider";
+import { useCompanySim } from "./sim/company-sim-context";
 import { toHydratePayload } from "./sim/hydrate";
 import type { CompanyOverrides } from "./sim/types";
 import type { CompanyAdvisorRow } from "./types";

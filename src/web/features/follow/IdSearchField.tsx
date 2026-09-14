@@ -22,20 +22,19 @@ export function IdSearchField({ id, onIdChange, onPick, searchType, disabled }: 
   const [error, setError] = useState<string | null>(null);
   const reqIdRef = useRef(0);
 
+  const q = query.trim();
+  const canSearch = q.length >= 2;
+  const displayUsers = canSearch ? users : [];
+  const displayMus = canSearch ? mus : [];
+  const displayError = canSearch ? error : null;
+  const displaySearching = canSearch && searching;
+
   useEffect(() => {
-    const q = query.trim();
-    if (q.length < 2) {
-      setUsers([]);
-      setMus([]);
-      setSearching(false);
-      setError(null);
-      return;
-    }
-    setSearching(true);
-    setError(null);
+    if (!canSearch) return;
     const reqId = ++reqIdRef.current;
     const handle = window.setTimeout(() => {
       void (async () => {
+        setSearching(true);
         try {
           if (searchType === "mu") {
             const data = await api<SearchMusResponse>(
@@ -44,6 +43,8 @@ export function IdSearchField({ id, onIdChange, onPick, searchType, disabled }: 
             if (reqId !== reqIdRef.current) return;
             setMus(data.mus);
             setUsers([]);
+            setError(null);
+            setSearching(false);
           } else {
             const data = await api<SearchUsersResponse>(
               `/api/economy/search?q=${encodeURIComponent(q)}&type=user`,
@@ -51,19 +52,20 @@ export function IdSearchField({ id, onIdChange, onPick, searchType, disabled }: 
             if (reqId !== reqIdRef.current) return;
             setUsers(data.users);
             setMus([]);
+            setError(null);
+            setSearching(false);
           }
         } catch (err) {
           if (reqId !== reqIdRef.current) return;
           setUsers([]);
           setMus([]);
           setError(err instanceof Error ? err.message : String(err));
-        } finally {
-          if (reqId === reqIdRef.current) setSearching(false);
+          setSearching(false);
         }
       })();
     }, 300);
     return () => window.clearTimeout(handle);
-  }, [query, searchType]);
+  }, [canSearch, q, searchType]);
 
   function pickUser(hit: UserHit) {
     onIdChange(hit.userId);
@@ -79,8 +81,7 @@ export function IdSearchField({ id, onIdChange, onPick, searchType, disabled }: 
     setMus([]);
   }
 
-  const trimmed = query.trim();
-  const showResults = trimmed.length >= 2;
+  const showResults = canSearch;
 
   return (
     <div className="flex flex-col gap-2">
@@ -110,18 +111,18 @@ export function IdSearchField({ id, onIdChange, onPick, searchType, disabled }: 
         </label>
       </div>
 
-      {error ? <p className="text-sm text-destructive">{error}</p> : null}
+      {displayError ? <p className="text-sm text-destructive">{displayError}</p> : null}
 
-      {showResults && !error ? (
+      {showResults && !displayError ? (
         <div className="rounded-md border border-border bg-card p-2">
-          {searching ? (
+          {displaySearching ? (
             <p className="px-1 py-2 text-sm text-muted-foreground">Searching…</p>
           ) : searchType === "mu" ? (
-            mus.length === 0 ? (
+            displayMus.length === 0 ? (
               <p className="px-1 py-2 text-sm text-muted-foreground">No MUs found.</p>
             ) : (
               <ul className="m-0 flex flex-col gap-1 p-0">
-                {mus.map((hit) => (
+                {displayMus.map((hit) => (
                   <li key={hit.muId}>
                     <button
                       type="button"
@@ -136,11 +137,11 @@ export function IdSearchField({ id, onIdChange, onPick, searchType, disabled }: 
                 ))}
               </ul>
             )
-          ) : users.length === 0 ? (
+          ) : displayUsers.length === 0 ? (
             <p className="px-1 py-2 text-sm text-muted-foreground">No players found.</p>
           ) : (
             <ul className="m-0 flex flex-col gap-1 p-0">
-              {users.map((hit) => (
+              {displayUsers.map((hit) => (
                 <li key={hit.userId}>
                   <button
                     type="button"

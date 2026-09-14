@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { CompaniesPlayerSearch } from "../features/companies/CompaniesPlayerSearch";
-import { usePlayerSelection } from "../player/PlayerSelectionContext";
+import { usePlayerSelection } from "../player/player-selection";
 import { loadPlayerData } from "../query/loadPlayerData";
 import { useCompaniesQuery } from "../query/useCompaniesQuery";
 

@@ -24,7 +24,7 @@ import { GoldIcon } from "../../components/GoldIcon";
 import { ItemIcon } from "../../components/ItemIcon";
 import { OpportunityItemModal } from "./OpportunityItemModal";
 import { nullsLastSortingFn } from "./nullsLastSortingFn";
-import { useItemPriceBoard } from "./sessionPrices/ItemPriceBoardProvider";
+import { useItemPriceBoard } from "./sessionPrices/item-price-board-context";
 import type { Opportunity } from "./types";
 
 const features = tableFeatures({

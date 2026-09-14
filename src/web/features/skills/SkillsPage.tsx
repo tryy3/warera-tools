@@ -2,7 +2,7 @@ import { getRouteApi } from "@tanstack/react-router";
 import { useCallback } from "react";
 import { BattleTab } from "../battle-build/BattleTab";
 import { buildSkillsSearch } from "../../lib/skillsSearch";
-import { usePlayerSelection } from "../../player/PlayerSelectionContext";
+import { usePlayerSelection } from "../../player/player-selection";
 import { useSyncPlayerSearch } from "../../player/useSyncPlayerSearch";
 import { useBattleBuildImportQuery } from "../../query/useBattleBuildImportQuery";
 import { useUserQuery } from "../../query/useUserQuery";

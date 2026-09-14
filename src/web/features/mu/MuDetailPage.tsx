@@ -184,93 +184,96 @@ export function MuDetailPage() {
   const [muHistory, setMuHistory] = useState<MuHistoryResponse | null>(null);
   const [memberHistory, setMemberHistory] = useState<MuMemberHistoryResponse | null>(null);
 
-  const [detailLoading, setDetailLoading] = useState(true);
-  const [muHistoryLoading, setMuHistoryLoading] = useState(true);
-  const [memberHistoryLoading, setMemberHistoryLoading] = useState(true);
-
   const [notFound, setNotFound] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [reloadToken, setReloadToken] = useState(0);
+  const detailKey = `${muId}:${reloadToken}`;
+  const [readyDetailKey, setReadyDetailKey] = useState<string | null>(null);
+  const detailLoading = readyDetailKey !== detailKey;
+  const muHistoryKey = `${muId}:${range}:${muMetric}:${reloadToken}`;
+  const [readyMuHistoryKey, setReadyMuHistoryKey] = useState<string | null>(null);
+  const muHistoryLoading = !notFound && !detailLoading && readyMuHistoryKey !== muHistoryKey;
+  const memberHistoryKey = `${muId}:${memberRange}:${memberMetric}:${reloadToken}`;
+  const [readyMemberHistoryKey, setReadyMemberHistoryKey] = useState<string | null>(null);
+  const memberHistoryLoading =
+    !notFound && !detailLoading && readyMemberHistoryKey !== memberHistoryKey;
 
   useEffect(() => {
     let cancelled = false;
-    setDetailLoading(true);
-    setError(null);
-    setNotFound(false);
 
     void fetchMuDetail(muId)
       .then((result) => {
         if (cancelled) return;
         setDetail(result);
+        setError(null);
+        setNotFound(false);
+        setReadyDetailKey(detailKey);
       })
       .catch((err: unknown) => {
         if (cancelled) return;
         if (err instanceof ApiError && (err.status === 404 || err.code === "not_found")) {
           setNotFound(true);
+          setError(null);
           setDetail(null);
+          setReadyDetailKey(detailKey);
           return;
         }
         setError(err instanceof Error ? err.message : String(err));
+        setNotFound(false);
         setDetail(null);
-      })
-      .finally(() => {
-        if (!cancelled) setDetailLoading(false);
+        setReadyDetailKey(detailKey);
       });
 
     return () => {
       cancelled = true;
     };
-  }, [muId, reloadToken]);
+  }, [muId, reloadToken, detailKey]);
 
   useEffect(() => {
     if (notFound || detailLoading) return;
 
     let cancelled = false;
-    setMuHistoryLoading(true);
 
     void fetchMuHistory(muId, range, muMetric)
       .then((result) => {
         if (cancelled) return;
         setMuHistory(result);
+        setReadyMuHistoryKey(muHistoryKey);
       })
       .catch((err: unknown) => {
         if (cancelled) return;
         setError(err instanceof Error ? err.message : String(err));
         setMuHistory(null);
-      })
-      .finally(() => {
-        if (!cancelled) setMuHistoryLoading(false);
+        setReadyMuHistoryKey(muHistoryKey);
       });
 
     return () => {
       cancelled = true;
     };
-  }, [muId, range, muMetric, notFound, detailLoading, reloadToken]);
+  }, [muId, range, muMetric, notFound, detailLoading, reloadToken, muHistoryKey]);
 
   useEffect(() => {
     if (notFound || detailLoading) return;
 
     let cancelled = false;
-    setMemberHistoryLoading(true);
 
     void fetchMemberHistory(muId, memberRange, memberMetric)
       .then((result) => {
         if (cancelled) return;
         setMemberHistory(result);
+        setReadyMemberHistoryKey(memberHistoryKey);
       })
       .catch((err: unknown) => {
         if (cancelled) return;
         setError(err instanceof Error ? err.message : String(err));
         setMemberHistory(null);
-      })
-      .finally(() => {
-        if (!cancelled) setMemberHistoryLoading(false);
+        setReadyMemberHistoryKey(memberHistoryKey);
       });
 
     return () => {
       cancelled = true;
     };
-  }, [muId, memberRange, memberMetric, notFound, detailLoading, reloadToken]);
+  }, [muId, memberRange, memberMetric, notFound, detailLoading, reloadToken, memberHistoryKey]);
 
   const muMetricLabel = formatMuMetricLabel(muMetric);
   const memberMetricLabel = formatMuMetricLabel(memberMetric);
@@ -286,9 +289,11 @@ export function MuDetailPage() {
 
       {detailLoading ? <p className="text-muted-foreground">Loading military unit…</p> : null}
 
-      {notFound ? <p className="text-muted-foreground">Military unit not found.</p> : null}
+      {!detailLoading && notFound ? (
+        <p className="text-muted-foreground">Military unit not found.</p>
+      ) : null}
 
-      {error ? (
+      {!detailLoading && error ? (
         <div className="my-2 flex flex-wrap items-center gap-3">
           <p className="m-0 text-destructive">{error}</p>
           <Button

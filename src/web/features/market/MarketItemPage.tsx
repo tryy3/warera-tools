@@ -6,7 +6,7 @@ import { PRICE_HISTORY_RANGES, type PriceHistoryRange } from "@/market/ranges";
 import { ApiError, api } from "../../api";
 import { GoldIcon } from "../../components/GoldIcon";
 import { ItemIcon } from "../../components/ItemIcon";
-import { usePlayerSelection } from "../../player/PlayerSelectionContext";
+import { usePlayerSelection } from "../../player/player-selection";
 import { formatItem } from "./formatItem";
 import { MarketPriceChart, type TradeDot } from "./MarketPriceChart";
 import { MyTradesStrip } from "./MyTradesStrip";
@@ -132,72 +132,74 @@ export function MarketItemPage() {
   const playerId = player?.userId ?? null;
 
   const [data, setData] = useState<PriceHistoryResponse | null>(null);
-  const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [reloadToken, setReloadToken] = useState(0);
+  const historyKey = `${itemCode}:${range}:${reloadToken}`;
+  const [readyHistoryKey, setReadyHistoryKey] = useState<string | null>(null);
+  const loading = readyHistoryKey !== historyKey;
 
   const [trades, setTrades] = useState<MyTradesResponse | null>(null);
-  const [tradesLoading, setTradesLoading] = useState(false);
   const [tradesError, setTradesError] = useState<string | null>(null);
   const [tradesReloadToken, setTradesReloadToken] = useState(0);
+  const tradesKey = playerId ? `${itemCode}:${range}:${playerId}:${tradesReloadToken}` : null;
+  const [readyTradesKey, setReadyTradesKey] = useState<string | null>(null);
+  const tradesLoading = tradesKey != null && readyTradesKey !== tradesKey;
 
   useEffect(() => {
     let cancelled = false;
-    setLoading(true);
-    setError(null);
-    setNotFound(false);
 
     void fetchPriceHistory(itemCode, range)
       .then((result) => {
         if (cancelled) return;
         setData(result);
+        setError(null);
+        setNotFound(false);
+        setReadyHistoryKey(historyKey);
       })
       .catch((err: unknown) => {
         if (cancelled) return;
         if (err instanceof ApiError && (err.status === 404 || err.code === "not_found")) {
           setNotFound(true);
+          setError(null);
           setData(null);
+          setReadyHistoryKey(historyKey);
           return;
         }
         setError(err instanceof Error ? err.message : String(err));
+        setNotFound(false);
         setData(null);
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
+        setReadyHistoryKey(historyKey);
       });
 
     return () => {
       cancelled = true;
     };
-  }, [itemCode, range, reloadToken]);
+  }, [itemCode, range, reloadToken, historyKey]);
 
   useEffect(() => {
-    if (!playerId) return;
+    if (!playerId || !tradesKey) return;
 
     let cancelled = false;
-    setTradesLoading(true);
-    setTradesError(null);
-    setTrades(null);
 
     void fetchMyTrades(itemCode, playerId, range)
       .then((result) => {
         if (cancelled) return;
         setTrades(result);
+        setTradesError(null);
+        setReadyTradesKey(tradesKey);
       })
       .catch((err: unknown) => {
         if (cancelled) return;
         setTradesError(err instanceof Error ? err.message : String(err));
         setTrades(null);
-      })
-      .finally(() => {
-        if (!cancelled) setTradesLoading(false);
+        setReadyTradesKey(tradesKey);
       });
 
     return () => {
       cancelled = true;
     };
-  }, [itemCode, range, playerId, tradesReloadToken]);
+  }, [itemCode, range, playerId, tradesReloadToken, tradesKey]);
 
   const activeTrades = playerId ? trades : null;
   const tradeDots = useMemo(
@@ -252,11 +254,11 @@ export function MarketItemPage() {
 
       {loading ? <p className="text-muted-foreground">Loading price history…</p> : null}
 
-      {notFound ? (
+      {!loading && notFound ? (
         <p className="text-muted-foreground">Item not found or no price history yet.</p>
       ) : null}
 
-      {error ? (
+      {!loading && error ? (
         <div className="my-2 flex flex-wrap items-center gap-3">
           <p className="m-0 text-destructive">{error}</p>
           <Button
