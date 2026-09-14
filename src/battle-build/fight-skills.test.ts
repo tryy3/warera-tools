@@ -3,10 +3,12 @@ import { FIGHT_SKILL_IDS, fightLevelsFromUserSkills, spentNonFightSp } from "./f
 
 describe("fightLevelsFromUserSkills", () => {
   it("reads known keys and defaults missing to 0", () => {
-    expect(fightLevelsFromUserSkills({ attack: { level: 5 }, energy: { level: 3 } })).toMatchObject({
-      attack: 5,
-      precision: 0,
-    });
+    expect(fightLevelsFromUserSkills({ attack: { level: 5 }, energy: { level: 3 } })).toMatchObject(
+      {
+        attack: 5,
+        precision: 0,
+      },
+    );
   });
 
   it("maps alternate API spellings to canonical fight skills", () => {

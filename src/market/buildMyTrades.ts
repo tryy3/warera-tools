@@ -21,10 +21,7 @@ export type MyTradesResult = {
   fillCount: number;
 };
 
-function rowsToFills(
-  rows: PlayerItemFillRow[],
-  playerId: string,
-): PlayerFill[] {
+function rowsToFills(rows: PlayerItemFillRow[], playerId: string): PlayerFill[] {
   return rows.map((row) => ({
     id: row.id,
     side: row.buyerId === playerId ? ("buy" as const) : ("sell" as const),
@@ -38,12 +35,7 @@ function chunkOverlapsRange(chunk: TradeChunk, since: Date, until: Date): boolea
   return chunk.endAt.getTime() >= since.getTime() && chunk.startAt.getTime() <= until.getTime();
 }
 
-function qtyInRange(
-  fills: PlayerFill[],
-  side: "buy" | "sell",
-  since: Date,
-  until: Date,
-): number {
+function qtyInRange(fills: PlayerFill[], side: "buy" | "sell", since: Date, until: Date): number {
   const sinceMs = since.getTime();
   const untilMs = until.getTime();
   let total = 0;

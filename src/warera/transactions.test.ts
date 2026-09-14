@@ -139,10 +139,13 @@ describe("fetchItemMarketTransactionsPage", () => {
     const request = vi.fn().mockResolvedValue({
       result: { data: { items: [], cursor: null } },
     });
-    await fetchItemMarketTransactionsPage({ request }, {
-      limit: 10,
-      transactionType: "trading",
-    });
+    await fetchItemMarketTransactionsPage(
+      { request },
+      {
+        limit: 10,
+        transactionType: "trading",
+      },
+    );
     expect(String(request.mock.calls[0]![0])).toContain("trading");
   });
 });

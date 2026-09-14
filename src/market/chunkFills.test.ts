@@ -1,7 +1,10 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 import { chunkFills, type PlayerFill } from "./chunkFills";
 
-function fill(partial: Partial<PlayerFill> & Pick<PlayerFill, "id" | "side" | "money" | "quantity" | "createdAt">): PlayerFill {
+function fill(
+  partial: Partial<PlayerFill> &
+    Pick<PlayerFill, "id" | "side" | "money" | "quantity" | "createdAt">,
+): PlayerFill {
   return partial;
 }
 

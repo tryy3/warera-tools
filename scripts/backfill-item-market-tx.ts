@@ -64,15 +64,13 @@ function parseArgs(argv: string[]) {
 async function main() {
   const args = parseArgs(process.argv.slice(2));
   const base = loadConfig();
-  const config =
-    args.rpm != null ? { ...base, wareraMaxRequestsPerMinute: args.rpm } : base;
+  const config = args.rpm != null ? { ...base, wareraMaxRequestsPerMinute: args.rpm } : base;
 
   const logger = createServerLogger(config);
   const { db, client } = createDb(config, logger);
   const warera = createWareraClient({ config, logger });
 
-  const types: TxType[] =
-    args.type === "both" ? ["trading", "itemMarket"] : [args.type];
+  const types: TxType[] = args.type === "both" ? ["trading", "itemMarket"] : [args.type];
 
   const ac = new AbortController();
   const onSig = () => {
@@ -87,8 +85,7 @@ async function main() {
 
   try {
     for (const transactionType of types) {
-      const apiType =
-        transactionType === "trading" ? COMMODITY_TRANSACTION_TYPE : "itemMarket";
+      const apiType = transactionType === "trading" ? COMMODITY_TRANSACTION_TYPE : "itemMarket";
 
       const result = await walkItemMarketTransactions({
         db,

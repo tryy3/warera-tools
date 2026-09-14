@@ -7,10 +7,7 @@ import { beforeEach, describe, expect, it } from "vite-plus/test";
 import type { ItemMarketTransaction } from "../warera/transactions";
 import type { Db } from "./client";
 import { insertItemMarketTransactionsIgnoreConflicts } from "./item-market-transactions";
-import {
-  listItemMarketTxForItemCodes,
-  listItemMarketTxSince,
-} from "./item-market-tx-read";
+import { listItemMarketTxForItemCodes, listItemMarketTxSince } from "./item-market-tx-read";
 import * as schema from "./schema";
 
 async function createDb(): Promise<Db> {
@@ -119,8 +116,6 @@ describe("listItemMarketTxForItemCodes", () => {
     ]);
     const rows = await listItemMarketTxForItemCodes(db, ["chest4", "helmet4"]);
     expect(rows.map((r) => r.id).sort()).toEqual(["a", "b"]);
-    expect(rows.every((r) => r.itemCode === "chest4" || r.itemCode === "helmet4")).toBe(
-      true,
-    );
+    expect(rows.every((r) => r.itemCode === "chest4" || r.itemCode === "helmet4")).toBe(true);
   });
 });

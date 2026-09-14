@@ -69,9 +69,7 @@ function chunkSideStream(fills: PlayerFill[]): TradeChunk[] {
     return [];
   }
 
-  const sorted = [...fills].sort(
-    (a, b) => a.createdAt.getTime() - b.createdAt.getTime(),
-  );
+  const sorted = [...fills].sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
 
   const chunks: TradeChunk[] = [];
   let open: OpenChunk | null = null;

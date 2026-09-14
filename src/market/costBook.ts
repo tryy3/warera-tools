@@ -18,9 +18,7 @@ export type CostBookResult = {
 type OpenLot = { qty: number; unitPrice: number };
 
 export function runCostBook(fills: PlayerFill[]): CostBookResult {
-  const sorted = [...fills].sort(
-    (a, b) => a.createdAt.getTime() - b.createdAt.getTime(),
-  );
+  const sorted = [...fills].sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
 
   const openLots: OpenLot[] = [];
   const realized: RealizedSale[] = [];
@@ -67,11 +65,7 @@ export function runCostBook(fills: PlayerFill[]): CostBookResult {
   return { realized, historyIncomplete, openLots };
 }
 
-export function sumRealizedPnl(
-  realized: RealizedSale[],
-  since: Date,
-  until: Date,
-): number {
+export function sumRealizedPnl(realized: RealizedSale[], since: Date, until: Date): number {
   const sinceMs = since.getTime();
   const untilMs = until.getTime();
 

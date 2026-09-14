@@ -56,8 +56,7 @@ export async function runItemMarketTxPoll(ctx: JobContext) {
 
   if (!isCommodityDeepenDone()) {
     const oldest = await oldestCommodityCreatedAt(ctx.db);
-    const covered =
-      oldest != null && oldest.getTime() <= Date.now() - PRICE_HISTORY_MAX_MS;
+    const covered = oldest != null && oldest.getTime() <= Date.now() - PRICE_HISTORY_MAX_MS;
     if (covered) {
       markCommodityDeepenDone();
       await ctx.setState({

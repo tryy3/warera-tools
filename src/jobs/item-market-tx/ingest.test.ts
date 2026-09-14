@@ -299,15 +299,11 @@ describe("walkItemMarketTransactions", () => {
     const fetchPage = vi
       .fn()
       .mockResolvedValueOnce({
-        items: [
-          makeTx({ id: "a", createdAt: new Date("2026-08-10T12:00:00.000Z") }),
-        ],
+        items: [makeTx({ id: "a", createdAt: new Date("2026-08-10T12:00:00.000Z") })],
         nextCursor: "c2",
       } satisfies ItemMarketTransactionsPage)
       .mockResolvedValueOnce({
-        items: [
-          makeTx({ id: "b", createdAt: new Date("2026-07-15T12:00:00.000Z") }),
-        ],
+        items: [makeTx({ id: "b", createdAt: new Date("2026-07-15T12:00:00.000Z") })],
         nextCursor: "c3",
       } satisfies ItemMarketTransactionsPage);
 
