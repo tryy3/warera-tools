@@ -99,6 +99,13 @@
       "when": 1789249149674,
       "tag": "0013_next_the_stranger",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "6",
+      "when": 1789401264538,
+      "tag": "0014_big_silverclaw",
+      "breakpoints": true
     }
   ]
 }

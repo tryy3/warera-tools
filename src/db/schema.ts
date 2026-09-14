@@ -17,17 +17,21 @@ export const jobs = sqliteTable("jobs", {
   state: text("state", { mode: "json" }).$type<Record<string, unknown> | null>(),
 });
 
-export const jobRuns = sqliteTable("job_runs", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
-  jobId: text("job_id")
-    .notNull()
-    .references(() => jobs.id),
-  startedAt: integer("started_at", { mode: "timestamp_ms" }).notNull(),
-  finishedAt: integer("finished_at", { mode: "timestamp_ms" }),
-  status: text("status").notNull(),
-  message: text("message"),
-  durationMs: integer("duration_ms"),
-});
+export const jobRuns = sqliteTable(
+  "job_runs",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    jobId: text("job_id")
+      .notNull()
+      .references(() => jobs.id),
+    startedAt: integer("started_at", { mode: "timestamp_ms" }).notNull(),
+    finishedAt: integer("finished_at", { mode: "timestamp_ms" }),
+    status: text("status").notNull(),
+    message: text("message"),
+    durationMs: integer("duration_ms"),
+  },
+  (t) => [index("job_runs_job_id_started_at_id_idx").on(t.jobId, t.startedAt, t.id)],
+);
 
 export const cache = sqliteTable("cache", {
   key: text("key").primaryKey(),
