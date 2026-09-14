@@ -1,6 +1,6 @@
 # WarEra data inventory (as-is)
 
-**Last reviewed:** 2026-09-06
+**Last reviewed:** 2026-09-14
 **Status:** Living — update when cadence, ownership, or major consumers change  
 **Tier rules:** [Data tier caching strategy](../superpowers/specs/2026-08-02-data-tier-caching-strategy-design.md)
 
@@ -56,11 +56,11 @@ Global battle catalog (`battle.getBattles` cursor drain); rows enter and stay st
 | Resource | What | Who refreshes | Cadence (default) | Upstream today | Storage | Main consumers |
 | --- | --- | --- | --- | --- | --- | --- |
 | Countries | Country list + tax metadata | `country-sync` | Daily midnight | api2 | Latest rows (`countries`) | Calculator, Equipment prefs, economy UI |
-| Regions | Region facts for watchlist ids | `region-sync`; advisor cold miss upserts + enqueues | Hourly at :05 | api2 | Latest rows (`regions`); row presence = watchlist | Advisor, Growth, recommended-region follow-ups |
+| Regions | Region facts for watchlist ids | `region-sync`; advisor cold miss upserts + enqueues | Hourly at :05 | api2 | Latest rows (`regions`); refresh when fetched_at null or older than 12h | Advisor, Growth, recommended-region follow-ups |
 | Military units (MU) | MU metadata + member roster/stats | `mu-stats-poll` over watchlist | Every 30 minutes | `mu.getById` via api2; **`muMember.getByMu` forced api2 + X-API-Key** | Latest roster + append stat snapshots | MU tool (`/mu`, `GET /api/mu/:id`, `GET /api/mu/:id/history`), Follow |
-| MU member profiles / activity | Identity + activity dates/leveling/premium for watched MU rosters | `mu-member-poll` | Every 5 minutes | `user.getUserById` batch | Append-only `user_profile_polls` / `user_profile_snapshots` | Follow sync (DB-first), future MU activity tools |
+| MU member profiles / activity | Identity + activity dates/leveling/premium for watched MU rosters | `mu-member-poll` | Every 5 minutes | `user.getUserById` batch | Append-on-change `user_profile_polls` / `user_profile_snapshots` (poll row every run; snapshot only when content changes) | Follow sync (DB-first), future MU activity tools |
 | Country watchlist | Distinct country ids with watch reasons (seed Sweden manual) | Manual insert now; future auto-enqueue | On write | — | `country_watch_reasons` | `donation-poll` |
-| Donations (MU/country) | Per-donor running totals for watched MUs + countries | `donation-poll` | Hourly (`0 0 * * * *`) | `donation.getManyPaginated` (api2 override) | Append `donation_polls` / `donation_snapshots` | Future MU weekly stats / rankings |
+| Donations (MU/country) | Per-donor running totals for watched MUs + countries | `donation-poll` | Hourly (`0 0 * * * *`) | `donation.getManyPaginated` (api2 override) | Append-on-change `donation_polls` / `donation_snapshots` (poll row every run; snapshot only when amount changes) | Future MU weekly stats / rankings |
 
 Event-driven Geo (`enqueueGeoRefresh` from battles/laws/etc.) is **documented as planned** in the data-tier design; not implemented. Quiet regions may stay unchanged for days; hot war regions change often — today’s sync does not differentiate.
 
