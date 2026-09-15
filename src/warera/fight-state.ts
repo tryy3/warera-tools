@@ -12,6 +12,8 @@ export type ParsedFightState = FightPlayerInput & {
   avatarUrl: string | null;
 };
 
+const KNOWN_PILL_BUFF_CODES = new Set(["cocain"]);
+
 type UnknownRecord = Record<string, unknown>;
 
 function asRecord(value: unknown): UnknownRecord | null {
@@ -48,10 +50,10 @@ function parsePillStatus(attack: UnknownRecord): PillStatus | null {
 function parsePillLabel(buffCodes: unknown, pillStatus: PillStatus): string | null {
   if (pillStatus !== "active" || !Array.isArray(buffCodes)) return null;
 
-  const codes = buffCodes
-    .filter((value): value is string => typeof value === "string" && value.length > 0)
-    .toSorted();
-  return codes.find((code) => code.toLowerCase().includes("cocain")) ?? codes[0] ?? null;
+  const codes = buffCodes.filter(
+    (value): value is string => typeof value === "string" && value.length > 0,
+  );
+  return codes.find((code) => KNOWN_PILL_BUFF_CODES.has(code)) ?? null;
 }
 
 export function parseFightState(raw: unknown): ParsedFightState | null {

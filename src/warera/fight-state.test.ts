@@ -87,7 +87,7 @@ describe("parseFightState", () => {
     expect(parseFightState(malformed)).toBeNull();
   });
 
-  it("prefers known pill codes and sorts unknown active codes deterministically", () => {
+  it("returns pillLabel only for verified pill buff codes", () => {
     const known = structuredClone(fixture) as {
       buffs: { buffCodes: string[] };
     };
@@ -106,7 +106,7 @@ describe("parseFightState", () => {
     ready.skills.attack.buffsPercent = 0;
 
     expect(parseFightState(known)?.pillLabel).toBe("cocain");
-    expect(parseFightState(unknown)?.pillLabel).toBe("alpha");
+    expect(parseFightState(unknown)?.pillLabel).toBeNull();
     expect(parseFightState(ready)?.pillLabel).toBeNull();
   });
 
