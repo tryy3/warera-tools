@@ -32,16 +32,18 @@ async function refreshFightStates(
   muId: string,
   userIds: string[],
   recordedAt: Date,
-): Promise<void> {
+): Promise<string[]> {
   const { db, warera, logger } = deps;
   const payloads = await fetchUserByIdRawBatch(warera, userIds);
   const rows: UserFightSnapshotRow[] = [];
   const errors: string[] = [];
+  const failedUserIds: string[] = [];
 
   for (const userId of userIds) {
     const raw = payloads.get(userId);
     const parsed = raw == null ? null : parseFightState(raw);
     if (!parsed || parsed.userId !== userId) {
+      failedUserIds.push(userId);
       errors.push(`user ${userId}: lookup or fight-state parse failed`);
       continue;
     }
@@ -80,19 +82,22 @@ async function refreshFightStates(
     },
     "fight desk refresh complete",
   );
+
+  return failedUserIds;
 }
 
-function incompleteMember(userId: string, role: string | null) {
+function incompleteMember(userId: string, role: string | null, refreshFailed = false) {
   return {
     userId,
     username: null,
     level: null,
     role,
     incomplete: true,
+    ...(refreshFailed ? { refreshFailed: true } : {}),
     fight: null,
     display: {
       avatarUrl: null,
-      militaryRank: null,
+      militaryRankBonus: null,
       ammoLabel: null,
       pillLabel: null,
       pillEndsAt: null,
@@ -102,17 +107,22 @@ function incompleteMember(userId: string, role: string | null) {
   };
 }
 
-function completeMember(snapshot: ParsedFightState, role: string | null) {
+function completeMember(
+  snapshot: ParsedFightState,
+  role: string | null,
+  refreshFailed = false,
+) {
   return {
     userId: snapshot.userId,
     username: snapshot.username,
     level: snapshot.level,
     role,
     incomplete: false,
+    ...(refreshFailed ? { refreshFailed: true } : {}),
     fight: toFightPlayerInput(snapshot),
     display: {
       avatarUrl: snapshot.avatarUrl,
-      militaryRank: snapshot.militaryRankBonus,
+      militaryRankBonus: snapshot.militaryRankBonus,
       ammoLabel: snapshot.ammoLabel,
       pillLabel: snapshot.pillLabel,
       pillEndsAt: snapshot.pillEndsAt?.toISOString() ?? null,
@@ -144,8 +154,9 @@ export function muFightDeskRoutes(deps: MuFightDeskRouteDeps) {
     let snapshots = await listLatestFightStatesForMu(db, muId);
     const watched = watchRows.length > 0;
     const shouldLiveFill = forceRefresh || (watched && snapshots.length === 0 && roster.length > 0);
+    let refreshFailedUserIds: string[] = [];
     if (shouldLiveFill) {
-      await refreshFightStates(
+      refreshFailedUserIds = await refreshFightStates(
         deps,
         muId,
         roster.map((member) => member.userId),
@@ -155,6 +166,7 @@ export function muFightDeskRoutes(deps: MuFightDeskRouteDeps) {
     }
 
     const userIds = roster.map((member) => member.userId);
+    const refreshFailedUserIdSet = new Set(refreshFailedUserIds);
     const asOfRow =
       userIds.length === 0
         ? null
@@ -173,11 +185,12 @@ export function muFightDeskRoutes(deps: MuFightDeskRouteDeps) {
       asOf: asOfRow?.recordedAt.toISOString() ?? null,
       members: roster.map((member) => {
         const snapshot = snapshotByUserId.get(member.userId);
+        const refreshFailed = refreshFailedUserIdSet.has(member.userId);
         return snapshot
-          ? completeMember(snapshot, member.role)
-          : incompleteMember(member.userId, member.role);
+          ? completeMember(snapshot, member.role, refreshFailed)
+          : incompleteMember(member.userId, member.role, refreshFailed);
       }),
-      meta: { watched, liveFilled: shouldLiveFill },
+      meta: { watched, liveFilled: shouldLiveFill, refreshFailedUserIds },
     };
   }
 

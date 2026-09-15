@@ -238,7 +238,7 @@ describe("muFightDeskRoutes", () => {
       mu: { id: "mu-1", name: "First Unit" },
       asOf: null,
       members: [],
-      meta: { watched: false, liveFilled: false },
+      meta: { watched: false, liveFilled: false, refreshFailedUserIds: [] },
     });
     expect(requestBatch).not.toHaveBeenCalled();
   });
@@ -260,7 +260,7 @@ describe("muFightDeskRoutes", () => {
         fight: null,
         display: {
           avatarUrl: null,
-          militaryRank: null,
+          militaryRankBonus: null,
           ammoLabel: null,
           pillLabel: null,
           pillEndsAt: null,
@@ -292,10 +292,18 @@ describe("muFightDeskRoutes", () => {
     const body = (await res.json()) as {
       asOf: string | null;
       members: Array<Record<string, unknown>>;
-      meta: { watched: boolean; liveFilled: boolean };
+      meta: {
+        watched: boolean;
+        liveFilled: boolean;
+        refreshFailedUserIds: string[];
+      };
     };
     expect(body.asOf).toBe(NOW.toISOString());
-    expect(body.meta).toEqual({ watched: true, liveFilled: false });
+    expect(body.meta).toEqual({
+      watched: true,
+      liveFilled: false,
+      refreshFailedUserIds: [],
+    });
     expect(body.members[0]).toMatchObject({
       userId: "u1",
       username: "alice",
@@ -310,7 +318,7 @@ describe("muFightDeskRoutes", () => {
       },
       display: {
         avatarUrl: "https://example.test/u1.png",
-        militaryRank: 0.35,
+        militaryRankBonus: 0.35,
         ammoLabel: "Q5",
         pillLabel: "cocain",
         pillEndsAt: "2026-09-15T13:00:00.000Z",
@@ -332,11 +340,19 @@ describe("muFightDeskRoutes", () => {
     const body = (await res.json()) as {
       asOf: string | null;
       members: Array<{ incomplete: boolean }>;
-      meta: { watched: boolean; liveFilled: boolean };
+      meta: {
+        watched: boolean;
+        liveFilled: boolean;
+        refreshFailedUserIds: string[];
+      };
     };
     expect(body.asOf).toBe(NOW.toISOString());
     expect(body.members[0]?.incomplete).toBe(false);
-    expect(body.meta).toEqual({ watched: true, liveFilled: true });
+    expect(body.meta).toEqual({
+      watched: true,
+      liveFilled: true,
+      refreshFailedUserIds: [],
+    });
     expect(await db.select().from(schema.userFightSnapshots)).toHaveLength(1);
   });
 
@@ -355,14 +371,22 @@ describe("muFightDeskRoutes", () => {
     expect(res.status).toBe(200);
     const body = (await res.json()) as {
       asOf: string | null;
-      members: Array<{ userId: string; incomplete: boolean }>;
-      meta: { watched: boolean; liveFilled: boolean };
+      members: Array<{ userId: string; incomplete: boolean; refreshFailed?: boolean }>;
+      meta: {
+        watched: boolean;
+        liveFilled: boolean;
+        refreshFailedUserIds: string[];
+      };
     };
     expect(body.asOf).toBe(NOW.toISOString());
-    expect(body.meta).toEqual({ watched: false, liveFilled: true });
+    expect(body.meta).toEqual({
+      watched: false,
+      liveFilled: true,
+      refreshFailedUserIds: ["u2"],
+    });
     expect(body.members).toMatchObject([
       { userId: "u1", incomplete: false },
-      { userId: "u2", incomplete: true },
+      { userId: "u2", incomplete: true, refreshFailed: true },
     ]);
     expect(requestBatch).toHaveBeenCalledWith([
       { procedure: "user.getUserById", input: { userId: "u1" } },
@@ -370,5 +394,55 @@ describe("muFightDeskRoutes", () => {
     ]);
     expect(await db.select().from(schema.userFightSnapshots)).toHaveLength(1);
     expect(await db.select().from(schema.userFightPolls)).toHaveLength(1);
+  });
+
+  it("keeps an existing snapshot and marks the member when forced refresh fails", async () => {
+    await seedMu(db, ["u1"]);
+    const oldAt = new Date("2026-09-15T11:55:00.000Z");
+    const pollId = await insertUserFightPoll(db, {
+      recordedAt: oldAt,
+      status: "success",
+      userCount: 1,
+      muCount: 1,
+    });
+    await insertUserFightSnapshots(db, pollId, [
+      { ...parsedFight("u1", "alice"), muId: "mu-1", recordedAt: oldAt },
+    ]);
+    const requestBatch = vi.fn(async () => [
+      { ok: true as const, data: { _id: "u1", username: "missing-fight-fields" } },
+    ]);
+    const { app } = appFor(db, requestBatch);
+
+    const res = await app.request("http://localhost/mu-1/fight-desk/refresh", {
+      method: "POST",
+    });
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      members: Array<{
+        userId: string;
+        incomplete: boolean;
+        refreshFailed?: boolean;
+        fight: unknown;
+      }>;
+      meta: {
+        liveFilled: boolean;
+        refreshFailedUserIds: string[];
+      };
+    };
+    expect(body.meta.liveFilled).toBe(true);
+    expect(body.meta.refreshFailedUserIds).toEqual(["u1"]);
+    expect(body.members[0]).toMatchObject({
+      userId: "u1",
+      incomplete: false,
+      refreshFailed: true,
+      fight: {
+        userId: "u1",
+        atk: 1_234,
+        precision: 0.82,
+        pillStatus: "active",
+      },
+    });
+    expect(await db.select().from(schema.userFightSnapshots)).toHaveLength(1);
   });
 });
