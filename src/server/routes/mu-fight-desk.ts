@@ -107,11 +107,7 @@ function incompleteMember(userId: string, role: string | null, refreshFailed = f
   };
 }
 
-function completeMember(
-  snapshot: ParsedFightState,
-  role: string | null,
-  refreshFailed = false,
-) {
+function completeMember(snapshot: ParsedFightState, role: string | null, refreshFailed = false) {
   return {
     userId: snapshot.userId,
     username: snapshot.username,

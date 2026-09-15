@@ -1,10 +1,7 @@
 import { describe, expect, it } from "vite-plus/test";
 import type { BuildClass } from "../../build-class";
 import type { PillStatus } from "../../fight-damage/types";
-import {
-  applyFightDeskPreset,
-  isFightDeskRosterReadyForInitialPreset,
-} from "./fightDeskSelection";
+import { applyFightDeskPreset, isFightDeskRosterReadyForInitialPreset } from "./fightDeskSelection";
 
 type Member = { userId: string; pillStatus: PillStatus; buildClass: BuildClass };
 
@@ -22,20 +19,12 @@ describe("isFightDeskRosterReadyForInitialPreset", () => {
   });
 
   it("waits while every member lacks fight data", () => {
-    expect(
-      isFightDeskRosterReadyForInitialPreset([
-        { fight: null },
-        { fight: null },
-      ]),
-    ).toBe(false);
+    expect(isFightDeskRosterReadyForInitialPreset([{ fight: null }, { fight: null }])).toBe(false);
   });
 
   it("is ready once any member has fight data", () => {
     expect(
-      isFightDeskRosterReadyForInitialPreset([
-        { fight: null },
-        { fight: { userId: "u1" } },
-      ]),
+      isFightDeskRosterReadyForInitialPreset([{ fight: null }, { fight: { userId: "u1" } }]),
     ).toBe(true);
   });
 });
@@ -59,7 +48,11 @@ describe("applyFightDeskPreset", () => {
   });
 
   it("damage_build selects war build members", () => {
-    expect(applyFightDeskPreset("damage_build", members)).toEqual(["active", "debuff", "war-ready"]);
+    expect(applyFightDeskPreset("damage_build", members)).toEqual([
+      "active",
+      "debuff",
+      "war-ready",
+    ]);
   });
 
   it("all selects every member", () => {

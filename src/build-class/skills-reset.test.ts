@@ -1,8 +1,5 @@
 import { describe, expect, it } from "vite-plus/test";
-import {
-  SKILLS_RESET_COOLDOWN_MS,
-  skillsResetStatus,
-} from "./skills-reset";
+import { SKILLS_RESET_COOLDOWN_MS, skillsResetStatus } from "./skills-reset";
 
 describe("skillsResetStatus", () => {
   const now = new Date("2026-03-15T12:00:00.000Z");

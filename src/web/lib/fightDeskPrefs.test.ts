@@ -134,10 +134,7 @@ describe("loadFightDeskPrefs", () => {
   });
 
   it("does not read prefs for a different muId", () => {
-    localStorage.setItem(
-      fightDeskPrefsKey("other-mu"),
-      JSON.stringify(defaultFightDeskPrefs()),
-    );
+    localStorage.setItem(fightDeskPrefsKey("other-mu"), JSON.stringify(defaultFightDeskPrefs()));
     expect(loadFightDeskPrefs(MU_ID)).toBeNull();
   });
 });
