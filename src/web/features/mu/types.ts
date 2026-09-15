@@ -1,5 +1,6 @@
 import type { MemberHistoryMetric, MuHistoryMetric } from "../../../mu/metrics";
 import type { MuHistoryRange } from "../../../mu/ranges";
+import type { FightPlayerInput } from "../../../fight-damage/types";
 
 export type MuSearchHit = { muId: string; name: string };
 
@@ -71,4 +72,32 @@ export type MuMemberHistoryResponse = {
   scope: "members";
   metric: MemberHistoryMetric;
   series: MuMemberHistorySeries[];
+};
+
+export type MuFightDeskMember = {
+  userId: string;
+  username: string | null;
+  level: number | null;
+  role: string | null;
+  incomplete: boolean;
+  fight: FightPlayerInput | null;
+  display: {
+    avatarUrl: string | null;
+    militaryRankBonus: number | null;
+    ammoLabel: string | null;
+    pillLabel: string | null;
+    pillEndsAt: string | null;
+    skillLevels: Record<string, number>;
+    lastSkillsResetAt: string | null;
+  };
+};
+
+export type MuFightDeskResponse = {
+  mu: { id: string; name: string | null };
+  asOf: string | null;
+  members: MuFightDeskMember[];
+  meta: {
+    watched: boolean;
+    liveFilled: boolean;
+  };
 };
