@@ -275,6 +275,59 @@ export const userProfileSnapshots = sqliteTable(
   ],
 );
 
+export const userFightPolls = sqliteTable(
+  "user_fight_polls",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    recordedAt: integer("recorded_at", { mode: "timestamp_ms" }).notNull(),
+    status: text("status").notNull(),
+    error: text("error"),
+    userCount: integer("user_count").notNull().default(0),
+    muCount: integer("mu_count").notNull().default(0),
+  },
+  (t) => [index("user_fight_polls_status_recorded_at_idx").on(t.status, t.recordedAt)],
+);
+
+export const userFightSnapshots = sqliteTable(
+  "user_fight_snapshots",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    pollId: integer("poll_id")
+      .notNull()
+      .references(() => userFightPolls.id),
+    userId: text("user_id").notNull(),
+    muId: text("mu_id").notNull(),
+    recordedAt: integer("recorded_at", { mode: "timestamp_ms" }).notNull(),
+    username: text("username").notNull(),
+    level: integer("level").notNull(),
+    militaryRankBonus: real("military_rank_bonus").notNull(),
+    ammoLabel: text("ammo_label"),
+    pillLabel: text("pill_label"),
+    pillEndsAt: integer("pill_ends_at", { mode: "timestamp_ms" }),
+    skillLevels: text("skill_levels", { mode: "json" }).notNull().$type<Record<string, number>>(),
+    lastSkillsResetAt: integer("last_skills_reset_at", { mode: "timestamp_ms" }),
+    avatarUrl: text("avatar_url"),
+    atk: real("atk").notNull(),
+    precision: real("precision").notNull(),
+    critChance: real("crit_chance").notNull(),
+    critDamage: real("crit_damage").notNull(),
+    armor: real("armor").notNull(),
+    dodge: real("dodge").notNull(),
+    hp: real("hp").notNull(),
+    maxHp: real("max_hp").notNull(),
+    hunger: real("hunger").notNull(),
+    maxHunger: real("max_hunger").notNull(),
+    hpRegenPerHour: real("hp_regen_per_hour").notNull(),
+    hungerRegenPerHour: real("hunger_regen_per_hour").notNull(),
+    pillStatus: text("pill_status").notNull().$type<"active" | "debuff" | "ready">(),
+  },
+  (t) => [
+    index("user_fight_snapshots_user_recorded_at_idx").on(t.userId, t.recordedAt),
+    index("user_fight_snapshots_poll_idx").on(t.pollId),
+    index("user_fight_snapshots_mu_recorded_at_idx").on(t.muId, t.recordedAt),
+  ],
+);
+
 export const players = sqliteTable("players", {
   id: text("id").primaryKey(),
   username: text("username"),
