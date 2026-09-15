@@ -80,6 +80,7 @@ export type MuFightDeskMember = {
   level: number | null;
   role: string | null;
   incomplete: boolean;
+  refreshFailed?: boolean;
   fight: FightPlayerInput | null;
   display: {
     avatarUrl: string | null;
@@ -99,5 +100,6 @@ export type MuFightDeskResponse = {
   meta: {
     watched: boolean;
     liveFilled: boolean;
+    refreshFailedUserIds: string[];
   };
 };

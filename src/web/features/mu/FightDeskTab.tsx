@@ -16,6 +16,12 @@ import {
   type FightDeskPresetId,
 } from "../../lib/fightDeskSelection";
 import { useMuFightDeskQuery, useRefreshMuFightDesk } from "../../query/useMuFightDeskQuery";
+import { FightDeskMemberRow } from "./FightDeskMemberRow";
+import {
+  buildFightDeskMemberRows,
+  sortFightDeskMemberRows,
+  type FightDeskSort,
+} from "./fightDeskMemberRows";
 
 const PRESETS: Array<{ id: FightDeskPresetId; label: string }> = [
   { id: "pilled", label: "Pilled" },
@@ -61,6 +67,7 @@ export function FightDeskTab({ muId }: { muId: string }) {
   });
   const [prefs, setPrefs] = useState<FightDeskPrefsV1>(initial.prefs);
   const [initialPresetDone, setInitialPresetDone] = useState(!initial.applyInitialPreset);
+  const [sort, setSort] = useState<FightDeskSort>("now");
 
   const presetMembers = useMemo(
     () =>
@@ -100,17 +107,31 @@ export function FightDeskTab({ muId }: { muId: string }) {
     saveFightDeskPrefs(muId, prefs);
   }, [initialPresetDone, muId, prefs]);
 
-  const summary = useMemo(() => {
-    const players = (query.data?.members ?? []).flatMap((member) =>
-      member.fight ? [member.fight] : [],
-    );
-    return aggregateFightDesk(players, new Set(prefs.selectedUserIds), {
+  const fightKnobs = useMemo(
+    () => ({
       foodId: prefs.foodId,
       foodBonus: foodBonusForId(prefs.foodId),
       battleBonus: prefs.battleBonus,
       ticks: prefs.ticks,
-    });
-  }, [prefs, query.data?.members]);
+    }),
+    [prefs.battleBonus, prefs.foodId, prefs.ticks],
+  );
+
+  const summary = useMemo(() => {
+    const players = (query.data?.members ?? []).flatMap((member) =>
+      member.fight ? [member.fight] : [],
+    );
+    return aggregateFightDesk(players, new Set(prefs.selectedUserIds), fightKnobs);
+  }, [fightKnobs, prefs.selectedUserIds, query.data?.members]);
+
+  const memberRows = useMemo(
+    () => buildFightDeskMemberRows(query.data?.members ?? [], fightKnobs),
+    [fightKnobs, query.data?.members],
+  );
+  const sortedMemberRows = useMemo(
+    () => sortFightDeskMemberRows(memberRows, sort),
+    [memberRows, sort],
+  );
 
   function updatePrefs(patch: Partial<FightDeskPrefsV1>) {
     setPrefs((current) => ({ ...current, ...patch }));
@@ -120,6 +141,28 @@ export function FightDeskTab({ muId }: { muId: string }) {
     updatePrefs({
       selectedUserIds: applyFightDeskPreset(preset, presetMembers),
       lastPresetId: preset,
+    });
+  }
+
+  function setMemberSelected(userId: string, selected: boolean) {
+    setPrefs((current) => {
+      const selectedIds = new Set(current.selectedUserIds);
+      if (selected) selectedIds.add(userId);
+      else selectedIds.delete(userId);
+      return {
+        ...current,
+        selectedUserIds: [...selectedIds],
+        lastPresetId: null,
+      };
+    });
+  }
+
+  function setMemberExpanded(userId: string, expanded: boolean) {
+    setPrefs((current) => {
+      const expandedIds = new Set(current.expandedUserIds);
+      if (expanded) expandedIds.add(userId);
+      else expandedIds.delete(userId);
+      return { ...current, expandedUserIds: [...expandedIds] };
     });
   }
 
@@ -266,11 +309,48 @@ export function FightDeskTab({ muId }: { muId: string }) {
         <SummaryCard label="Top" value={formatDisplayNumber(summary.topDamage, 0)} />
       </section>
 
-      <section className="rounded-md border border-dashed border-border px-4 py-8 text-center">
-        <p className="m-0 text-sm font-medium">Member damage rows arrive next.</p>
-        <p className="mt-1 mb-0 text-xs text-muted-foreground">
-          Presets and totals already use the latest complete fight snapshots.
-        </p>
+      <section className="overflow-hidden rounded-md border border-border/70 bg-background/20">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/60 px-3 py-2.5">
+          <div>
+            <h2 className="m-0 text-sm font-semibold">Member readiness</h2>
+            <p className="mt-0.5 mb-0 text-xs text-muted-foreground">
+              Projected with the current food, bonus, and tick settings.
+            </p>
+          </div>
+          <label className="flex items-center gap-2 text-xs text-muted-foreground">
+            Sort
+            <select
+              className="h-8 rounded-lg border border-input bg-secondary px-2.5 text-sm text-foreground scheme-dark outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+              value={sort}
+              onChange={(event) => setSort(event.target.value as FightDeskSort)}
+            >
+              <option value="now">Total now</option>
+              <option value="potential">Potential</option>
+              <option value="hp">HP</option>
+              <option value="name">Name</option>
+            </select>
+          </label>
+        </div>
+
+        {sortedMemberRows.length > 0 ? (
+          <div>
+            {sortedMemberRows.map((row, index) => (
+              <FightDeskMemberRow
+                key={row.member.userId}
+                row={row}
+                rank={index + 1}
+                selected={prefs.selectedUserIds.includes(row.member.userId)}
+                expanded={prefs.expandedUserIds.includes(row.member.userId)}
+                onSelectedChange={(selected) => setMemberSelected(row.member.userId, selected)}
+                onExpandedChange={(expanded) => setMemberExpanded(row.member.userId, expanded)}
+              />
+            ))}
+          </div>
+        ) : (
+          <p className="m-0 px-4 py-8 text-center text-sm text-muted-foreground">
+            No MU members found.
+          </p>
+        )}
       </section>
     </div>
   );
