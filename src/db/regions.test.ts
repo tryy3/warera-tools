@@ -12,7 +12,9 @@ import {
   getRegionsByIds,
   enqueueRegions,
   listRegionsForSync,
+  REGION_SYNC_MAX_AGE_MS,
   upsertRegionFetched,
+  upsertRegionsFetched,
 } from "./regions";
 
 async function createDb(): Promise<Db> {
@@ -75,9 +77,45 @@ describe("regions db", () => {
       countryCode: "FI",
       fetchedAt: new Date("2026-08-01T11:30:00.000Z"),
     });
-    const ids = (await listRegionsForSync(db)).map((r) => r.id);
+    const ids = (
+      await listRegionsForSync(db, {
+        now: new Date("2026-08-01T12:00:00.000Z"),
+        maxAgeMs: Number.POSITIVE_INFINITY,
+      })
+    ).map((r) => r.id);
     expect(ids[0]).toBe("pending");
     expect(ids.slice(1)).toEqual(["old", "newer"]);
+  });
+
+  it("listRegionsForSync skips rows fresher than maxAgeMs", async () => {
+    const now = new Date("2026-09-14T12:00:00.000Z");
+    await upsertRegionFetched(db, {
+      id: "fresh",
+      name: "Fresh",
+      countryCode: "SE",
+      fetchedAt: new Date(now.getTime() - 60_000),
+    });
+    await upsertRegionFetched(db, {
+      id: "stale",
+      name: "Stale",
+      countryCode: "NO",
+      fetchedAt: new Date(now.getTime() - REGION_SYNC_MAX_AGE_MS - 1),
+    });
+    await enqueueRegion(db, "pending", now);
+    const ids = (await listRegionsForSync(db, { now, maxAgeMs: REGION_SYNC_MAX_AGE_MS })).map(
+      (r) => r.id,
+    );
+    expect(ids).toEqual(["pending", "stale"]);
+  });
+
+  it("upsertRegionsFetched writes many rows in one call", async () => {
+    const fetchedAt = new Date("2026-09-14T12:00:00.000Z");
+    await upsertRegionsFetched(db, [
+      { id: "a", name: "A", countryCode: "SE", fetchedAt },
+      { id: "b", name: "B", countryCode: "NO", fetchedAt },
+    ]);
+    expect((await getRegion(db, "a"))?.name).toBe("A");
+    expect((await getRegion(db, "b"))?.countryCode).toBe("NO");
   });
 
   it("batch loads and enqueues regions", async () => {

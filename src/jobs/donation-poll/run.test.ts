@@ -12,7 +12,7 @@ import {
   WATCH_REASON_MANUAL,
   insertMuWatchReason,
 } from "../../db/watch-reasons";
-import { runDonationPoll } from "./run";
+import { donationFingerprintCache, runDonationPoll } from "./run";
 
 async function createDb(): Promise<Db> {
   const dir = mkdtempSync(join(tmpdir(), "donation-poll-"));
@@ -86,14 +86,29 @@ function makeLogger() {
   };
 }
 
-function donation(scope: "mu" | "country") {
+function donation(scope: "mu" | "country", amount?: number) {
   return {
     _id: `${scope}-donation`,
     ...(scope === "mu" ? { muId: MU_ID } : { countryId: SEED_COUNTRY_SWEDEN_ID }),
     userId: `${scope}-user`,
-    amount: scope === "mu" ? 100 : 200,
+    amount: amount ?? (scope === "mu" ? 100 : 200),
     createdAt: "2026-04-20T08:27:34.084Z",
     updatedAt: "2026-09-03T06:57:17.251Z",
+  };
+}
+
+function makeScopeDonationWarera(overrides?: { muAmount?: number; countryAmount?: number }) {
+  return {
+    request: vi.fn().mockImplementation((path: unknown) => {
+      const decoded = decodeURIComponent(String(path));
+      const items =
+        decoded.includes(`"muId":"${MU_ID}"`) || decoded.includes(`muId":"${MU_ID}`)
+          ? [donation("mu", overrides?.muAmount)]
+          : [donation("country", overrides?.countryAmount)];
+      return Promise.resolve({
+        result: { data: { items, nextCursor: null } },
+      });
+    }),
   };
 }
 
@@ -102,6 +117,7 @@ describe("runDonationPoll", () => {
 
   beforeEach(async () => {
     db = await createDb();
+    donationFingerprintCache.clear();
   });
 
   it("ensures Sweden and writes snapshots for MU and country scopes", async () => {
@@ -172,5 +188,63 @@ describe("runDonationPoll", () => {
       scopeType: "country",
       scopeId: SEED_COUNTRY_SWEDEN_ID,
     });
+  });
+
+  it("second identical poll writes poll row but zero new snapshots", async () => {
+    await seedMuReason(db);
+    const warera = makeScopeDonationWarera();
+
+    await runDonationPoll({ db, warera: warera as never, logger: makeLogger() as never });
+    const afterFirst = (await db.select().from(schema.donationSnapshots)).length;
+
+    await runDonationPoll({ db, warera: warera as never, logger: makeLogger() as never });
+    const polls = await db.select().from(schema.donationPolls);
+    const snapshots = await db.select().from(schema.donationSnapshots);
+    expect(polls.length).toBe(2);
+    expect(snapshots.length).toBe(afterFirst);
+    expect(polls[1]?.rowCount).toBe(0);
+  });
+
+  it("writes a snapshot when amount changes", async () => {
+    await seedMuReason(db);
+    const wareraFirst = makeScopeDonationWarera();
+    await runDonationPoll({
+      db,
+      warera: wareraFirst as never,
+      logger: makeLogger() as never,
+    });
+
+    const wareraSecond = makeScopeDonationWarera({ muAmount: 150 });
+    await runDonationPoll({
+      db,
+      warera: wareraSecond as never,
+      logger: makeLogger() as never,
+    });
+
+    const polls = await db.select().from(schema.donationPolls);
+    const snapshots = await db.select().from(schema.donationSnapshots);
+    expect(polls.length).toBe(2);
+    expect(polls[1]?.rowCount).toBe(1);
+    expect(snapshots.length).toBe(3);
+    const muSnapshots = snapshots.filter(
+      (s) => s.scopeType === "mu" && s.scopeId === MU_ID && s.userId === "mu-user",
+    );
+    expect(muSnapshots.map((s) => s.amount)).toEqual([100, 150]);
+  });
+
+  it("warms from DB and skips rewrite after cache clear", async () => {
+    await seedMuReason(db);
+    const warera = makeScopeDonationWarera();
+
+    await runDonationPoll({ db, warera: warera as never, logger: makeLogger() as never });
+    const afterFirst = (await db.select().from(schema.donationSnapshots)).length;
+    donationFingerprintCache.clear();
+
+    await runDonationPoll({ db, warera: warera as never, logger: makeLogger() as never });
+    const polls = await db.select().from(schema.donationPolls);
+    const snapshots = await db.select().from(schema.donationSnapshots);
+    expect(polls.length).toBe(2);
+    expect(snapshots.length).toBe(afterFirst);
+    expect(polls[1]?.rowCount).toBe(0);
   });
 });

@@ -1,4 +1,4 @@
-import { and, desc, eq, notInArray } from "drizzle-orm";
+import { and, desc, eq, lt, or } from "drizzle-orm";
 import type { Db } from "../db/client";
 import { jobRuns } from "../db/schema";
 
@@ -13,16 +13,28 @@ export async function pruneJobRuns(db: Db, jobId: string, keep: number): Promise
   }
 
   const keepRows = await db
-    .select({ id: jobRuns.id })
+    .select({ id: jobRuns.id, startedAt: jobRuns.startedAt })
     .from(jobRuns)
     .where(eq(jobRuns.jobId, jobId))
     .orderBy(desc(jobRuns.startedAt), desc(jobRuns.id))
     .limit(keep);
 
-  const keepIds = keepRows.map((row) => row.id);
-  if (keepIds.length === 0) {
+  if (keepRows.length < keep) {
     return;
   }
 
-  await db.delete(jobRuns).where(and(eq(jobRuns.jobId, jobId), notInArray(jobRuns.id, keepIds)));
+  const cutoff = keepRows[keepRows.length - 1]!;
+  const cutoffStartedAt = cutoff.startedAt as Date;
+
+  await db
+    .delete(jobRuns)
+    .where(
+      and(
+        eq(jobRuns.jobId, jobId),
+        or(
+          lt(jobRuns.startedAt, cutoffStartedAt),
+          and(eq(jobRuns.startedAt, cutoffStartedAt), lt(jobRuns.id, cutoff.id)),
+        ),
+      ),
+    );
 }

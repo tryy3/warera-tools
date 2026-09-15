@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vite-plus/test";
 import type { Db } from "../../db/client";
 import * as schema from "../../db/schema";
-import { runMuMemberPoll } from "./run";
+import { runMuMemberPoll, userProfileFingerprintCache } from "./run";
 
 async function createDb(): Promise<Db> {
   const dir = mkdtempSync(join(tmpdir(), "mu-member-poll-"));
@@ -143,6 +143,7 @@ describe("runMuMemberPoll", () => {
 
   beforeEach(async () => {
     db = await createDb();
+    userProfileFingerprintCache.clear();
   });
 
   it("writes two profile snapshots for members of a watched MU in one batch", async () => {
@@ -214,6 +215,77 @@ describe("runMuMemberPoll", () => {
     const polls = await db.select().from(schema.userProfilePolls);
     expect(polls).toHaveLength(1);
     expect(polls[0]?.userCount).toBe(0);
+  });
+
+  it("second identical poll writes poll row but zero new snapshots", async () => {
+    await seedWatchedMu(db, "mu-1", ["u1"]);
+    const requestBatch = vi.fn(async () => [{ ok: true as const, data: profileFixture("u1") }]);
+    await runMuMemberPoll({
+      db,
+      warera: { request: vi.fn(), requestBatch } as never,
+      logger: makeLogger() as never,
+      now: NOW,
+    });
+    await runMuMemberPoll({
+      db,
+      warera: { request: vi.fn(), requestBatch } as never,
+      logger: makeLogger() as never,
+      now: new Date(NOW.getTime() + 5 * 60_000),
+    });
+    expect(await db.select().from(schema.userProfileSnapshots)).toHaveLength(1);
+    const polls = await db.select().from(schema.userProfilePolls);
+    expect(polls).toHaveLength(2);
+    expect(polls[1]?.userCount).toBe(0);
+  });
+
+  it("writes when a stored field changes", async () => {
+    await seedWatchedMu(db, "mu-1", ["u1"]);
+    const requestBatchFirst = vi.fn(async () => [
+      { ok: true as const, data: profileFixture("u1") },
+    ]);
+    await runMuMemberPoll({
+      db,
+      warera: { request: vi.fn(), requestBatch: requestBatchFirst } as never,
+      logger: makeLogger() as never,
+      now: NOW,
+    });
+
+    const changed = profileFixture("u1");
+    changed.leveling = { ...changed.leveling, totalXp: 12_346 };
+    const requestBatchSecond = vi.fn(async () => [{ ok: true as const, data: changed }]);
+    await runMuMemberPoll({
+      db,
+      warera: { request: vi.fn(), requestBatch: requestBatchSecond } as never,
+      logger: makeLogger() as never,
+      now: new Date(NOW.getTime() + 5 * 60_000),
+    });
+
+    expect(await db.select().from(schema.userProfileSnapshots)).toHaveLength(2);
+    const polls = await db.select().from(schema.userProfilePolls);
+    expect(polls).toHaveLength(2);
+    expect(polls[1]?.userCount).toBe(1);
+  });
+
+  it("after cache.clear(), warms from DB and skips identical rewrite", async () => {
+    await seedWatchedMu(db, "mu-1", ["u1"]);
+    const requestBatch = vi.fn(async () => [{ ok: true as const, data: profileFixture("u1") }]);
+    await runMuMemberPoll({
+      db,
+      warera: { request: vi.fn(), requestBatch } as never,
+      logger: makeLogger() as never,
+      now: NOW,
+    });
+    userProfileFingerprintCache.clear();
+    await runMuMemberPoll({
+      db,
+      warera: { request: vi.fn(), requestBatch } as never,
+      logger: makeLogger() as never,
+      now: new Date(NOW.getTime() + 5 * 60_000),
+    });
+    expect(await db.select().from(schema.userProfileSnapshots)).toHaveLength(1);
+    const polls = await db.select().from(schema.userProfilePolls);
+    expect(polls).toHaveLength(2);
+    expect(polls[1]?.userCount).toBe(0);
   });
 
   it("marks the poll error when every batch slot fails", async () => {

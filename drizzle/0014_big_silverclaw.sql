@@ -1,0 +1,1 @@
+CREATE INDEX `job_runs_job_id_started_at_id_idx` ON `job_runs` (`job_id`,`started_at`,`id`);

@@ -3,11 +3,16 @@ import {
   insertUserProfilePoll,
   insertUserProfileSnapshots,
   listDistinctWatchedMuMemberUserIds,
+  loadLatestUserProfileFingerprints,
+  userProfileContentFingerprint,
   type UserProfileSnapshotRow,
 } from "../../db/user-profiles";
 import type { Logger } from "../../logging/logger";
 import type { WareraRequester } from "../../warera/prices";
 import { fetchUserProfileBatch } from "../../warera/users";
+import { createFingerprintCache } from "../snapshot-fingerprint-cache";
+
+export const userProfileFingerprintCache = createFingerprintCache();
 
 export type MuMemberPollResult = {
   pollId: number;
@@ -83,24 +88,38 @@ export async function runMuMemberPoll(options: {
 
   const status: MuMemberPollResult["status"] =
     rows.length === 0 ? "error" : errors.length > 0 ? "partial" : "success";
+
+  await userProfileFingerprintCache.ensureWarmed(
+    rows.map((r) => r.userId),
+    (missing) => loadLatestUserProfileFingerprints(db, missing),
+  );
+
+  const deltas = rows.filter((r) => {
+    const fp = userProfileContentFingerprint(r);
+    return userProfileFingerprintCache.get(r.userId) !== fp;
+  });
+
   const pollId = await insertUserProfilePoll(db, {
     recordedAt,
     status,
     error: errors.length > 0 ? errors.slice(0, 20).join("; ") : null,
-    userCount: rows.length,
+    userCount: deltas.length,
     muCount,
   });
-  await insertUserProfileSnapshots(db, pollId, rows);
+  await insertUserProfileSnapshots(db, pollId, deltas);
+  userProfileFingerprintCache.setMany(
+    deltas.map((r) => [r.userId, userProfileContentFingerprint(r)]),
+  );
 
   logger.info(
     {
       poll_id: pollId,
-      user_count: rows.length,
+      user_count: deltas.length,
       mu_count: muCount,
       status,
       error_count: errors.length,
     },
     "mu member poll complete",
   );
-  return { pollId, userCount: rows.length, muCount, status };
+  return { pollId, userCount: deltas.length, muCount, status };
 }

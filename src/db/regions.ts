@@ -1,4 +1,4 @@
-import { eq, inArray } from "drizzle-orm";
+import { eq, inArray, sql } from "drizzle-orm";
 import type { Db } from "./client";
 import { regions } from "./schema";
 
@@ -73,16 +73,67 @@ export async function getRegionsByIds(
   return out;
 }
 
-export async function listRegionsForSync(db: Db): Promise<RegionRow[]> {
+export const REGION_SYNC_MAX_AGE_MS = 12 * 60 * 60 * 1000;
+const REGION_UPSERT_CHUNK = 100;
+
+export async function listRegionsForSync(
+  db: Db,
+  opts?: { now?: Date; maxAgeMs?: number },
+): Promise<RegionRow[]> {
+  const now = opts?.now ?? new Date();
+  const maxAgeMs = opts?.maxAgeMs ?? REGION_SYNC_MAX_AGE_MS;
+  const cutoff = maxAgeMs === Number.POSITIVE_INFINITY ? null : new Date(now.getTime() - maxAgeMs);
   const rows = await db.select().from(regions);
-  return rows.map(mapRow).toSorted((a, b) => {
-    if (a.fetchedAt == null && b.fetchedAt != null) return -1;
-    if (a.fetchedAt != null && b.fetchedAt == null) return 1;
-    if (a.fetchedAt == null && b.fetchedAt == null) {
-      return a.enqueuedAt.getTime() - b.enqueuedAt.getTime();
-    }
-    return a.fetchedAt!.getTime() - b.fetchedAt!.getTime();
-  });
+  return rows
+    .map(mapRow)
+    .filter(
+      (r) => cutoff == null || r.fetchedAt == null || r.fetchedAt.getTime() <= cutoff.getTime(),
+    )
+    .toSorted((a, b) => {
+      if (a.fetchedAt == null && b.fetchedAt != null) return -1;
+      if (a.fetchedAt != null && b.fetchedAt == null) return 1;
+      if (a.fetchedAt == null && b.fetchedAt == null) {
+        return a.enqueuedAt.getTime() - b.enqueuedAt.getTime();
+      }
+      return a.fetchedAt!.getTime() - b.fetchedAt!.getTime();
+    });
+}
+
+export async function upsertRegionsFetched(
+  db: Db,
+  rows: Array<{
+    id: string;
+    name: string | null;
+    countryCode: string | null;
+    payload?: Record<string, unknown> | null;
+    fetchedAt: Date;
+  }>,
+): Promise<void> {
+  if (rows.length === 0) return;
+  for (let i = 0; i < rows.length; i += REGION_UPSERT_CHUNK) {
+    const chunk = rows.slice(i, i + REGION_UPSERT_CHUNK);
+    await db
+      .insert(regions)
+      .values(
+        chunk.map((row) => ({
+          id: row.id,
+          name: row.name,
+          countryCode: row.countryCode,
+          payload: row.payload ?? null,
+          fetchedAt: row.fetchedAt,
+          enqueuedAt: row.fetchedAt,
+        })),
+      )
+      .onConflictDoUpdate({
+        target: regions.id,
+        set: {
+          name: sql`excluded.name`,
+          countryCode: sql`excluded.country_code`,
+          payload: sql`excluded.payload`,
+          fetchedAt: sql`excluded.fetched_at`,
+        },
+      });
+  }
 }
 
 export async function upsertRegionFetched(
@@ -95,23 +146,5 @@ export async function upsertRegionFetched(
     fetchedAt: Date;
   },
 ): Promise<void> {
-  await db
-    .insert(regions)
-    .values({
-      id: row.id,
-      name: row.name,
-      countryCode: row.countryCode,
-      payload: row.payload ?? null,
-      fetchedAt: row.fetchedAt,
-      enqueuedAt: row.fetchedAt,
-    })
-    .onConflictDoUpdate({
-      target: regions.id,
-      set: {
-        name: row.name,
-        countryCode: row.countryCode,
-        payload: row.payload ?? null,
-        fetchedAt: row.fetchedAt,
-      },
-    });
+  await upsertRegionsFetched(db, [row]);
 }

@@ -74,6 +74,30 @@ describe("runRegionSync", () => {
     expect(row?.fetchedAt).not.toBeNull();
   });
 
+  it("skips fresh regions within TTL on second run", async () => {
+    await enqueueRegion(db, "r1", new Date("2026-08-01T12:00:00.000Z"));
+    const warera = {
+      request: vi.fn(async () => ({
+        result: { data: { name: "City", countryCode: "SE" } },
+      })),
+    };
+    const logger = {
+      info: vi.fn(),
+      warn: vi.fn(),
+      error: vi.fn(),
+      debug: vi.fn(),
+      child: vi.fn(),
+    } as never;
+    const firstNow = new Date("2026-08-01T12:00:00.000Z");
+    await runRegionSync({ db, warera: warera as never, logger, now: firstNow });
+    expect(warera.request).toHaveBeenCalledTimes(1);
+
+    const secondNow = new Date(firstNow.getTime() + 60_000);
+    const result = await runRegionSync({ db, warera: warera as never, logger, now: secondNow });
+    expect(result).toEqual({ regionCount: 0, status: "success", errors: 0 });
+    expect(warera.request).toHaveBeenCalledTimes(1);
+  });
+
   it("keeps prior data when one refresh throws", async () => {
     await enqueueRegion(db, "ok", new Date("2026-08-01T12:00:00.000Z"));
     await enqueueRegion(db, "bad", new Date("2026-08-01T12:00:00.000Z"));
