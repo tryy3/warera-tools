@@ -41,6 +41,21 @@ export function fightStateContentFingerprint(row: UserFightSnapshotRow): string 
   ]);
 }
 
+export async function loadLatestFightStateFingerprints(
+  db: Db,
+  userIds: string[],
+): Promise<Map<string, string>> {
+  const out = new Map<string, string>();
+  const unique = [...new Set(userIds.filter((id) => id.length > 0))];
+  await Promise.all(
+    unique.map(async (userId) => {
+      const latest = await getLatestSnapshotRow(db, userId);
+      if (latest) out.set(userId, fightStateContentFingerprint(toSnapshotRow(latest)));
+    }),
+  );
+  return out;
+}
+
 export async function insertUserFightPoll(
   db: Db,
   values: {
