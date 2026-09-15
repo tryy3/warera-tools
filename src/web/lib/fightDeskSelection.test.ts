@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vite-plus/test";
 import type { BuildClass } from "../../build-class";
 import type { PillStatus } from "../../fight-damage/types";
-import { applyFightDeskPreset } from "./fightDeskSelection";
+import {
+  applyFightDeskPreset,
+  isFightDeskRosterReadyForInitialPreset,
+} from "./fightDeskSelection";
 
 type Member = { userId: string; pillStatus: PillStatus; buildClass: BuildClass };
 
@@ -12,6 +15,30 @@ const members: Member[] = [
   { userId: "war-ready", pillStatus: "ready", buildClass: "war" },
   { userId: "unknown", pillStatus: "ready", buildClass: "unknown" },
 ];
+
+describe("isFightDeskRosterReadyForInitialPreset", () => {
+  it("is ready for an empty roster", () => {
+    expect(isFightDeskRosterReadyForInitialPreset([])).toBe(true);
+  });
+
+  it("waits while every member lacks fight data", () => {
+    expect(
+      isFightDeskRosterReadyForInitialPreset([
+        { fight: null },
+        { fight: null },
+      ]),
+    ).toBe(false);
+  });
+
+  it("is ready once any member has fight data", () => {
+    expect(
+      isFightDeskRosterReadyForInitialPreset([
+        { fight: null },
+        { fight: { userId: "u1" } },
+      ]),
+    ).toBe(true);
+  });
+});
 
 describe("applyFightDeskPreset", () => {
   it("pilled selects active pill members only", () => {

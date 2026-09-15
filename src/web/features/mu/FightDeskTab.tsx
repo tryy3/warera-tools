@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { classifyBuildFromSkillLevels } from "../../../build-class/classify";
 import { aggregateFightDesk } from "../../../fight-damage/aggregate";
 import { FIGHT_FOOD_OPTIONS, foodBonusForId } from "../../../fight-damage/food";
@@ -10,7 +10,11 @@ import {
   saveFightDeskPrefs,
   type FightDeskPrefsV1,
 } from "../../lib/fightDeskPrefs";
-import { applyFightDeskPreset, type FightDeskPresetId } from "../../lib/fightDeskSelection";
+import {
+  applyFightDeskPreset,
+  isFightDeskRosterReadyForInitialPreset,
+  type FightDeskPresetId,
+} from "../../lib/fightDeskSelection";
 import { useMuFightDeskQuery, useRefreshMuFightDesk } from "../../query/useMuFightDeskQuery";
 
 const PRESETS: Array<{ id: FightDeskPresetId; label: string }> = [
@@ -56,7 +60,7 @@ export function FightDeskTab({ muId }: { muId: string }) {
     return { prefs: stored ?? defaultFightDeskPrefs(), applyInitialPreset: stored == null };
   });
   const [prefs, setPrefs] = useState<FightDeskPrefsV1>(initial.prefs);
-  const appliedInitialPreset = useRef(!initial.applyInitialPreset);
+  const [initialPresetDone, setInitialPresetDone] = useState(!initial.applyInitialPreset);
 
   const presetMembers = useMemo(
     () =>
@@ -77,18 +81,24 @@ export function FightDeskTab({ muId }: { muId: string }) {
   );
 
   useEffect(() => {
-    if (appliedInitialPreset.current || !query.data) return;
-    appliedInitialPreset.current = true;
-    setPrefs((current) => ({
-      ...current,
-      selectedUserIds: applyFightDeskPreset("pilled", presetMembers),
-      lastPresetId: "pilled",
-    }));
-  }, [presetMembers, query.data]);
+    if (initialPresetDone || !query.data) return;
+    if (!isFightDeskRosterReadyForInitialPreset(query.data.members)) return;
+
+    setPrefs((current) => {
+      if (current.selectedUserIds.length > 0) return current;
+      return {
+        ...current,
+        selectedUserIds: applyFightDeskPreset("pilled", presetMembers),
+        lastPresetId: "pilled",
+      };
+    });
+    setInitialPresetDone(true);
+  }, [initialPresetDone, presetMembers, query.data]);
 
   useEffect(() => {
+    if (!initialPresetDone) return;
     saveFightDeskPrefs(muId, prefs);
-  }, [muId, prefs]);
+  }, [initialPresetDone, muId, prefs]);
 
   const summary = useMemo(() => {
     const players = (query.data?.members ?? []).flatMap((member) =>

@@ -15,6 +15,13 @@ type FightDeskMember = {
   buildClass: BuildClass;
 };
 
+/** True when first-visit preset can run: empty roster or at least one warmed fight snapshot. */
+export function isFightDeskRosterReadyForInitialPreset(
+  members: Array<{ fight: unknown | null }>,
+): boolean {
+  return members.length === 0 || members.some((member) => member.fight != null);
+}
+
 export function applyFightDeskPreset(
   preset: FightDeskPresetId,
   members: FightDeskMember[],
