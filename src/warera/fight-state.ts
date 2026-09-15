@@ -36,12 +36,22 @@ function dateOrNull(value: unknown): Date | null {
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
-function parsePillStatus(attack: UnknownRecord): PillStatus {
-  const buffsPercent = finiteNumber(attack, "buffsPercent") ?? 0;
-  const debuffsPercent = finiteNumber(attack, "debuffsPercent") ?? 0;
+function parsePillStatus(attack: UnknownRecord): PillStatus | null {
+  const buffsPercent = finiteNumber(attack, "buffsPercent");
+  const debuffsPercent = finiteNumber(attack, "debuffsPercent");
+  if (buffsPercent == null || debuffsPercent == null) return null;
   if (buffsPercent !== 0) return "active";
   if (debuffsPercent !== 0) return "debuff";
   return "ready";
+}
+
+function parsePillLabel(buffCodes: unknown, pillStatus: PillStatus): string | null {
+  if (pillStatus !== "active" || !Array.isArray(buffCodes)) return null;
+
+  const codes = buffCodes
+    .filter((value): value is string => typeof value === "string" && value.length > 0)
+    .toSorted();
+  return codes.find((code) => code.toLowerCase().includes("cocain")) ?? codes[0] ?? null;
 }
 
 export function parseFightState(raw: unknown): ParsedFightState | null {
@@ -89,6 +99,7 @@ export function parseFightState(raw: unknown): ParsedFightState | null {
   const hpRegenPerHour = finiteNumber(health, "hourlyBarRegen");
   const hungerRegenPerHour = finiteNumber(hunger, "hourlyBarRegen");
   const militaryRankPercent = finiteNumber(attack, "militaryRankPercent");
+  const pillStatus = parsePillStatus(attack);
 
   if (
     userId == null ||
@@ -106,7 +117,8 @@ export function parseFightState(raw: unknown): ParsedFightState | null {
     maxHunger == null ||
     hpRegenPerHour == null ||
     hungerRegenPerHour == null ||
-    militaryRankPercent == null
+    militaryRankPercent == null ||
+    pillStatus == null
   ) {
     return null;
   }
@@ -120,10 +132,7 @@ export function parseFightState(raw: unknown): ParsedFightState | null {
 
   const equipment = asRecord(user.equipment);
   const buffs = asRecord(user.buffs);
-  const buffCodes = Array.isArray(buffs?.buffCodes) ? buffs.buffCodes : [];
-  const pillLabel = buffCodes.find(
-    (value): value is string => typeof value === "string" && value.length > 0,
-  );
+  const pillLabel = parsePillLabel(buffs?.buffCodes, pillStatus);
   const dates = asRecord(user.dates);
 
   return {
@@ -142,11 +151,11 @@ export function parseFightState(raw: unknown): ParsedFightState | null {
     maxHunger,
     hpRegenPerHour,
     hungerRegenPerHour,
-    pillStatus: parsePillStatus(attack),
+    pillStatus,
     militaryRankBonus: militaryRankPercent / 100,
     ammoLabel: equipment ? nonEmptyString(equipment, "ammo") : null,
-    pillLabel: pillLabel ?? null,
-    pillEndsAt: dateOrNull(buffs?.buffEndAt),
+    pillLabel,
+    pillEndsAt: pillStatus === "active" ? dateOrNull(buffs?.buffEndAt) : null,
     skillLevels,
     lastSkillsResetAt: dateOrNull(dates?.lastSkillsResetAt),
     avatarUrl: nonEmptyString(user, "avatarUrl"),

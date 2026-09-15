@@ -20,6 +20,10 @@ Verified against live allowlisted `user.getUserLite` and `user.getUserById` on
 sample, but omitted `equipment`; `user.getUserById` returned the same fields
 plus `equipment.ammo`, so it is the complete single-call source.
 
-An active `cocain` payload and its end time were observed live. The debuff
-status mapping uses the documented `skills.attack.debuffsPercent` field; a
-nonzero debuff sample was not captured during this gate.
+An active `cocain` payload and its `buffs.buffEndAt` time were observed live.
+The debuff status mapping uses the documented
+`skills.attack.debuffsPercent !== 0` signal, but this gate captured no live
+nonzero debuff sample. No allowlisted OpenAPI/community path for a debuff end
+time was found in-repo, so the parser does not invent one: `pillEndsAt` remains
+`null` during debuff, and the debuff countdown is incomplete until a timer path
+is verified.

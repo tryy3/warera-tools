@@ -56,16 +56,58 @@ describe("parseFightState", () => {
     });
   });
 
-  it("uses the verified attack debuff percentage as the pill cooldown signal", () => {
+  it("maps a synthetic nonzero debuff percentage without inventing a timer", () => {
     const raw = structuredClone(fixture) as {
       skills: { attack: { buffsPercent: number; debuffsPercent: number } };
-      buffs?: unknown;
     };
     raw.skills.attack.buffsPercent = 0;
     raw.skills.attack.debuffsPercent = 30;
-    delete raw.buffs;
 
-    expect(parseFightState(raw)?.pillStatus).toBe("debuff");
+    expect(parseFightState(raw)).toMatchObject({
+      pillStatus: "debuff",
+      pillLabel: null,
+      pillEndsAt: null,
+    });
+  });
+
+  it("returns null when pill percentage fields are missing or malformed", () => {
+    const missing = structuredClone(fixture) as {
+      skills: { attack: { buffsPercent?: number; debuffsPercent?: number } };
+    };
+    delete missing.skills.attack.buffsPercent;
+    delete missing.skills.attack.debuffsPercent;
+
+    const malformed = structuredClone(fixture) as {
+      skills: { attack: { buffsPercent: unknown; debuffsPercent: unknown } };
+    };
+    malformed.skills.attack.buffsPercent = "60";
+    malformed.skills.attack.debuffsPercent = Number.NaN;
+
+    expect(parseFightState(missing)).toBeNull();
+    expect(parseFightState(malformed)).toBeNull();
+  });
+
+  it("prefers known pill codes and sorts unknown active codes deterministically", () => {
+    const known = structuredClone(fixture) as {
+      buffs: { buffCodes: string[] };
+    };
+    known.buffs.buffCodes = ["zeta", "cocain", "alpha"];
+
+    const unknown = structuredClone(fixture) as {
+      buffs: { buffCodes: string[] };
+    };
+    unknown.buffs.buffCodes = ["zeta", "alpha"];
+
+    const ready = structuredClone(fixture) as {
+      buffs: { buffCodes: string[] };
+      skills: { attack: { buffsPercent: number } };
+    };
+    ready.buffs.buffCodes = ["zeta", "alpha"];
+    ready.skills.attack.buffsPercent = 0;
+
+    expect(parseFightState(known)?.pillLabel).toBe("cocain");
+    expect(parseFightState(unknown)?.pillLabel).toBe("alpha");
+    expect(parseFightState(ready)?.pillLabel).toBeNull();
   });
 
   it("returns null when required fight fields are absent", () => {
