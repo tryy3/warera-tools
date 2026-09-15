@@ -132,8 +132,19 @@ export async function insertUserFightSnapshots(
     }),
   );
 
+  const sortedRows = [...rows]
+    .map((row, index) => ({ row, index }))
+    .toSorted((left, right) => {
+      const userCompare = left.row.userId.localeCompare(right.row.userId);
+      if (userCompare !== 0) return userCompare;
+      const timeCompare = left.row.recordedAt.getTime() - right.row.recordedAt.getTime();
+      if (timeCompare !== 0) return timeCompare;
+      return left.index - right.index;
+    })
+    .map(({ row }) => row);
+
   const changedRows: UserFightSnapshotRow[] = [];
-  for (const row of rows) {
+  for (const row of sortedRows) {
     const fingerprint = fightStateContentFingerprint(row);
     if (latestFingerprints.get(row.userId) === fingerprint) continue;
     changedRows.push(row);

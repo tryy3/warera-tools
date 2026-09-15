@@ -181,6 +181,32 @@ describe("user fight state db", () => {
     await expect(getLatestFightState(db, "missing")).resolves.toBeNull();
   });
 
+  it("processes each user's batch in recordedAt order before fingerprinting", async () => {
+    const pollId = await insertUserFightPoll(db, {
+      recordedAt: new Date("2026-09-15T12:00:00.000Z"),
+      status: "success",
+      userCount: 1,
+      muCount: 1,
+    });
+    const baseline = fightRow();
+    expect(await insertUserFightSnapshots(db, pollId, [baseline])).toBe(1);
+
+    const unchangedMiddle = fightRow({
+      recordedAt: new Date("2026-09-15T12:05:00.000Z"),
+    });
+    const latestChanged = fightRow({
+      recordedAt: new Date("2026-09-15T12:10:00.000Z"),
+      hp: 750,
+      pillStatus: "debuff",
+      pillLabel: null,
+      pillEndsAt: null,
+    });
+    const outOfOrderBatch = [latestChanged, unchangedMiddle];
+
+    expect(await insertUserFightSnapshots(db, pollId, outOfOrderBatch)).toBe(1);
+    await expect(getLatestFightState(db, "user-1")).resolves.toEqual(parsed(latestChanged));
+  });
+
   it("lists each current MU member's latest fight state", async () => {
     const at = new Date("2026-09-15T12:00:00.000Z");
     await db.insert(schema.mus).values([
