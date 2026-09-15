@@ -1,0 +1,63 @@
+{
+  "_id": "fixture-user",
+  "username": "Fixture Fighter",
+  "avatarUrl": "https://media.warera.io/avatars/fixture-user.png",
+  "dates": {
+    "lastSkillsResetAt": "2026-09-06T11:07:20.190Z"
+  },
+  "leveling": {
+    "level": 33
+  },
+  "militaryRank": 74,
+  "equipment": {
+    "ammo": "lightAmmo"
+  },
+  "skills": {
+    "health": {
+      "level": 5,
+      "currentBarValue": 0.5,
+      "total": 150,
+      "hourlyBarRegen": 15
+    },
+    "hunger": {
+      "level": 4,
+      "currentBarValue": 0.8,
+      "total": 8,
+      "hourlyBarRegen": 0.8
+    },
+    "attack": {
+      "level": 6,
+      "ammoPercent": 10,
+      "buffsPercent": 60,
+      "debuffsPercent": 0,
+      "militaryRankPercent": 22.75,
+      "total": 782
+    },
+    "criticalChance": {
+      "level": 5,
+      "total": 52
+    },
+    "criticalDamages": {
+      "level": 3,
+      "total": 199
+    },
+    "armor": {
+      "level": 4,
+      "total": 68,
+      "totalAfterSoftCap": 63
+    },
+    "precision": {
+      "level": 5,
+      "total": 90
+    },
+    "dodge": {
+      "level": 5,
+      "total": 35,
+      "totalAfterSoftCap": 47
+    }
+  },
+  "buffs": {
+    "buffCodes": ["cocain"],
+    "buffEndAt": "2026-09-15T17:41:22.479Z"
+  }
+}
