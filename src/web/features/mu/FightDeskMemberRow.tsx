@@ -12,9 +12,9 @@ function formatPercent(value: number | null): string {
   return value == null || !Number.isFinite(value) ? "—" : `${formatDisplayNumber(value * 100, 1)}%`;
 }
 
-function formatRemaining(endsAt: string | Date | null): string | null {
+function formatRemaining(endsAt: string | Date | null, nowMs: number): string | null {
   if (endsAt == null) return null;
-  const remainingMs = new Date(endsAt).getTime() - Date.now();
+  const remainingMs = new Date(endsAt).getTime() - nowMs;
   if (!Number.isFinite(remainingMs)) return null;
   if (remainingMs <= 0) return "ended";
   const totalMinutes = Math.ceil(remainingMs / 60_000);
@@ -90,6 +90,7 @@ export function FightDeskMemberRow({
   rank,
   selected,
   expanded,
+  nowMs,
   onSelectedChange,
   onExpandedChange,
 }: {
@@ -97,6 +98,7 @@ export function FightDeskMemberRow({
   rank: number;
   selected: boolean;
   expanded: boolean;
+  nowMs: number;
   onSelectedChange: (selected: boolean) => void;
   onExpandedChange: (expanded: boolean) => void;
 }) {
@@ -109,12 +111,13 @@ export function FightDeskMemberRow({
   const buildClass = classifyBuildFromSkillLevels(skillEntries);
   const reset = skillsResetStatus(
     member.display.lastSkillsResetAt ? new Date(member.display.lastSkillsResetAt) : null,
+    new Date(nowMs),
   );
   const resetText =
     reset.kind === "available"
       ? "Reset available"
-      : `Reset ${formatRemaining(reset.endsAt) ?? "—"}`;
-  const pillTimer = formatRemaining(member.display.pillEndsAt);
+      : `Reset ${formatRemaining(reset.endsAt, nowMs) ?? "—"}`;
+  const pillTimer = formatRemaining(member.display.pillEndsAt, nowMs);
   const pillText = !fight
     ? "Unavailable"
     : fight.pillStatus === "ready"

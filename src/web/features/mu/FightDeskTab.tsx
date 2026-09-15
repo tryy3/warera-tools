@@ -68,6 +68,12 @@ export function FightDeskTab({ muId }: { muId: string }) {
   const [prefs, setPrefs] = useState<FightDeskPrefsV1>(initial.prefs);
   const [initialPresetDone, setInitialPresetDone] = useState(!initial.applyInitialPreset);
   const [sort, setSort] = useState<FightDeskSort>("now");
+  const [nowMs, setNowMs] = useState(() => Date.now());
+
+  useEffect(() => {
+    const id = window.setInterval(() => setNowMs(Date.now()), 1000);
+    return () => window.clearInterval(id);
+  }, []);
 
   const presetMembers = useMemo(
     () =>
@@ -341,6 +347,7 @@ export function FightDeskTab({ muId }: { muId: string }) {
                 rank={index + 1}
                 selected={prefs.selectedUserIds.includes(row.member.userId)}
                 expanded={prefs.expandedUserIds.includes(row.member.userId)}
+                nowMs={nowMs}
                 onSelectedChange={(selected) => setMemberSelected(row.member.userId, selected)}
                 onExpandedChange={(expanded) => setMemberExpanded(row.member.userId, expanded)}
               />
