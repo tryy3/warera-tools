@@ -6,6 +6,7 @@ import { donationPollJob } from "./donation-poll";
 import { exampleHeartbeatJob } from "./example-heartbeat";
 import { itemMarketTxBackfillJob } from "./item-market-tx-backfill";
 import { itemMarketTxPollJob } from "./item-market-tx-poll";
+import { muFightPollJob } from "./mu-fight-poll";
 import { muMemberPollJob } from "./mu-member-poll";
 import { muStatsPollJob } from "./mu-stats-poll";
 import { pricePollJob } from "./price-poll";
@@ -23,6 +24,7 @@ export function listJobDefinitions(): JobDefinition[] {
     regionSyncJob,
     muStatsPollJob,
     muMemberPollJob,
+    muFightPollJob,
     donationPollJob,
     battleInfoPollJob,
     workStatsPollJob,

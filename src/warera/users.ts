@@ -314,6 +314,41 @@ export async function fetchUserByIdBatch(
   return out;
 }
 
+/**
+ * Batch-fetch raw `user.getUserById` payloads for parsers that need fields
+ * beyond the normalized profile. Dedupes ids. Failed / missing slots → null.
+ */
+export async function fetchUserByIdRawBatch(
+  warera: WareraRequester,
+  userIds: string[],
+): Promise<Map<string, unknown>> {
+  const unique = [...new Set(userIds.filter((id) => id.length > 0))];
+  const out = new Map<string, unknown>();
+  if (unique.length === 0) return out;
+
+  if (!warera.requestBatch) {
+    throw new Error("fetchUserByIdRawBatch requires warera.requestBatch");
+  }
+
+  try {
+    const slots = await warera.requestBatch(
+      unique.map((userId) => ({
+        procedure: "user.getUserById",
+        input: { userId },
+      })),
+    );
+    for (let i = 0; i < unique.length; i++) {
+      const userId = unique[i]!;
+      const slot = slots[i];
+      out.set(userId, slot?.ok ? slot.data : null);
+    }
+  } catch {
+    for (const userId of unique) out.set(userId, null);
+  }
+
+  return out;
+}
+
 export async function fetchUserProfileBatch(
   warera: WareraRequester,
   userIds: string[],
