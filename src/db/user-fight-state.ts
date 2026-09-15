@@ -1,4 +1,5 @@
-import { desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, gt, notExists, or } from "drizzle-orm";
+import { alias } from "drizzle-orm/sqlite-core";
 import type { ParsedFightState } from "../warera/fight-state";
 import type { Db } from "./client";
 import { muMembers, userFightPolls, userFightSnapshots } from "./schema";
@@ -13,6 +14,7 @@ function dateFingerprint(value: Date | null): number | null {
 }
 
 export function fightStateContentFingerprint(row: UserFightSnapshotRow): string {
+  // TODO: Separate material combat changes from volatile HP/hunger before pruning history.
   return JSON.stringify([
     row.userId,
     row.muId,
@@ -188,27 +190,34 @@ export async function listLatestFightStatesForMu(
   db: Db,
   muId: string,
 ): Promise<ParsedFightState[]> {
-  const members = await db
-    .select({ userId: muMembers.userId })
-    .from(muMembers)
-    .where(eq(muMembers.muId, muId));
-  const userIds = members.map((member) => member.userId);
-  if (userIds.length === 0) return [];
+  const newerSnapshot = alias(userFightSnapshots, "newer_fight_snapshot");
 
   const rows = await db
-    .select()
+    .select({ snapshot: userFightSnapshots })
     .from(userFightSnapshots)
-    .where(inArray(userFightSnapshots.userId, userIds))
-    .orderBy(
-      userFightSnapshots.userId,
-      desc(userFightSnapshots.recordedAt),
-      desc(userFightSnapshots.id),
-    );
-  const latestByUser = new Map<string, ParsedFightState>();
-  for (const row of rows) {
-    if (!latestByUser.has(row.userId)) {
-      latestByUser.set(row.userId, toParsedFightState(row));
-    }
-  }
-  return [...latestByUser.values()];
+    .innerJoin(muMembers, eq(muMembers.userId, userFightSnapshots.userId))
+    .where(
+      and(
+        eq(muMembers.muId, muId),
+        notExists(
+          db
+            .select({ id: newerSnapshot.id })
+            .from(newerSnapshot)
+            .where(
+              and(
+                eq(newerSnapshot.userId, userFightSnapshots.userId),
+                or(
+                  gt(newerSnapshot.recordedAt, userFightSnapshots.recordedAt),
+                  and(
+                    eq(newerSnapshot.recordedAt, userFightSnapshots.recordedAt),
+                    gt(newerSnapshot.id, userFightSnapshots.id),
+                  ),
+                ),
+              ),
+            ),
+        ),
+      ),
+    )
+    .orderBy(userFightSnapshots.userId);
+  return rows.map(({ snapshot }) => toParsedFightState(snapshot));
 }

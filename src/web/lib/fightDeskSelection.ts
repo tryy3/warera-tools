@@ -17,7 +17,7 @@ type FightDeskMember = {
 
 /** True when first-visit preset can run: empty roster or at least one warmed fight snapshot. */
 export function isFightDeskRosterReadyForInitialPreset(
-  members: Array<{ fight: unknown | null }>,
+  members: Array<{ fight: unknown }>,
 ): boolean {
   return members.length === 0 || members.some((member) => member.fight != null);
 }

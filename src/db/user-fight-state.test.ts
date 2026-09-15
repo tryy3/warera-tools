@@ -207,7 +207,7 @@ describe("user fight state db", () => {
     await expect(getLatestFightState(db, "user-1")).resolves.toEqual(parsed(latestChanged));
   });
 
-  it("lists each current MU member's latest fight state", async () => {
+  it("lists only each current MU member's latest fight state, breaking time ties by id", async () => {
     const at = new Date("2026-09-15T12:00:00.000Z");
     await db.insert(schema.mus).values([
       { id: "mu-1", name: "One", enqueuedAt: at },
@@ -226,7 +226,6 @@ describe("user fight state db", () => {
     });
     const user1 = fightRow();
     const user1Latest = fightRow({
-      recordedAt: new Date("2026-09-15T12:05:00.000Z"),
       hp: 700,
     });
     const user2 = fightRow({ userId: "user-2", username: "Second" });

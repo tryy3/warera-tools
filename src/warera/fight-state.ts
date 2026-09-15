@@ -92,8 +92,8 @@ export function parseFightState(raw: unknown): ParsedFightState | null {
   const precisionTotal = finiteNumber(precision, "total");
   const criticalChanceTotal = finiteNumber(criticalChance, "total");
   const criticalDamageTotal = finiteNumber(criticalDamages, "total");
-  const armorTotal = finiteNumber(armor, "total");
-  const dodgeTotal = finiteNumber(dodge, "total");
+  const armorTotal = finiteNumber(armor, "totalAfterSoftCap") ?? finiteNumber(armor, "total");
+  const dodgeTotal = finiteNumber(dodge, "totalAfterSoftCap") ?? finiteNumber(dodge, "total");
   const hp = finiteNumber(health, "currentBarValue");
   const maxHp = finiteNumber(health, "total");
   const hungerCurrent = finiteNumber(hunger, "currentBarValue");

@@ -44,8 +44,8 @@ describe("parseFightState", () => {
       precision: 0.9,
       critChance: 0.52,
       critDamage: 1.99,
-      armor: 68,
-      dodge: 35,
+      armor: 63,
+      dodge: 47,
       hp: 0.5,
       maxHp: 150,
       hunger: 0.8,
@@ -54,6 +54,22 @@ describe("parseFightState", () => {
       hungerRegenPerHour: 0.8,
       pillStatus: "active",
     });
+  });
+
+  it("falls back to total when armor or dodge soft-cap totals are not finite", () => {
+    const raw = structuredClone(fixture) as {
+      skills: {
+        armor: { totalAfterSoftCap?: unknown };
+        dodge: { totalAfterSoftCap?: unknown };
+      };
+    };
+    raw.skills.armor.totalAfterSoftCap = Number.NaN;
+    delete raw.skills.dodge.totalAfterSoftCap;
+
+    const parsed = parseFightState(raw);
+
+    expect(parsed?.armor).toBe(68);
+    expect(parsed?.dodge).toBe(35);
   });
 
   it("maps a synthetic nonzero debuff percentage without inventing a timer", () => {
