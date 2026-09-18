@@ -7,7 +7,7 @@ export const MASK_KEYS = [
   "password",
   "cookie",
   "WARERA_API_KEY",
-  "TURSO_AUTH_TOKEN",
+  "DATABASE_URL",
   "DISCORD_WEBHOOK_URL",
   "SENTRY_DSN",
   "dsn",

@@ -4,8 +4,7 @@ export type AppConfig = {
   nodeEnv: "development" | "production" | "test";
   host: string;
   port: number;
-  tursoDatabaseUrl: string;
-  tursoAuthToken: string | undefined;
+  databaseUrl: string;
   wareraApiBaseUrl: string;
   wareraApiKey: string | undefined;
   wareraMaxRequestsPerMinute: number;
@@ -28,9 +27,9 @@ function parseBoolEnv(value: string | undefined, defaultValue: boolean): boolean
 export function parseConfig(
   env: NodeJS.ProcessEnv | Record<string, string | undefined>,
 ): AppConfig {
-  const tursoDatabaseUrl = env.TURSO_DATABASE_URL;
-  if (!tursoDatabaseUrl) {
-    throw new Error("TURSO_DATABASE_URL is required");
+  const databaseUrl = env.DATABASE_URL;
+  if (!databaseUrl) {
+    throw new Error("DATABASE_URL is required");
   }
   const nodeEnv = (env.NODE_ENV ?? "development") as AppConfig["nodeEnv"];
   const defaultHost = nodeEnv === "production" ? "0.0.0.0" : "127.0.0.1";
@@ -38,8 +37,7 @@ export function parseConfig(
     nodeEnv,
     host: env.HOST ?? defaultHost,
     port: Number(env.PORT ?? 8787),
-    tursoDatabaseUrl,
-    tursoAuthToken: env.TURSO_AUTH_TOKEN,
+    databaseUrl,
     wareraApiBaseUrl: env.WARERA_API_BASE_URL ?? "https://api2.warera.io/trpc",
     wareraApiKey: env.WARERA_API_KEY,
     wareraMaxRequestsPerMinute: Number(env.WARERA_MAX_REQUESTS_PER_MINUTE ?? 120),

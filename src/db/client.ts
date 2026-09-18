@@ -7,8 +7,7 @@ import * as schema from "./schema";
 
 export function createDb(config: AppConfig, logger?: Logger) {
   const raw = createClient({
-    url: config.tursoDatabaseUrl,
-    authToken: config.tursoAuthToken,
+    url: config.databaseUrl,
   });
   const client = logger ? instrumentLibsqlClient(raw, logger) : raw;
   const db = drizzle(client, { schema });
