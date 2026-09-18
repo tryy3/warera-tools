@@ -56,20 +56,26 @@ TRUNCATE TABLE
 RESTART IDENTITY CASCADE
 `;
 
-let shared: {
+type SharedDb = {
   container: StartedPostgreSqlContainer;
   pool: pg.Pool;
   db: Db;
-} | null = null;
+};
 
-async function ensureShared() {
+let shared: SharedDb | null = null;
+let sharedInit: Promise<SharedDb> | null = null;
+
+async function ensureShared(): Promise<SharedDb> {
   if (shared) return shared;
-  const container = await new PostgreSqlContainer("postgres:16-alpine").start();
-  const pool = new pg.Pool({ connectionString: container.getConnectionUri() });
-  const db = drizzle(pool, { schema });
-  await migrateDb(db);
-  shared = { container, pool, db };
-  return shared;
+  sharedInit ??= (async () => {
+    const container = await new PostgreSqlContainer("postgres:16-alpine").start();
+    const pool = new pg.Pool({ connectionString: container.getConnectionUri() });
+    const db = drizzle(pool, { schema });
+    await migrateDb(db);
+    shared = { container, pool, db };
+    return shared;
+  })();
+  return sharedInit;
 }
 
 export async function createTestDb(): Promise<{
