@@ -1,7 +1,7 @@
 # Turso → Postgres Migration (Happy Path) — Design
 
 **Date:** 2026-09-18  
-**Status:** Draft for review  
+**Status:** Approved  
 **Depends on / extends:**
 
 - [WarEra Toolkit Foundation](./2026-07-31-warera-toolkit-foundation-design.md) (Turso + Drizzle baseline)
