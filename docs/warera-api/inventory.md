@@ -1,6 +1,6 @@
 # WarEra data inventory (as-is)
 
-**Last reviewed:** 2026-09-14
+**Last reviewed:** 2026-09-18
 **Status:** Living — update when cadence, ownership, or major consumers change  
 **Tier rules:** [Data tier caching strategy](../superpowers/specs/2026-08-02-data-tier-caching-strategy-design.md)
 
@@ -11,7 +11,7 @@ High-level catalog of how we fetch, store, and use WarEra-related data today. No
 ```
 Browser (SPA)
   → Hono /api/*  (TanStack Query in memory for user packs / some shared reads)
-  → Turso (SoT for Global / Geo / packs / history)
+  → Postgres via pg Pool + Drizzle (SoT for Global / Geo / packs / history; cutover from Turso)
   → Croner jobs (bulk Global / Geo refresh)
   → createWareraClient (governor, batch, dedup)
   → api2.warera.io/trpc

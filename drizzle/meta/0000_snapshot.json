@@ -148,12 +148,8 @@
           "name": "battle_loot_snapshots_poll_id_battle_polls_id_fk",
           "tableFrom": "battle_loot_snapshots",
           "tableTo": "battle_polls",
-          "columnsFrom": [
-            "poll_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["poll_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -401,12 +397,8 @@
           "name": "battle_scoreboard_snapshots_poll_id_battle_polls_id_fk",
           "tableFrom": "battle_scoreboard_snapshots",
           "tableTo": "battle_polls",
-          "columnsFrom": [
-            "poll_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["poll_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -724,10 +716,7 @@
       "compositePrimaryKeys": {
         "company_work_stats_company_id_daily_date_pk": {
           "name": "company_work_stats_company_id_daily_date_pk",
-          "columns": [
-            "company_id",
-            "daily_date"
-          ]
+          "columns": ["company_id", "daily_date"]
         }
       },
       "uniqueConstraints": {},
@@ -796,9 +785,7 @@
         "countries_name_unique": {
           "name": "countries_name_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "name"
-          ]
+          "columns": ["name"]
         }
       },
       "policies": {},
@@ -845,11 +832,7 @@
       "compositePrimaryKeys": {
         "country_watch_reasons_country_id_reason_source_id_pk": {
           "name": "country_watch_reasons_country_id_reason_source_id_pk",
-          "columns": [
-            "country_id",
-            "reason",
-            "source_id"
-          ]
+          "columns": ["country_id", "reason", "source_id"]
         }
       },
       "uniqueConstraints": {},
@@ -1036,12 +1019,8 @@
           "name": "donation_snapshots_poll_id_donation_polls_id_fk",
           "tableFrom": "donation_snapshots",
           "tableTo": "donation_polls",
-          "columnsFrom": [
-            "poll_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["poll_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -1352,12 +1331,8 @@
           "name": "job_runs_job_id_jobs_id_fk",
           "tableFrom": "job_runs",
           "tableTo": "jobs",
-          "columnsFrom": [
-            "job_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["job_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -1561,12 +1536,8 @@
           "name": "mu_member_stat_snapshots_poll_id_mu_polls_id_fk",
           "tableFrom": "mu_member_stat_snapshots",
           "tableTo": "mu_polls",
-          "columnsFrom": [
-            "poll_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["poll_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -1612,12 +1583,8 @@
           "name": "mu_members_mu_id_mus_id_fk",
           "tableFrom": "mu_members",
           "tableTo": "mus",
-          "columnsFrom": [
-            "mu_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["mu_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -1625,10 +1592,7 @@
       "compositePrimaryKeys": {
         "mu_members_mu_id_user_id_pk": {
           "name": "mu_members_mu_id_user_id_pk",
-          "columns": [
-            "mu_id",
-            "user_id"
-          ]
+          "columns": ["mu_id", "user_id"]
         }
       },
       "uniqueConstraints": {},
@@ -1887,12 +1851,8 @@
           "name": "mu_stat_snapshots_poll_id_mu_polls_id_fk",
           "tableFrom": "mu_stat_snapshots",
           "tableTo": "mu_polls",
-          "columnsFrom": [
-            "poll_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["poll_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -1943,11 +1903,7 @@
       "compositePrimaryKeys": {
         "mu_watch_reasons_mu_id_reason_source_id_pk": {
           "name": "mu_watch_reasons_mu_id_reason_source_id_pk",
-          "columns": [
-            "mu_id",
-            "reason",
-            "source_id"
-          ]
+          "columns": ["mu_id", "reason", "source_id"]
         }
       },
       "uniqueConstraints": {},
@@ -2092,11 +2048,7 @@
       "compositePrimaryKeys": {
         "player_watch_reasons_player_id_reason_source_id_pk": {
           "name": "player_watch_reasons_player_id_reason_source_id_pk",
-          "columns": [
-            "player_id",
-            "reason",
-            "source_id"
-          ]
+          "columns": ["player_id", "reason", "source_id"]
         }
       },
       "uniqueConstraints": {},
@@ -2291,12 +2243,8 @@
           "name": "price_snapshots_poll_id_price_polls_id_fk",
           "tableFrom": "price_snapshots",
           "tableTo": "price_polls",
-          "columnsFrom": [
-            "poll_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["poll_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -2722,12 +2670,8 @@
           "name": "user_profile_snapshots_poll_id_user_profile_polls_id_fk",
           "tableFrom": "user_profile_snapshots",
           "tableTo": "user_profile_polls",
-          "columnsFrom": [
-            "poll_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["poll_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -2796,11 +2740,7 @@
       "compositePrimaryKeys": {
         "worker_work_stats_company_id_worker_id_daily_date_pk": {
           "name": "worker_work_stats_company_id_worker_id_daily_date_pk",
-          "columns": [
-            "company_id",
-            "worker_id",
-            "daily_date"
-          ]
+          "columns": ["company_id", "worker_id", "daily_date"]
         }
       },
       "uniqueConstraints": {},
@@ -2813,20 +2753,12 @@
     "public.job_status": {
       "name": "job_status",
       "schema": "public",
-      "values": [
-        "success",
-        "error",
-        "running"
-      ]
+      "values": ["success", "error", "running"]
     },
     "public.poll_status": {
       "name": "poll_status",
       "schema": "public",
-      "values": [
-        "success",
-        "partial",
-        "error"
-      ]
+      "values": ["success", "partial", "error"]
     }
   },
   "schemas": {},

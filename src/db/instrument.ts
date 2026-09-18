@@ -1,10 +1,5 @@
-import type { Client, InStatement, ResultSet } from "@libsql/client";
+import type pg from "pg";
 import type { Logger } from "../logging/logger";
-
-function sqlText(stmt: InStatement | string): string {
-  if (typeof stmt === "string") return stmt;
-  return stmt.sql;
-}
 
 function truncateSql(sql: string, max = 180): string {
   const oneLine = sql.replace(/\s+/g, " ").trim();
@@ -12,65 +7,38 @@ function truncateSql(sql: string, max = 180): string {
 }
 
 /**
- * Wrap a libsql client so each execute/batch is logged like warera requests
+ * Wrap a pg Pool so each query is logged like warera requests
  * (`db query` with sql + durationMs).
  */
-export function instrumentLibsqlClient(client: Client, logger: Logger): Client {
-  const execute = client.execute.bind(client);
-  const batch = client.batch.bind(client);
-
-  client.execute = async (stmt: InStatement | string): Promise<ResultSet> => {
+export function instrumentPgPool(pool: pg.Pool, logger: Logger): pg.Pool {
+  const query = pool.query.bind(pool);
+  (pool as pg.Pool).query = ((...args: unknown[]) => {
     const started = performance.now();
-    try {
-      const result = await execute(stmt);
-      logger.debug(
-        {
-          sql: truncateSql(sqlText(stmt)),
-          durationMs: Math.round(performance.now() - started),
-        },
-        "db query",
-      );
-      return result;
-    } catch (err) {
-      logger.debug(
-        {
-          sql: truncateSql(sqlText(stmt)),
-          durationMs: Math.round(performance.now() - started),
-          error: err instanceof Error ? err.message : String(err),
-        },
-        "db query",
-      );
-      throw err;
-    }
-  };
-
-  client.batch = async (
-    stmts: InStatement[],
-    mode?: Parameters<Client["batch"]>[1],
-  ): Promise<ResultSet[]> => {
-    const started = performance.now();
-    try {
-      const result = await batch(stmts, mode);
-      logger.debug(
-        {
-          sql: `batch(${stmts.length})`,
-          durationMs: Math.round(performance.now() - started),
-        },
-        "db query",
-      );
-      return result;
-    } catch (err) {
-      logger.debug(
-        {
-          sql: `batch(${stmts.length})`,
-          durationMs: Math.round(performance.now() - started),
-          error: err instanceof Error ? err.message : String(err),
-        },
-        "db query",
-      );
-      throw err;
-    }
-  };
-
-  return client;
+    const sql =
+      typeof args[0] === "string"
+        ? args[0]
+        : String((args[0] as { text?: string } | undefined)?.text ?? "");
+    const result = (query as (...a: unknown[]) => Promise<unknown>)(...args);
+    return Promise.resolve(result).then(
+      (rows) => {
+        logger.debug(
+          { sql: truncateSql(sql), durationMs: Math.round(performance.now() - started) },
+          "db query",
+        );
+        return rows;
+      },
+      (err) => {
+        logger.debug(
+          {
+            sql: truncateSql(sql),
+            durationMs: Math.round(performance.now() - started),
+            error: err instanceof Error ? err.message : String(err),
+          },
+          "db query",
+        );
+        throw err;
+      },
+    );
+  }) as typeof pool.query;
+  return pool;
 }

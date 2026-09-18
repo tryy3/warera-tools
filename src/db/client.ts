@@ -1,17 +1,15 @@
-import { createClient } from "@libsql/client";
-import { drizzle } from "drizzle-orm/libsql";
+import { drizzle } from "drizzle-orm/node-postgres";
+import pg from "pg";
 import type { AppConfig } from "../config/env";
 import type { Logger } from "../logging/logger";
-import { instrumentLibsqlClient } from "./instrument";
+import { instrumentPgPool } from "./instrument";
 import * as schema from "./schema";
 
 export function createDb(config: AppConfig, logger?: Logger) {
-  const raw = createClient({
-    url: config.databaseUrl,
-  });
-  const client = logger ? instrumentLibsqlClient(raw, logger) : raw;
-  const db = drizzle(client, { schema });
-  return { db, client };
+  const pool = new pg.Pool({ connectionString: config.databaseUrl });
+  const instrumented = logger ? instrumentPgPool(pool, logger) : pool;
+  const db = drizzle(instrumented, { schema });
+  return { db, pool: instrumented };
 }
 
 export type Db = ReturnType<typeof createDb>["db"];
