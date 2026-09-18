@@ -1,110 +1,12 @@
 {
   "version": "7",
-  "dialect": "sqlite",
+  "dialect": "postgresql",
   "entries": [
     {
       "idx": 0,
-      "version": "6",
-      "when": 1785506799471,
-      "tag": "0000_slippery_ezekiel_stane",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "6",
-      "when": 1785515901211,
-      "tag": "0001_late_dreadnoughts",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "6",
-      "when": 1785519707511,
-      "tag": "0002_rich_menace",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "6",
-      "when": 1785528000000,
-      "tag": "0003_price_history",
-      "breakpoints": true
-    },
-    {
-      "idx": 4,
-      "version": "6",
-      "when": 1785547406854,
-      "tag": "0004_ambiguous_leper_queen",
-      "breakpoints": true
-    },
-    {
-      "idx": 5,
-      "version": "6",
-      "when": 1785593121392,
-      "tag": "0005_empty_shinko_yamashiro",
-      "breakpoints": true
-    },
-    {
-      "idx": 6,
-      "version": "6",
-      "when": 1785595505595,
-      "tag": "0006_kind_puck",
-      "breakpoints": true
-    },
-    {
-      "idx": 7,
-      "version": "6",
-      "when": 1785762182038,
-      "tag": "0007_perpetual_pandemic",
-      "breakpoints": true
-    },
-    {
-      "idx": 8,
-      "version": "6",
-      "when": 1785863630759,
-      "tag": "0008_tough_terrax",
-      "breakpoints": true
-    },
-    {
-      "idx": 9,
-      "version": "6",
-      "when": 1787263302743,
-      "tag": "0009_nebulous_blue_marvel",
-      "breakpoints": true
-    },
-    {
-      "idx": 10,
-      "version": "6",
-      "when": 1788434956046,
-      "tag": "0010_damp_prowler",
-      "breakpoints": true
-    },
-    {
-      "idx": 11,
-      "version": "6",
-      "when": 1788460188961,
-      "tag": "0011_unique_crusher_hogan",
-      "breakpoints": true
-    },
-    {
-      "idx": 12,
-      "version": "6",
-      "when": 1788547879995,
-      "tag": "0012_sad_rictor",
-      "breakpoints": true
-    },
-    {
-      "idx": 13,
-      "version": "6",
-      "when": 1789249149674,
-      "tag": "0013_next_the_stranger",
-      "breakpoints": true
-    },
-    {
-      "idx": 14,
-      "version": "6",
-      "when": 1789401264538,
-      "tag": "0014_big_silverclaw",
+      "version": "7",
+      "when": 1789768309202,
+      "tag": "0000_uneven_elektra",
       "breakpoints": true
     }
   ]
