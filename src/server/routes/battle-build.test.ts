@@ -101,7 +101,7 @@ describe("POST /quote", () => {
     const body = (await res.json()) as {
       results: Array<{
         id: string;
-        median: number | null;
+        median: string | null;
         trades: number;
         window: string;
         widened: boolean;
@@ -109,7 +109,7 @@ describe("POST /quote", () => {
       quotedAt: string;
     };
     expect(body.results).toEqual([
-      { id: "chest", median: 5.5, trades: 10, window: "24h", widened: false },
+      { id: "chest", median: "5.5", trades: 10, window: "24h", widened: false },
     ]);
     expect(Number.isNaN(Date.parse(body.quotedAt))).toBe(false);
   });

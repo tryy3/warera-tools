@@ -40,7 +40,7 @@ export function sumLoadoutQuotes(quotes: QuoteLineResult[]): {
   let total = 0;
   let quotedCount = 0;
   for (const quote of quotes) {
-    const median = moneyToNumber(quote.median as never);
+    const median = moneyToNumber(quote.median);
     if (median == null) continue;
     total += median;
     quotedCount += 1;

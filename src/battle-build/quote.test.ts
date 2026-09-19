@@ -21,7 +21,7 @@ describe("quoteItem", () => {
     expect(result.window).toBe("24h");
     expect(result.widened).toBe(false);
     expect(result.trades).toBe(10);
-    expect(result.median).toBe(14.5);
+    expect(result.median!.toNumber()).toBe(14.5);
   });
 
   it("falls back to the 10 newest exact matches when 24h is thin", () => {
@@ -38,7 +38,7 @@ describe("quoteItem", () => {
 
     expect(result.window).toBe("last10");
     expect(result.trades).toBe(10);
-    expect(result.median).toBe(50);
+    expect(result.median!.toNumber()).toBe(50);
   });
 
   it("widens to ±1 when exact matches are thin", () => {
@@ -53,7 +53,7 @@ describe("quoteItem", () => {
     expect(result.widened).toBe(true);
     expect(result.window).toBe("last10");
     expect(result.trades).toBe(10);
-    expect(result.median).toBe(20);
+    expect(result.median!.toNumber()).toBe(20);
   });
 
   it("uses all widened matches for a thin quote", () => {
@@ -64,12 +64,10 @@ describe("quoteItem", () => {
       nowMs: now,
     });
 
-    expect(result).toEqual({
-      median: 15,
-      trades: 2,
-      window: "thin",
-      widened: true,
-    });
+    expect(result.window).toBe("thin");
+    expect(result.widened).toBe(true);
+    expect(result.trades).toBe(2);
+    expect(result.median!.toNumber()).toBe(15);
   });
 
   it("quotes consumables without skills", () => {
@@ -84,7 +82,7 @@ describe("quoteItem", () => {
     expect(result.widened).toBe(false);
     expect(result.window).toBe("24h");
     expect(result.trades).toBe(10);
-    expect(result.median).toBeCloseTo(1.45);
+    expect(result.median!.toNumber()).toBeCloseTo(1.45);
   });
 
   it("returns an empty thin quote when no transactions match", () => {
@@ -112,21 +110,21 @@ describe("quoteBatch", () => {
     ];
     const txsByCode = new Map([["ammo", [tx(2, hour)]]]);
 
-    expect(quoteBatch(items, txsByCode, now)).toEqual([
-      {
-        id: "ammo-1",
-        median: 2,
-        trades: 1,
-        window: "thin",
-        widened: false,
-      },
-      {
-        id: "ammo-2",
-        median: null,
-        trades: 0,
-        window: "thin",
-        widened: false,
-      },
-    ]);
+    const results = quoteBatch(items, txsByCode, now);
+    expect(results).toHaveLength(2);
+    expect(results[0]).toMatchObject({
+      id: "ammo-1",
+      trades: 1,
+      window: "thin",
+      widened: false,
+    });
+    expect(results[0]!.median!.toNumber()).toBe(2);
+    expect(results[1]).toEqual({
+      id: "ammo-2",
+      median: null,
+      trades: 0,
+      window: "thin",
+      widened: false,
+    });
   });
 });

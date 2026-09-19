@@ -10,9 +10,19 @@ export type QuoteLineInput = {
   skills: Record<string, number> | null;
 };
 
-export type QuoteLineResult = {
+/** Domain quote line — median is Decimal until serialized at the API boundary. */
+export type QuoteLineComputed = {
   id: string;
   median: Decimal | null;
+  trades: number;
+  window: QuoteWindow;
+  widened: boolean;
+};
+
+/** API/JSON wire shape — median is `serializeMoney` string | null. */
+export type QuoteLineResult = {
+  id: string;
+  median: string | null;
   trades: number;
   window: QuoteWindow;
   widened: boolean;
@@ -27,7 +37,7 @@ export type QuoteTx = {
 export const QUOTE_MIN_TRADES = 10;
 export const QUOTE_24H_MS = 24 * 60 * 60 * 1000;
 
-type ItemQuote = Omit<QuoteLineResult, "id">;
+type ItemQuote = Omit<QuoteLineComputed, "id">;
 type SufficientQuote = Omit<ItemQuote, "widened">;
 
 function moneyValues(txs: QuoteTx[]): Decimal[] {
@@ -104,7 +114,7 @@ export function quoteBatch(
   items: QuoteLineInput[],
   txsByCode: Map<string, QuoteTx[]>,
   nowMs: number,
-): QuoteLineResult[] {
+): QuoteLineComputed[] {
   return items.map((item) => ({
     id: item.id,
     ...quoteItem({

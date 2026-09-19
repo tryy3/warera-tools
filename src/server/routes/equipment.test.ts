@@ -160,28 +160,28 @@ describe("GET /overview", () => {
     expect(res.status).toBe(200);
     const body = (await res.json()) as {
       windowMs: number;
-      scrapPrice: number | null;
+      scrapPrice: string | null;
       scrapedAt: string | null;
       items: Array<{
         itemCode: string;
         tier: string | null;
-        marketMedian: number | null;
-        scrapFloor: number | null;
-        spread: number | null;
+        marketMedian: string | null;
+        scrapFloor: string | null;
+        spread: string | null;
         trades: number;
       }>;
     };
 
     expect(body.windowMs).toBe(MARKET_WINDOW_MS);
-    expect(body.scrapPrice).toBe(0.2);
+    expect(body.scrapPrice).toBe("0.2");
     expect(body.scrapedAt).toBe(recordedAt.toISOString());
     expect(body.items).toHaveLength(1);
     const row = body.items[0]!;
     expect(row.itemCode).toBe("chest4");
     expect(row.tier).toBe("purple");
-    expect(row.marketMedian).toBe(45);
-    expect(row.scrapFloor).toBe(32.4);
-    expect(row.spread).toBeCloseTo(12.6);
+    expect(row.marketMedian).toBe("45");
+    expect(row.scrapFloor).toBe("32.4");
+    expect(row.spread).toBe("12.6");
     expect(row.trades).toBe(2);
   });
 
@@ -190,7 +190,7 @@ describe("GET /overview", () => {
     expect(res.status).toBe(200);
     const body = (await res.json()) as {
       windowMs: number;
-      scrapPrice: number | null;
+      scrapPrice: string | null;
       scrapedAt: string | null;
       items: unknown[];
     };
@@ -256,13 +256,13 @@ describe("GET /:itemCode", () => {
     const body = (await res.json()) as {
       itemCode: string;
       tier: string | null;
-      scrapPrice: number | null;
+      scrapPrice: string | null;
       taxRate: number | null;
       countryId: string | null;
-      marketMedian: number | null;
-      sellerNet: number | null;
-      scrapFloor: number | null;
-      recommend: { scrapFloor: number; breakEvenIncl: number; attractiveIncl: number } | null;
+      marketMedian: string | null;
+      sellerNet: string | null;
+      scrapFloor: string | null;
+      recommend: { scrapFloor: string; breakEvenIncl: string; attractiveIncl: string } | null;
       trades: number;
       activeBands: Array<{ key: string; target: number; band: number }>;
       lowestObserved: Record<string, number> | null;
@@ -270,17 +270,17 @@ describe("GET /:itemCode", () => {
 
     expect(body.itemCode).toBe("chest4");
     expect(body.tier).toBe("purple");
-    expect(body.scrapPrice).toBe(0.2);
+    expect(body.scrapPrice).toBe("0.2");
     expect(body.taxRate).toBe(0.01);
     expect(body.countryId).toBe("sweden");
     expect(body.activeBands).toEqual([{ key: "armor", target: 22, band: 0 }]);
     expect(body.lowestObserved).toEqual({ armor: 22 });
-    expect(body.marketMedian).toBe(45);
+    expect(body.marketMedian).toBe("45");
     expect(body.trades).toBe(2);
-    expect(body.sellerNet).toBeCloseTo(45 / 1.01, 5);
-    expect(body.scrapFloor).toBe(32.4);
-    expect(body.recommend?.scrapFloor).toBe(32.4);
-    expect(body.recommend?.breakEvenIncl).toBeCloseTo(32.4 * 1.01, 5);
+    expect(Number(body.sellerNet)).toBeCloseTo(45 / 1.01, 5);
+    expect(body.scrapFloor).toBe("32.4");
+    expect(body.recommend?.scrapFloor).toBe("32.4");
+    expect(Number(body.recommend?.breakEvenIncl)).toBeCloseTo(32.4 * 1.01, 5);
   });
 
   it("defaults skills to lowestObserved band 1 when skills omitted", async () => {
@@ -306,11 +306,11 @@ describe("GET /:itemCode", () => {
     expect(res.status).toBe(200);
     const body = (await res.json()) as {
       activeBands: Array<{ key: string; target: number; band: number }>;
-      marketMedian: number | null;
+      marketMedian: string | null;
       trades: number;
     };
     expect(body.activeBands).toEqual([{ key: "armor", target: 22, band: 1 }]);
-    expect(body.marketMedian).toBe(40);
+    expect(body.marketMedian).toBe("40");
     expect(body.trades).toBe(1);
   });
 
@@ -331,16 +331,16 @@ describe("GET /:itemCode", () => {
     expect(res.status).toBe(200);
     const body = (await res.json()) as {
       taxRate: number | null;
-      sellerNet: number | null;
+      sellerNet: string | null;
       recommend: unknown;
-      scrapFloor: number | null;
-      marketMedian: number | null;
+      scrapFloor: string | null;
+      marketMedian: string | null;
     };
     expect(body.taxRate).toBeNull();
     expect(body.sellerNet).toBeNull();
     expect(body.recommend).toBeNull();
-    expect(body.scrapFloor).toBe(32.4);
-    expect(body.marketMedian).toBe(40);
+    expect(body.scrapFloor).toBe("32.4");
+    expect(body.marketMedian).toBe("40");
   });
 
   it("rejects malformed skills query with 400", async () => {
@@ -359,11 +359,11 @@ describe("GET /craft-compare", () => {
     scrapQty: number;
     steelRandom: number;
     steelSpecific: number;
-    steelPrice: number | null;
-    steelCostRandom: number | null;
+    steelPrice: string | null;
+    steelCostRandom: string | null;
     taxRate: number;
     specific: Array<{ itemCode: string }>;
-    random: { medianAdvantage: number | null };
+    random: { medianAdvantage: string | null };
   };
 
   let db: Db;
