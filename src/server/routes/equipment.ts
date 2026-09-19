@@ -5,12 +5,17 @@ import type { Db } from "../../db/client";
 import { listItemMarketTxSince } from "../../db/item-market-tx-read";
 import { getLatestItemMarketPrice } from "../../db/prices";
 import { countries } from "../../db/schema";
-import { buildCraftCompare } from "../../equipment/craft";
-import { buildEquipmentDetail } from "../../equipment/detail";
-import { buildEquipmentOverview } from "../../equipment/overview";
+import {
+  buildCraftCompare,
+  type CraftCompareResult,
+  type CraftStatBlock,
+} from "../../equipment/craft";
+import { buildEquipmentDetail, type EquipmentDetail } from "../../equipment/detail";
+import { buildEquipmentOverview, type OverviewItemRow } from "../../equipment/overview";
 import type { SkillBand } from "../../equipment/skills";
 import { MARKET_WINDOW_MS, TREND_LOOKBACK_MS } from "../../equipment/windows";
 import type { Logger } from "../../logging/logger";
+import { serializeMoney } from "../../money/decimal";
 import type { WareraRequester } from "../../warera/prices";
 import { HttpError } from "../errors";
 
@@ -39,6 +44,85 @@ function parseSkillsQuery(raw: string | undefined): SkillBand[] | null {
   }
 }
 
+function serializeOverviewItem(item: OverviewItemRow) {
+  return {
+    itemCode: item.itemCode,
+    tier: item.tier,
+    marketMedian: serializeMoney(item.marketMedian),
+    scrapFloor: serializeMoney(item.scrapFloor),
+    spread: serializeMoney(item.spread),
+    trades: item.trades,
+  };
+}
+
+function serializeCraftStatBlock(block: CraftStatBlock) {
+  return {
+    minExcl: serializeMoney(block.minExcl),
+    medianExcl: serializeMoney(block.medianExcl),
+    maxExcl: serializeMoney(block.maxExcl),
+    minAdvantage: serializeMoney(block.minAdvantage),
+    medianAdvantage: serializeMoney(block.medianAdvantage),
+    maxAdvantage: serializeMoney(block.maxAdvantage),
+    trades: block.trades,
+  };
+}
+
+function serializeCraftCompare(compare: CraftCompareResult) {
+  return {
+    tier: compare.tier,
+    scrapQty: compare.scrapQty,
+    steelRandom: compare.steelRandom,
+    steelSpecific: compare.steelSpecific,
+    scrapPrice: serializeMoney(compare.scrapPrice),
+    steelPrice: serializeMoney(compare.steelPrice),
+    scrapValue: serializeMoney(compare.scrapValue),
+    steelCostRandom: serializeMoney(compare.steelCostRandom),
+    steelCostSpecific: serializeMoney(compare.steelCostSpecific),
+    taxRate: compare.taxRate,
+    itemCount: compare.itemCount,
+    pricedItemCount: compare.pricedItemCount,
+    random: serializeCraftStatBlock(compare.random),
+    specific: compare.specific.map((row) => ({
+      itemCode: row.itemCode,
+      ...serializeCraftStatBlock(row),
+    })),
+  };
+}
+
+function serializeEquipmentDetail(detail: EquipmentDetail) {
+  return {
+    itemCode: detail.itemCode,
+    tier: detail.tier,
+    scrapPrice: serializeMoney(detail.scrapPrice),
+    taxRate: detail.taxRate,
+    countryId: detail.countryId,
+    lowestObserved: detail.lowestObserved,
+    skillKeys: detail.skillKeys,
+    activeBands: detail.activeBands,
+    marketMedian: serializeMoney(detail.marketMedian),
+    sellerNet: serializeMoney(detail.sellerNet),
+    scrapFloor: serializeMoney(detail.scrapFloor),
+    recommend: detail.recommend
+      ? {
+          scrapFloor: serializeMoney(detail.recommend.scrapFloor)!,
+          breakEvenIncl: serializeMoney(detail.recommend.breakEvenIncl)!,
+          attractiveIncl: serializeMoney(detail.recommend.attractiveIncl)!,
+        }
+      : null,
+    trades: detail.trades,
+    dailyMedians: detail.dailyMedians.map((row) => ({
+      day: row.day,
+      median: serializeMoney(row.median)!,
+      trades: row.trades,
+    })),
+    ladder: detail.ladder.map((row) => ({
+      bucketLabel: row.bucketLabel,
+      median: serializeMoney(row.median)!,
+      trades: row.trades,
+    })),
+  };
+}
+
 export function equipmentRoutes(deps: EquipmentRouteDeps) {
   const { db } = deps;
   const app = new Hono();
@@ -51,9 +135,9 @@ export function equipmentRoutes(deps: EquipmentRouteDeps) {
     const items = buildEquipmentOverview(txs, scrap?.price ?? null);
     return c.json({
       windowMs: MARKET_WINDOW_MS,
-      scrapPrice: scrap?.price ?? null,
+      scrapPrice: serializeMoney(scrap?.price ?? null),
       scrapedAt: scrap?.fetchedAt?.toISOString() ?? null,
-      items,
+      items: items.map(serializeOverviewItem),
     });
   });
 
@@ -98,7 +182,7 @@ export function equipmentRoutes(deps: EquipmentRouteDeps) {
       windowMs: MARKET_WINDOW_MS,
       scrapedAt: scrap?.fetchedAt?.toISOString() ?? null,
       steelFetchedAt: steel?.fetchedAt?.toISOString() ?? null,
-      ...compare,
+      ...serializeCraftCompare(compare),
     });
   });
 
@@ -134,7 +218,7 @@ export function equipmentRoutes(deps: EquipmentRouteDeps) {
       skills,
       now,
     });
-    return c.json(detail);
+    return c.json(serializeEquipmentDetail(detail));
   });
 
   return app;

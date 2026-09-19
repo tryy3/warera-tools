@@ -1,4 +1,5 @@
 import type { CompanyWorkDay, WorkerWorkDay } from "../warera/work-stats";
+import { parseMoney } from "../money/decimal";
 import type { Db } from "./client";
 import { companyWorkStats, workerWorkStats } from "./schema";
 
@@ -20,7 +21,7 @@ export async function upsertCompanyWorkDays(
         employeeProd: day.employeeProd,
         selfWork: day.selfWork,
         total: day.total,
-        wage: day.wage,
+        wage: parseMoney(day.wage),
         payload: day.payload,
         fetchedAt,
       })
@@ -31,7 +32,7 @@ export async function upsertCompanyWorkDays(
           employeeProd: day.employeeProd,
           selfWork: day.selfWork,
           total: day.total,
-          wage: day.wage,
+          wage: parseMoney(day.wage),
           payload: day.payload,
           fetchedAt,
         },
@@ -58,7 +59,7 @@ export async function upsertWorkerWorkDays(
         dailyDate: day.dailyDate,
         employeeProd: day.employeeProd,
         total: day.total,
-        wage: day.wage,
+        wage: parseMoney(day.wage),
         payload: day.payload,
         fetchedAt,
       })
@@ -67,7 +68,7 @@ export async function upsertWorkerWorkDays(
         set: {
           employeeProd: day.employeeProd,
           total: day.total,
-          wage: day.wage,
+          wage: parseMoney(day.wage),
           payload: day.payload,
           fetchedAt,
         },

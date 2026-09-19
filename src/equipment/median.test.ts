@@ -7,9 +7,9 @@ describe("median", () => {
   });
 
   it("handles odd and even lengths", () => {
-    expect(median([3])).toBe(3);
-    expect(median([1, 3, 2])).toBe(2);
-    expect(median([1, 2, 3, 4])).toBe(2.5);
+    expect(median([3])!.toNumber()).toBe(3);
+    expect(median([1, 3, 2])!.toNumber()).toBe(2);
+    expect(median([1, 2, 3, 4])!.toNumber()).toBe(2.5);
   });
 
   it("does not mutate input", () => {

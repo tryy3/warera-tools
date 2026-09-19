@@ -1,11 +1,7 @@
-import { createClient } from "@libsql/client";
 import { eq } from "drizzle-orm";
-import { drizzle } from "drizzle-orm/libsql";
-import { mkdtempSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { beforeEach, describe, expect, it } from "vite-plus/test";
+import { beforeAll, beforeEach, describe, expect, it } from "vite-plus/test";
 import type { Db } from "./client";
+import { createTestDb, truncateAllTables } from "./test/postgres";
 import {
   insertBattleLootSnapshots,
   insertBattlePoll,
@@ -13,66 +9,15 @@ import {
 } from "./battle-stats";
 import * as schema from "./schema";
 
-async function createDb(): Promise<Db> {
-  const dir = mkdtempSync(join(tmpdir(), "battle-stats-"));
-  const client = createClient({ url: `file:${join(dir, "test.db")}` });
-  await client.execute(`
-    CREATE TABLE battle_polls (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      recorded_at INTEGER NOT NULL,
-      status TEXT NOT NULL,
-      error TEXT,
-      active_battle_pages INTEGER,
-      battle_count INTEGER NOT NULL DEFAULT 0,
-      loot_snapshot_count INTEGER NOT NULL DEFAULT 0,
-      finalized_count INTEGER NOT NULL DEFAULT 0
-    )
-  `);
-  await client.execute(`
-    CREATE TABLE battle_scoreboard_snapshots (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      poll_id INTEGER NOT NULL REFERENCES battle_polls(id),
-      battle_id TEXT NOT NULL,
-      round_id TEXT,
-      round_number INTEGER,
-      round_is_active INTEGER,
-      attacker_points REAL,
-      defender_points REAL,
-      attacker_damages REAL,
-      defender_damages REAL,
-      attacker_hit_count INTEGER,
-      defender_hit_count INTEGER,
-      ticks_count INTEGER,
-      next_tick_at INTEGER,
-      round_started_at_game INTEGER,
-      recorded_at INTEGER NOT NULL
-    )
-  `);
-  await client.execute(`
-    CREATE TABLE battle_loot_snapshots (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      poll_id INTEGER NOT NULL REFERENCES battle_polls(id),
-      battle_id TEXT NOT NULL,
-      user_id TEXT NOT NULL,
-      mu_id TEXT NOT NULL,
-      total_dmg REAL,
-      hits INTEGER,
-      total_money_from_bounty REAL,
-      total_money_from_contract REAL,
-      case1_count INTEGER,
-      case2_count INTEGER,
-      pool_loot TEXT,
-      payload TEXT,
-      recorded_at INTEGER NOT NULL
-    )
-  `);
-  return drizzle(client, { schema });
-}
-
 describe("battle-stats db", () => {
   let db: Db;
+
+  beforeAll(async () => {
+    ({ db } = await createTestDb());
+  });
+
   beforeEach(async () => {
-    db = await createDb();
+    await truncateAllTables(db);
   });
 
   it("inserts poll, scoreboard, and loot snapshots and returns ids / row counts", async () => {

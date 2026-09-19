@@ -1,10 +1,11 @@
 import { and, asc, eq, or } from "drizzle-orm";
+import type { Decimal } from "../money/decimal";
 import type { Db } from "./client";
 import { itemMarketTransactions } from "./schema";
 
 export type PlayerItemFillRow = {
   id: string;
-  money: number;
+  money: Decimal;
   quantity: number;
   buyerId: string;
   sellerId: string;
@@ -16,7 +17,7 @@ export async function listPlayerItemFills(
   opts: { playerId: string; itemCode: string },
 ): Promise<PlayerItemFillRow[]> {
   const { playerId, itemCode } = opts;
-  return db
+  const rows = await db
     .select({
       id: itemMarketTransactions.id,
       money: itemMarketTransactions.money,
@@ -36,4 +37,5 @@ export async function listPlayerItemFills(
       ),
     )
     .orderBy(asc(itemMarketTransactions.createdAt));
+  return rows;
 }

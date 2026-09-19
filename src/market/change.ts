@@ -1,20 +1,18 @@
+import { isFiniteMoney, parseMoney, type Decimal } from "../money/decimal";
+
 export type PriceChange = { absolute: number; percent: number };
 
 export function calculatePriceChange(
-  current: number | null,
-  baseline: number | null,
+  current: Decimal | number | null,
+  baseline: Decimal | number | null,
 ): PriceChange | null {
-  if (
-    current == null ||
-    baseline == null ||
-    !Number.isFinite(current) ||
-    !Number.isFinite(baseline) ||
-    baseline === 0
-  ) {
+  const cur = parseMoney(current);
+  const base = parseMoney(baseline);
+  if (!isFiniteMoney(cur) || !isFiniteMoney(base) || base.isZero()) {
     return null;
   }
-  const absolute = current - baseline;
-  const percent = (absolute / baseline) * 100;
+  const absolute = cur.minus(base);
+  const percent = absolute.div(base).times(100);
   return {
     absolute: parseFloat(absolute.toPrecision(12)),
     percent: parseFloat(percent.toPrecision(12)),

@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import type { Db } from "../../db/client";
 import { listPlayerItemFills } from "../../db/item-market-tx-player";
-import { buildMyTrades } from "../../market/buildMyTrades";
+import { buildMyTrades, serializeMyTradesResult } from "../../market/buildMyTrades";
 import { parsePriceHistoryRange } from "../../market/ranges";
 import { HttpError } from "../errors";
 
@@ -21,14 +21,7 @@ export function marketRoutes(deps: MarketRouteDeps) {
     const range = parsePriceHistoryRange(c.req.query("range"));
     const rows = await listPlayerItemFills(db, { playerId, itemCode });
     const result = buildMyTrades({ itemCode, playerId, range, rows });
-    return c.json({
-      ...result,
-      chunks: result.chunks.map((ch) => ({
-        ...ch,
-        startAt: ch.startAt.toISOString(),
-        endAt: ch.endAt.toISOString(),
-      })),
-    });
+    return c.json(serializeMyTradesResult(result));
   });
 
   return app;

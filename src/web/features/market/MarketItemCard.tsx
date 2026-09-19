@@ -1,23 +1,26 @@
 import { Link } from "@tanstack/react-router";
 import { formatDisplayNumber } from "@/lib/formatDisplayNumber";
+import { moneyToNumber } from "@/money/decimal";
 import { GoldIcon } from "../../components/GoldIcon";
 import { ItemIcon } from "../../components/ItemIcon";
 import { formatItem } from "./formatItem";
 import type { LatestPriceItem } from "./types";
 
-function formatNum(value: number | null | undefined, digits = 4): string {
-  if (value == null || !Number.isFinite(value)) return "—";
-  return formatDisplayNumber(value, digits);
+function formatNum(value: string | number | null | undefined, digits = 4): string {
+  const n = moneyToNumber(value);
+  if (n == null) return "—";
+  return formatDisplayNumber(n, digits);
 }
 
-function MarketPriceLine({ value }: { value: number | null }) {
-  if (value == null || !Number.isFinite(value)) {
+function MarketPriceLine({ value }: { value: string | number | null }) {
+  const n = moneyToNumber(value);
+  if (n == null) {
     return <span className="text-muted-foreground">—</span>;
   }
   return (
     <span className="inline-flex items-center gap-1 text-muted-foreground">
       <GoldIcon />
-      {formatDisplayNumber(value)}
+      {formatDisplayNumber(n)}
     </span>
   );
 }

@@ -4,8 +4,9 @@ import { scaleLinear } from "@tanstack/charts/scales/linear";
 import { tooltip } from "@tanstack/charts/tooltip";
 import { Chart } from "@tanstack/react-charts";
 import { useMemo } from "react";
+import { moneyToNumber } from "@/money/decimal";
 
-type LadderBucket = { bucketLabel: string; median: number; trades: number };
+type LadderBucket = { bucketLabel: string; median: string | number; trades: number };
 
 export function EquipmentLadderChart({
   ladder,
@@ -15,7 +16,12 @@ export function EquipmentLadderChart({
   itemLabel: string;
 }) {
   const rows = useMemo(
-    () => ladder.filter((b) => Number.isFinite(b.median) && b.bucketLabel.length > 0),
+    () =>
+      ladder.flatMap((b) => {
+        const median = moneyToNumber(b.median);
+        if (median == null || b.bucketLabel.length === 0) return [];
+        return [{ bucketLabel: b.bucketLabel, median, trades: b.trades }];
+      }),
     [ladder],
   );
 

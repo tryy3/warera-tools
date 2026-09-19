@@ -1,14 +1,17 @@
 import { calculateProfitPerPp, explainAeDaily, type BookPrices } from "../../../../economy/profit";
+import { Decimal, isFiniteMoney, parseMoney } from "../../../../money/decimal";
 import type { Opportunity } from "../types";
 import type { ItemPriceOverride, ItemPriceOverrides } from "./types";
 
 /** Build live buy/sell maps from opportunity rows (one entry per producible item). */
 export function bookFromOpportunities(opportunities: readonly Opportunity[]): BookPrices {
-  const buy: Record<string, number> = {};
-  const sell: Record<string, number> = {};
+  const buy: Record<string, Decimal> = {};
+  const sell: Record<string, Decimal> = {};
   for (const o of opportunities) {
-    if (o.buyPrice != null && Number.isFinite(o.buyPrice)) buy[o.itemCode] = o.buyPrice;
-    if (o.sellPrice != null && Number.isFinite(o.sellPrice)) sell[o.itemCode] = o.sellPrice;
+    const buyP = parseMoney(o.buyPrice);
+    const sellP = parseMoney(o.sellPrice);
+    if (isFiniteMoney(buyP)) buy[o.itemCode] = buyP;
+    if (isFiniteMoney(sellP)) sell[o.itemCode] = sellP;
   }
   return { buy, sell };
 }
@@ -17,8 +20,12 @@ export function mergeBookPrices(live: BookPrices, overrides: ItemPriceOverrides)
   const buy = { ...live.buy };
   const sell = { ...live.sell };
   for (const [itemCode, override] of Object.entries(overrides)) {
-    if (override.buy != null && Number.isFinite(override.buy)) buy[itemCode] = override.buy;
-    if (override.sell != null && Number.isFinite(override.sell)) sell[itemCode] = override.sell;
+    if (override.buy != null && Number.isFinite(override.buy)) {
+      buy[itemCode] = new Decimal(override.buy);
+    }
+    if (override.sell != null && Number.isFinite(override.sell)) {
+      sell[itemCode] = new Decimal(override.sell);
+    }
   }
   return { buy, sell };
 }
@@ -41,31 +48,33 @@ export function recomputeOpportunity(live: Opportunity, book: BookPrices): Oppor
   const breakdown = calculateProfitPerPp(live.itemCode, book);
   if (!breakdown) return live;
 
-  const buyPrice =
-    book.buy[live.itemCode] != null && Number.isFinite(book.buy[live.itemCode]!)
-      ? book.buy[live.itemCode]!
-      : null;
-  const sellPrice =
-    book.sell[live.itemCode] != null && Number.isFinite(book.sell[live.itemCode]!)
-      ? book.sell[live.itemCode]!
-      : breakdown.sellPrice;
+  const buyCandidate = parseMoney(book.buy[live.itemCode]);
+  const buyPrice = isFiniteMoney(buyCandidate) ? buyCandidate.toFixed() : null;
+  const sellCandidate = parseMoney(book.sell[live.itemCode]);
+  const sellPrice = isFiniteMoney(sellCandidate)
+    ? sellCandidate.toFixed()
+    : breakdown.sellPrice.toFixed();
 
   const hasBonus = live.bestBonus != null && Number.isFinite(live.bestBonus);
-  const hasPp = breakdown.profitPerPp != null && Number.isFinite(breakdown.profitPerPp);
+  const hasPp = isFiniteMoney(breakdown.profitPerPp);
 
   return {
     ...live,
-    marketPrice: breakdown.marketPrice,
+    marketPrice: breakdown.marketPrice.toFixed(),
     buyPrice,
     sellPrice,
-    inputCost: breakdown.inputCost,
-    unitProfit: breakdown.unitProfit,
+    inputCost: breakdown.inputCost.toFixed(),
+    unitProfit: breakdown.unitProfit.toFixed(),
     consumedPp: breakdown.consumedPp,
-    profitPerPp: breakdown.profitPerPp,
+    profitPerPp: breakdown.profitPerPp?.toFixed() ?? null,
     formula: breakdown.formula,
     roughDailyValue:
       hasBonus && hasPp
-        ? explainAeDaily(live.referenceAeLevel, live.bestBonus!, breakdown.profitPerPp!).dailyValue
+        ? explainAeDaily(
+            live.referenceAeLevel,
+            live.bestBonus!,
+            breakdown.profitPerPp!,
+          ).dailyValue.toFixed()
         : null,
   };
 }
@@ -85,8 +94,8 @@ export function effectiveProfitForItem(
   const breakdown = calculateProfitPerPp(itemCode, book);
   if (!breakdown) return null;
   return {
-    profitPerPp: breakdown.profitPerPp,
-    inputCost: breakdown.inputCost,
+    profitPerPp: isFiniteMoney(breakdown.profitPerPp) ? breakdown.profitPerPp.toNumber() : null,
+    inputCost: breakdown.inputCost.toNumber(),
   };
 }
 

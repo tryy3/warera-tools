@@ -1,48 +1,20 @@
-import { createClient } from "@libsql/client";
 import { eq } from "drizzle-orm";
-import { drizzle } from "drizzle-orm/libsql";
-import { mkdtempSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { beforeEach, describe, expect, it } from "vite-plus/test";
+import { beforeAll, beforeEach, describe, expect, it } from "vite-plus/test";
+import { Decimal, moneyEquals } from "../money/decimal";
 import type { Db } from "./client";
+import { createTestDb, truncateAllTables } from "./test/postgres";
 import { insertDonationPoll, insertDonationSnapshots } from "./donations";
 import * as schema from "./schema";
 
-async function createDb(): Promise<Db> {
-  const dir = mkdtempSync(join(tmpdir(), "donations-"));
-  const client = createClient({ url: `file:${join(dir, "test.db")}` });
-  await client.execute(`
-    CREATE TABLE donation_polls (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      recorded_at INTEGER NOT NULL,
-      status TEXT NOT NULL,
-      error TEXT,
-      scope_count INTEGER NOT NULL DEFAULT 0,
-      row_count INTEGER NOT NULL DEFAULT 0
-    )
-  `);
-  await client.execute(`
-    CREATE TABLE donation_snapshots (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      poll_id INTEGER NOT NULL REFERENCES donation_polls(id),
-      scope_type TEXT NOT NULL,
-      scope_id TEXT NOT NULL,
-      user_id TEXT NOT NULL,
-      donation_row_id TEXT,
-      amount REAL,
-      donation_created_at INTEGER,
-      donation_updated_at INTEGER,
-      payload TEXT
-    )
-  `);
-  return drizzle(client, { schema });
-}
-
 describe("donations db", () => {
   let db: Db;
+
+  beforeAll(async () => {
+    ({ db } = await createTestDb());
+  });
+
   beforeEach(async () => {
-    db = await createDb();
+    await truncateAllTables(db);
   });
 
   it("inserts poll and snapshot rows", async () => {
@@ -79,7 +51,7 @@ describe("donations db", () => {
     expect(snaps[0]?.scopeId).toBe("mu1");
     expect(snaps[0]?.userId).toBe("u1");
     expect(snaps[0]?.donationRowId).toBe("d1");
-    expect(snaps[0]?.amount).toBe(100);
+    expect(moneyEquals(snaps[0]?.amount, new Decimal("100"))).toBe(true);
   });
 
   it("no-ops on empty snapshot arrays", async () => {

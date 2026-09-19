@@ -1,53 +1,9 @@
-import { createClient } from "@libsql/client";
-import { drizzle } from "drizzle-orm/libsql";
-import { mkdtempSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { beforeEach, describe, expect, it, vi } from "vite-plus/test";
+import { beforeAll, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 import type { Db } from "../db/client";
+import { createTestDb, truncateAllTables } from "../db/test/postgres";
 import { insertPricePoll, insertPriceSnapshots } from "../db/prices";
-import * as schema from "../db/schema";
 import { listProducibleRecipes } from "../economy/recipes";
 import { buildGrowthBootstrap, mapGrowthBootstrap } from "./bootstrap";
-
-async function createDb(): Promise<Db> {
-  const dir = mkdtempSync(join(tmpdir(), "growth-bootstrap-"));
-  const client = createClient({ url: `file:${join(dir, "test.db")}` });
-  await client.execute(`
-    CREATE TABLE price_polls (
-      id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-      recorded_at INTEGER NOT NULL,
-      status TEXT NOT NULL,
-      error TEXT,
-      item_count INTEGER DEFAULT 0 NOT NULL
-    )
-  `);
-  await client.execute(`
-    CREATE TABLE price_snapshots (
-      id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-      poll_id INTEGER NOT NULL,
-      item_code TEXT NOT NULL,
-      market_price REAL,
-      buy_min REAL,
-      buy_max REAL,
-      buy_avg REAL,
-      sell_min REAL,
-      sell_max REAL,
-      sell_avg REAL
-    )
-  `);
-  await client.execute(`
-    CREATE TABLE regions (
-      id TEXT PRIMARY KEY NOT NULL,
-      name TEXT,
-      country_code TEXT,
-      payload TEXT,
-      fetched_at INTEGER,
-      enqueued_at INTEGER NOT NULL
-    )
-  `);
-  return drizzle(client, { schema });
-}
 
 async function seedPrices(db: Db): Promise<void> {
   const pollId = await insertPricePoll(db, {
@@ -126,14 +82,14 @@ describe("mapGrowthBootstrap", () => {
     expect(result.startBalance).toBe(0);
     expect(result.steel).toBe(0);
     expect(result.concrete).toBe(0);
-    expect(result.prices).toEqual({ steel: 20, concrete: 5 });
+    expect(result.prices).toEqual({ steel: "20", concrete: "5" });
     expect(result.opportunitiesLite).toEqual([
-      { itemCode: "steel", profitPerPp: 0.5 },
-      { itemCode: "iron", profitPerPp: 0.2 },
+      { itemCode: "steel", profitPerPp: "0.5" },
+      { itemCode: "iron", profitPerPp: "0.2" },
     ]);
     expect(result.bestItem).toEqual({
       itemCode: "steel",
-      profitPerPp: 0.5,
+      profitPerPp: "0.5",
       suggestedBonus: 0,
     });
     expect(result).not.toHaveProperty("companies");
@@ -156,8 +112,12 @@ describe("mapGrowthBootstrap", () => {
 describe("buildGrowthBootstrap", () => {
   let db: Db;
 
+  beforeAll(async () => {
+    ({ db } = await createTestDb());
+  });
+
   beforeEach(async () => {
-    db = await createDb();
+    await truncateAllTables(db);
     await seedPrices(db);
   });
 
@@ -182,8 +142,8 @@ describe("buildGrowthBootstrap", () => {
     expect(result.steel).toBe(0);
     expect(result.concrete).toBe(0);
     expect(result.recordedAt).toBe("2026-08-01T12:00:00.000Z");
-    expect(result.prices.steel).toBe(20);
-    expect(result.prices.concrete).toBe(5);
+    expect(result.prices.steel).toBe("20");
+    expect(result.prices.concrete).toBe("5");
     expect(result.bestItem?.suggestedBonus).toBe(0);
     expect(result).not.toHaveProperty("opportunities");
     expect(request).not.toHaveBeenCalled();

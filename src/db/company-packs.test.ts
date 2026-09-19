@@ -1,26 +1,7 @@
-import { createClient } from "@libsql/client";
-import { drizzle } from "drizzle-orm/libsql";
-import { mkdtempSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { beforeEach, describe, expect, it } from "vite-plus/test";
+import { beforeAll, beforeEach, describe, expect, it } from "vite-plus/test";
 import type { Db } from "./client";
-import * as schema from "./schema";
+import { createTestDb, truncateAllTables } from "./test/postgres";
 import { getCompanyPack, isCompanyPackFresh, upsertCompanyPack } from "./company-packs";
-
-async function createDb(): Promise<Db> {
-  const dir = mkdtempSync(join(tmpdir(), "company-packs-"));
-  const client = createClient({ url: `file:${join(dir, "test.db")}` });
-  await client.execute(`
-    CREATE TABLE company_packs (
-      user_id TEXT PRIMARY KEY NOT NULL,
-      payload TEXT NOT NULL,
-      fetched_at INTEGER NOT NULL,
-      ttl_seconds INTEGER NOT NULL DEFAULT 600
-    )
-  `);
-  return drizzle(client, { schema });
-}
 
 describe("company_packs", () => {
   it("isCompanyPackFresh respects TTL", () => {
@@ -30,8 +11,13 @@ describe("company_packs", () => {
   });
 
   let db: Db;
+
+  beforeAll(async () => {
+    ({ db } = await createTestDb());
+  });
+
   beforeEach(async () => {
-    db = await createDb();
+    await truncateAllTables(db);
   });
 
   it("upserts and reads pack payload", async () => {

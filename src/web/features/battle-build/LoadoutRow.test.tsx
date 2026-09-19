@@ -104,9 +104,9 @@ describe("sumLoadoutQuotes", () => {
   it("sums non-null medians", () => {
     expect(
       sumLoadoutQuotes([
-        { id: "weapon", median: 12.5, trades: 10, window: "24h", widened: false },
+        { id: "weapon", median: "12.5", trades: 10, window: "24h", widened: false },
         { id: "helmet", median: null, trades: 0, window: "thin", widened: true },
-        { id: "food", median: 2, trades: 4, window: "thin", widened: false },
+        { id: "food", median: "2", trades: 4, window: "thin", widened: false },
       ]),
     ).toEqual({ total: 14.5, quotedCount: 2 });
   });
@@ -120,7 +120,7 @@ describe("SlotCard", () => {
         item={{ itemCode: "gloves3", skills: { armor: 20 } }}
         quote={{
           id: "gloves",
-          median: 4.5,
+          median: "4.5",
           trades: 3,
           window: "thin",
           widened: true,

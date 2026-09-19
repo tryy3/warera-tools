@@ -1,4 +1,5 @@
 import type { PlayerItemFillRow } from "../db/item-market-tx-player";
+import { serializeMoney, type Decimal } from "../money/decimal";
 import { chunkFills, type PlayerFill, type TradeChunk } from "./chunkFills";
 import { runCostBook, sumRealizedPnl } from "./costBook";
 import { rangeToMs, type PriceHistoryRange } from "./ranges";
@@ -9,17 +10,42 @@ export type MyTradesResult = {
   range: PriceHistoryRange;
   chunks: Array<{
     side: "buy" | "sell";
-    unitPrice: number;
+    unitPrice: Decimal;
     totalQty: number;
-    totalMoney: number;
+    totalMoney: Decimal;
     startAt: Date;
     endAt: Date;
     fillCount: number;
   }>;
-  realized: { pnl: number | null; sellQty: number; buyQty: number };
+  realized: { pnl: Decimal | null; sellQty: number; buyQty: number };
   historyIncomplete: boolean;
   fillCount: number;
 };
+
+/** API wire shape for my-trades (money as strings). */
+export function serializeMyTradesResult(result: MyTradesResult) {
+  return {
+    itemCode: result.itemCode,
+    playerId: result.playerId,
+    range: result.range,
+    chunks: result.chunks.map((ch) => ({
+      side: ch.side,
+      unitPrice: serializeMoney(ch.unitPrice),
+      totalQty: ch.totalQty,
+      totalMoney: serializeMoney(ch.totalMoney),
+      startAt: ch.startAt.toISOString(),
+      endAt: ch.endAt.toISOString(),
+      fillCount: ch.fillCount,
+    })),
+    realized: {
+      pnl: serializeMoney(result.realized.pnl),
+      sellQty: result.realized.sellQty,
+      buyQty: result.realized.buyQty,
+    },
+    historyIncomplete: result.historyIncomplete,
+    fillCount: result.fillCount,
+  };
+}
 
 function rowsToFills(rows: PlayerItemFillRow[], playerId: string): PlayerFill[] {
   return rows.map((row) => ({
@@ -64,6 +90,7 @@ export function buildMyTrades(opts: {
   const book = runCostBook(fills);
   const allChunks = chunkFills(fills);
   const chunks = allChunks.filter((chunk) => chunkOverlapsRange(chunk, since, until));
+  const pnl = sumRealizedPnl(book.realized, since, until);
 
   return {
     itemCode: opts.itemCode,
@@ -71,7 +98,7 @@ export function buildMyTrades(opts: {
     range: opts.range,
     chunks,
     realized: {
-      pnl: sumRealizedPnl(book.realized, since, until),
+      pnl,
       sellQty: qtyInRange(fills, "sell", since, until),
       buyQty: qtyInRange(fills, "buy", since, until),
     },

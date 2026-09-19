@@ -4,6 +4,7 @@ import { tooltip } from "@tanstack/charts/tooltip";
 import { Chart } from "@tanstack/react-charts";
 import { scaleUtc } from "d3-scale";
 import { useMemo } from "react";
+import { moneyToNumber } from "@/money/decimal";
 import type { PriceHistoryPointDto } from "./types";
 
 type ChartRow = {
@@ -36,9 +37,9 @@ export function MarketPriceChart({
     () =>
       points.map((p) => ({
         date: new Date(p.recordedAt),
-        marketPrice: p.marketPrice,
-        topBuy: p.topBuy,
-        topSell: p.topSell,
+        marketPrice: moneyToNumber(p.marketPrice),
+        topBuy: moneyToNumber(p.topBuy),
+        topSell: moneyToNumber(p.topSell),
       })),
     [points],
   );

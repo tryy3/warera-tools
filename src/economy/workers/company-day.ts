@@ -1,5 +1,6 @@
 import { dailyActionsFromBar } from "../../skills/income";
 import { skillValueFromLevel } from "../../skills/values";
+import { Decimal } from "../../money/decimal";
 import { explainAeDaily } from "../profit";
 import { getRecipe } from "../recipes";
 import { maxGrossWagePerPp as maxGrossWagePerPpFromProfit } from "./wages";
@@ -75,7 +76,8 @@ function unitsFromPp(itemCode: string | null, totalPp: number): number | null {
 }
 
 export function companyDay(input: CompanyDayInput): CompanyDayResult {
-  const ae = explainAeDaily(input.aeLevel, input.productionBonus, input.profitPerPp);
+  const profitDec = new Decimal(input.profitPerPp);
+  const ae = explainAeDaily(input.aeLevel, input.productionBonus, profitDec);
   const { selfWorkDailyPp, selfWorkDailyValue } = selfWorkDaily(
     input.includeSelfWork,
     input.entrepreneurshipLevel,
@@ -120,17 +122,18 @@ export function companyDay(input: CompanyDayInput): CompanyDayResult {
   const inputCostPerDay = unitsProduced != null ? unitsProduced * input.inputCostPerUnit : 0;
 
   // Gross sales = PP×profitPerPp (already net of inputs) + input costs restored for P&L.
-  const revenuePerDay = ae.dailyValue + selfWorkDailyValue + workerRevenuePerDay + inputCostPerDay;
+  const aeDailyValue = ae.dailyValue.toNumber();
+  const revenuePerDay = aeDailyValue + selfWorkDailyValue + workerRevenuePerDay + inputCostPerDay;
   const netPerDay = revenuePerDay - workerWageCostPerDay - inputCostPerDay;
 
   const totalPpAtMax = ae.dailyPp + selfWorkDailyPp + workerPpAtMax;
   const unitsAtMax = unitsFromPp(input.itemCode, totalPpAtMax);
   const inputCostAtMax = unitsAtMax != null ? unitsAtMax * input.inputCostPerUnit : 0;
-  const revenueAtMax = ae.dailyValue + selfWorkDailyValue + workerRevenueAtMax + inputCostAtMax;
+  const revenueAtMax = aeDailyValue + selfWorkDailyValue + workerRevenueAtMax + inputCostAtMax;
   const netPerDayAtMaxWorkerFidelity = revenueAtMax - workerWageAtMax - inputCostAtMax;
 
   return {
-    aeDailyValue: ae.dailyValue,
+    aeDailyValue,
     aeDailyPp: ae.dailyPp,
     selfWorkDailyValue,
     selfWorkDailyPp,

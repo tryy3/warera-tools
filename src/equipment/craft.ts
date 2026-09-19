@@ -1,5 +1,6 @@
 import type { GearTierId } from "../calculator";
-import type { ItemMarketTxRow } from "../db/item-market-tx-read";
+import { txMoney, type ItemMarketTxRow } from "../db/item-market-tx-read";
+import { Decimal, isFiniteMoney, parseMoney } from "../money/decimal";
 import { compareEquipmentItems, ITEM_CODE_TIER_OVERRIDES } from "./catalog";
 import { median } from "./median";
 
@@ -43,12 +44,12 @@ export function itemCodesForTier(tier: GearTierId): string[] {
 }
 
 export type CraftStatBlock = {
-  minExcl: number | null;
-  medianExcl: number | null;
-  maxExcl: number | null;
-  minAdvantage: number | null;
-  medianAdvantage: number | null;
-  maxAdvantage: number | null;
+  minExcl: Decimal | null;
+  medianExcl: Decimal | null;
+  maxExcl: Decimal | null;
+  minAdvantage: Decimal | null;
+  medianAdvantage: Decimal | null;
+  maxAdvantage: Decimal | null;
   trades: number;
 };
 
@@ -59,11 +60,11 @@ export type CraftCompareResult = {
   scrapQty: number;
   steelRandom: number;
   steelSpecific: number;
-  scrapPrice: number | null;
-  steelPrice: number | null;
-  scrapValue: number | null;
-  steelCostRandom: number | null;
-  steelCostSpecific: number | null;
+  scrapPrice: Decimal | null;
+  steelPrice: Decimal | null;
+  scrapValue: Decimal | null;
+  steelCostRandom: Decimal | null;
+  steelCostSpecific: Decimal | null;
   taxRate: number;
   itemCount: number;
   pricedItemCount: number;
@@ -71,27 +72,27 @@ export type CraftCompareResult = {
   specific: CraftSpecificRow[];
 };
 
-function exclFromMoney(money: number, taxRate: number): number {
-  return money / (1 + taxRate);
+function exclFromMoney(money: Decimal, taxRate: number): Decimal {
+  return money.div(1 + taxRate);
 }
 
 function advantage(
-  gearExcl: number | null,
-  steelCost: number | null,
-  scrapValue: number | null,
-): number | null {
+  gearExcl: Decimal | null,
+  steelCost: Decimal | null,
+  scrapValue: Decimal | null,
+): Decimal | null {
   if (gearExcl == null || steelCost == null || scrapValue == null) return null;
-  return gearExcl - steelCost - scrapValue;
+  return gearExcl.minus(steelCost).minus(scrapValue);
 }
 
-function minMax(values: number[]): { min: number | null; max: number | null } {
+function minMax(values: Decimal[]): { min: Decimal | null; max: Decimal | null } {
   if (values.length === 0) return { min: null, max: null };
   let min = values[0]!;
   let max = values[0]!;
   for (let i = 1; i < values.length; i++) {
     const v = values[i]!;
-    if (v < min) min = v;
-    if (v > max) max = v;
+    if (v.lt(min)) min = v;
+    if (v.gt(max)) max = v;
   }
   return { min, max };
 }
@@ -109,9 +110,9 @@ function emptyStats(trades = 0): CraftStatBlock {
 }
 
 function statsFromExcls(
-  exclPrices: number[],
-  steelCost: number | null,
-  scrapValue: number | null,
+  exclPrices: Decimal[],
+  steelCost: Decimal | null,
+  scrapValue: Decimal | null,
 ): CraftStatBlock {
   if (exclPrices.length === 0) return emptyStats(0);
   const { min, max } = minMax(exclPrices);
@@ -130,26 +131,25 @@ function statsFromExcls(
 export function buildCraftCompare(input: {
   tier: GearTierId;
   txs: ItemMarketTxRow[];
-  scrapPrice: number | null;
-  steelPrice: number | null;
+  scrapPrice: Decimal | number | null;
+  steelPrice: Decimal | number | null;
   taxRate: number;
 }): CraftCompareResult {
-  const { tier, txs, scrapPrice, steelPrice, taxRate } = input;
+  const { tier, txs, taxRate } = input;
+  const scrapPrice = parseMoney(input.scrapPrice);
+  const steelPrice = parseMoney(input.steelPrice);
   const cost = craftCostForTier(tier);
   const codes = itemCodesForTier(tier);
-  const scrapValue =
-    scrapPrice != null && Number.isFinite(scrapPrice) ? cost.scrapQty * scrapPrice : null;
-  const steelCostRandom =
-    steelPrice != null && Number.isFinite(steelPrice) ? cost.steelRandom * steelPrice : null;
-  const steelCostSpecific =
-    steelPrice != null && Number.isFinite(steelPrice) ? cost.steelSpecific * steelPrice : null;
+  const scrapValue = isFiniteMoney(scrapPrice) ? scrapPrice.times(cost.scrapQty) : null;
+  const steelCostRandom = isFiniteMoney(steelPrice) ? steelPrice.times(cost.steelRandom) : null;
+  const steelCostSpecific = isFiniteMoney(steelPrice) ? steelPrice.times(cost.steelSpecific) : null;
 
-  const byCode = new Map<string, number[]>();
+  const byCode = new Map<string, Decimal[]>();
   for (const code of codes) byCode.set(code, []);
   for (const row of txs) {
     const list = byCode.get(row.itemCode);
     if (!list) continue;
-    list.push(exclFromMoney(row.money, taxRate));
+    list.push(exclFromMoney(txMoney(row), taxRate));
   }
 
   const specific: CraftSpecificRow[] = codes.map((itemCode) => {
@@ -166,15 +166,14 @@ export function buildCraftCompare(input: {
     }
     if (a.medianAdvantage == null) return 1;
     if (b.medianAdvantage == null) return -1;
-    if (b.medianAdvantage !== a.medianAdvantage) {
-      return b.medianAdvantage - a.medianAdvantage;
-    }
+    const cmp = b.medianAdvantage.comparedTo(a.medianAdvantage);
+    if (cmp !== 0) return cmp;
     return compareEquipmentItems(a.itemCode, b.itemCode);
   });
 
   const priced = specific.filter((r) => r.trades > 0);
-  const allExcls: number[] = [];
-  const medians: number[] = [];
+  const allExcls: Decimal[] = [];
+  const medians: Decimal[] = [];
   let randomTrades = 0;
   for (const row of priced) {
     const exclPrices = byCode.get(row.itemCode) ?? [];
@@ -189,7 +188,9 @@ export function buildCraftCompare(input: {
   } else {
     const { min, max } = minMax(allExcls);
     const typical =
-      medians.length === 0 ? null : medians.reduce((s, v) => s + v, 0) / medians.length;
+      medians.length === 0
+        ? null
+        : medians.reduce((s, v) => s.plus(v), new Decimal(0)).div(medians.length);
     random = {
       minExcl: min,
       medianExcl: typical,

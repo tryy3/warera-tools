@@ -1,5 +1,5 @@
 import type { Db } from "./client";
-import { muMemberStatSnapshots, muPolls, muStatSnapshots } from "./schema";
+import { muMemberStatSnapshots, muPolls, muStatSnapshots, type PricePollStatus } from "./schema";
 
 export type MuStatSnapshotRow = {
   muId: string;
@@ -43,7 +43,7 @@ export async function insertMuPoll(
   db: Db,
   values: {
     recordedAt: Date;
-    status: string;
+    status: PricePollStatus;
     error?: string | null;
     muCount: number;
     memberCount: number;

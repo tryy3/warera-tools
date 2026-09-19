@@ -5,6 +5,7 @@ import type { Db } from "../../db/client";
 import { runPricePoll } from "../../jobs/price-poll/run";
 import type { Logger } from "../../logging/logger";
 import { parsePriceHistoryRange } from "../../market/ranges";
+import { serializeMoney, serializeMoneyMap } from "../../money/decimal";
 import type { WareraRequester } from "../../warera/prices";
 import { HttpError } from "../errors";
 
@@ -39,8 +40,17 @@ export function pricesRoutes(deps: PricesRouteDeps) {
       pollId: latest.pollId,
       recordedAt: latest.recordedAt.toISOString(),
       status: latest.status,
-      market: marketPriceMap(latest),
-      items: latest.items,
+      market: serializeMoneyMap(marketPriceMap(latest)),
+      items: latest.items.map((p) => ({
+        itemCode: p.itemCode,
+        marketPrice: serializeMoney(p.marketPrice),
+        buyMin: serializeMoney(p.buyMin),
+        buyMax: serializeMoney(p.buyMax),
+        buyAvg: serializeMoney(p.buyAvg),
+        sellMin: serializeMoney(p.sellMin),
+        sellMax: serializeMoney(p.sellMax),
+        sellAvg: serializeMoney(p.sellAvg),
+      })),
     });
   });
 
@@ -57,9 +67,9 @@ export function pricesRoutes(deps: PricesRouteDeps) {
     }
     const isoPoint = (p: NonNullable<typeof history.latest>) => ({
       recordedAt: p.recordedAt.toISOString(),
-      marketPrice: p.marketPrice,
-      topBuy: p.topBuy,
-      topSell: p.topSell,
+      marketPrice: serializeMoney(p.marketPrice),
+      topBuy: serializeMoney(p.topBuy),
+      topSell: serializeMoney(p.topSell),
     });
     return c.json({
       itemCode: history.itemCode,
@@ -78,8 +88,17 @@ export function pricesRoutes(deps: PricesRouteDeps) {
       return c.json({
         ...result,
         recordedAt: latest?.recordedAt.toISOString() ?? null,
-        market: latest ? marketPriceMap(latest) : {},
-        items: latest?.items ?? [],
+        market: latest ? serializeMoneyMap(marketPriceMap(latest)) : {},
+        items: (latest?.items ?? []).map((p) => ({
+          itemCode: p.itemCode,
+          marketPrice: serializeMoney(p.marketPrice),
+          buyMin: serializeMoney(p.buyMin),
+          buyMax: serializeMoney(p.buyMax),
+          buyAvg: serializeMoney(p.buyAvg),
+          sellMin: serializeMoney(p.sellMin),
+          sellMax: serializeMoney(p.sellMax),
+          sellAvg: serializeMoney(p.sellAvg),
+        })),
       });
     } catch (err) {
       throw new HttpError(

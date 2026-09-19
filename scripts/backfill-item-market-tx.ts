@@ -67,7 +67,7 @@ async function main() {
   const config = args.rpm != null ? { ...base, wareraMaxRequestsPerMinute: args.rpm } : base;
 
   const logger = createServerLogger(config);
-  const { db, client } = createDb(config, logger);
+  const { db, pool } = createDb(config, logger);
   const warera = createWareraClient({ config, logger });
 
   const types: TxType[] = args.type === "both" ? ["trading", "itemMarket"] : [args.type];
@@ -123,7 +123,7 @@ async function main() {
     }
   } finally {
     process.off("SIGINT", onSig);
-    client.close();
+    await pool.end();
   }
 
   console.log(summaries.join("\n"));

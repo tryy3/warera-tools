@@ -1,9 +1,7 @@
-import { createClient } from "@libsql/client";
 import { eq } from "drizzle-orm";
-import { drizzle } from "drizzle-orm/libsql";
-import { describe, expect, it, vi } from "vite-plus/test";
+import { beforeAll, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 import type { Db } from "../db/client";
-import * as schema from "../db/schema";
+import { createTestDb, truncateAllTables } from "../db/test/postgres";
 import { jobRuns, jobs } from "../db/schema";
 import type { Logger } from "../logging/logger";
 import type { WareraRequester } from "../warera/prices";
@@ -37,36 +35,15 @@ const silentLogger = {
   child: () => silentLogger,
 } as unknown as Logger;
 
-async function createMemoryJobsDb(): Promise<Db> {
-  const client = createClient({ url: ":memory:" });
-  await client.execute(`
-    CREATE TABLE jobs (
-      id TEXT PRIMARY KEY NOT NULL,
-      name TEXT NOT NULL,
-      description TEXT DEFAULT '' NOT NULL,
-      enabled INTEGER DEFAULT 1 NOT NULL,
-      cron TEXT NOT NULL,
-      max_runs INTEGER,
-      last_started_at INTEGER,
-      last_finished_at INTEGER,
-      last_status TEXT,
-      last_error TEXT,
-      state TEXT
-    )
-  `);
-  await client.execute(`
-    CREATE TABLE job_runs (
-      id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-      job_id TEXT NOT NULL REFERENCES jobs(id),
-      started_at INTEGER NOT NULL,
-      finished_at INTEGER,
-      status TEXT NOT NULL,
-      message TEXT,
-      duration_ms INTEGER
-    )
-  `);
-  return drizzle(client, { schema });
-}
+let db: Db;
+
+beforeAll(async () => {
+  ({ db } = await createTestDb());
+});
+
+beforeEach(async () => {
+  await truncateAllTables(db);
+});
 
 describe("isStaleRunning", () => {
   const now = new Date("2026-07-31T12:00:00.000Z");
@@ -95,7 +72,6 @@ describe("INTERRUPTED_MESSAGE", () => {
 
 describe("runJob log correlation", () => {
   it("wraps def.run in withLogContext and passes a child logger with job_id and job_run_id", async () => {
-    const db = await createMemoryJobsDb();
     await db.insert(jobs).values({
       id: "test-job",
       name: "Test",
@@ -158,7 +134,6 @@ describe("runJob log correlation", () => {
 
 describe("recordJobOverrun", () => {
   it("inserts a failed job_runs row without flipping jobs.last_status", async () => {
-    const db = await createMemoryJobsDb();
     const startedAt = new Date("2026-08-04T12:00:00.000Z");
 
     await db.insert(jobs).values({

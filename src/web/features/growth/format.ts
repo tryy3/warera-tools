@@ -1,4 +1,5 @@
 import { formatDisplayNumber } from "@/lib/formatDisplayNumber";
+import { moneyToNumber } from "@/money/decimal";
 import type { GrowthPlanResult } from "./types";
 
 /** Prefer days for path timing; keep short waits readable. */
@@ -27,8 +28,10 @@ export function formatPlanStatus(result: GrowthPlanResult): {
   return { label: "—", tone: "muted" };
 }
 
-export function formatGold(value: number, digits = 2): string {
-  return formatDisplayNumber(value, digits);
+export function formatGold(value: string | number, digits = 2): string {
+  const n = moneyToNumber(value);
+  if (n == null) return "—";
+  return formatDisplayNumber(n, digits);
 }
 
 export function formatSignedGold(value: number, digits = 2): string {

@@ -1,6 +1,7 @@
 import type { GearTierId } from "../calculator";
 import { scrapAmountForTier } from "../calculator";
-import type { ItemMarketTxRow } from "../db/item-market-tx-read";
+import { txMoney, type ItemMarketTxRow } from "../db/item-market-tx-read";
+import { isFiniteMoney, parseMoney, type Decimal } from "../money/decimal";
 import { tierFromItemCode } from "./catalog";
 import { median } from "./median";
 import { recommendListing, type RecommendListing } from "./recommend";
@@ -16,25 +17,25 @@ import { MARKET_WINDOW_MS } from "./windows";
 export type EquipmentDetail = {
   itemCode: string;
   tier: GearTierId | null;
-  scrapPrice: number | null;
+  scrapPrice: Decimal | null;
   taxRate: number | null;
   countryId: string | null;
   lowestObserved: SkillNumbers | null;
   skillKeys: string[];
   activeBands: SkillBand[];
-  marketMedian: number | null;
-  sellerNet: number | null;
-  scrapFloor: number | null;
+  marketMedian: Decimal | null;
+  sellerNet: Decimal | null;
+  scrapFloor: Decimal | null;
   recommend: RecommendListing | null;
   trades: number;
-  dailyMedians: { day: string; median: number; trades: number }[];
-  ladder: { bucketLabel: string; median: number; trades: number }[];
+  dailyMedians: { day: string; median: Decimal; trades: number }[];
+  ladder: { bucketLabel: string; median: Decimal; trades: number }[];
 };
 
 export type BuildEquipmentDetailInput = {
   itemCode: string;
   txs: ItemMarketTxRow[];
-  scrapPrice: number | null;
+  scrapPrice: Decimal | number | null;
   taxRate: number | null;
   countryId: string | null;
   skills: SkillBand[] | null;
@@ -42,7 +43,7 @@ export type BuildEquipmentDetailInput = {
 };
 
 type ParsedTx = {
-  money: number;
+  money: Decimal;
   createdAtMs: number;
   skills: SkillNumbers;
 };
@@ -59,7 +60,7 @@ function bandsFromLowest(lowest: SkillNumbers | null): SkillBand[] {
 }
 
 function buildDailyMedians(matched: ParsedTx[]): EquipmentDetail["dailyMedians"] {
-  const byDay = new Map<string, number[]>();
+  const byDay = new Map<string, Decimal[]>();
   for (const row of matched) {
     const day = utcDay(row.createdAtMs);
     const list = byDay.get(day);
@@ -87,7 +88,7 @@ function buildLadder(
   const eligible = parsed.filter((row) => matchesSkillBands(row.skills, otherBands));
   if (eligible.length === 0) return [];
 
-  const byBucket = new Map<number, number[]>();
+  const byBucket = new Map<number, Decimal[]>();
   for (const row of eligible) {
     const raw = row.skills[ladderKey];
     if (raw === undefined) continue;
@@ -107,7 +108,8 @@ function buildLadder(
 }
 
 export function buildEquipmentDetail(input: BuildEquipmentDetailInput): EquipmentDetail {
-  const { itemCode, txs, scrapPrice, taxRate, countryId, skills, now } = input;
+  const { itemCode, txs, taxRate, countryId, skills, now } = input;
+  const scrapPrice = parseMoney(input.scrapPrice);
   const tier = tierFromItemCode(itemCode);
 
   const parsed: ParsedTx[] = [];
@@ -117,7 +119,7 @@ export function buildEquipmentDetail(input: BuildEquipmentDetailInput): Equipmen
     if (!skillsNum) continue;
     skillRows.push(skillsNum);
     parsed.push({
-      money: tx.money,
+      money: txMoney(tx),
       createdAtMs: tx.createdAt.getTime(),
       skills: skillsNum,
     });
@@ -134,13 +136,13 @@ export function buildEquipmentDetail(input: BuildEquipmentDetailInput): Equipmen
   const marketMedian = median(marketMatched.map((r) => r.money));
   const trades = marketMatched.length;
 
-  const sellerNet = marketMedian != null && taxRate != null ? marketMedian / (1 + taxRate) : null;
+  const sellerNet = marketMedian != null && taxRate != null ? marketMedian.div(1 + taxRate) : null;
 
   const scrapFloor =
-    tier != null && scrapPrice != null ? scrapAmountForTier(tier) * scrapPrice : null;
+    tier != null && isFiniteMoney(scrapPrice) ? scrapPrice.times(scrapAmountForTier(tier)) : null;
 
   const recommend =
-    tier != null && scrapPrice != null && taxRate != null
+    tier != null && isFiniteMoney(scrapPrice) && taxRate != null
       ? recommendListing({ tier, scrapPrice, taxRate })
       : null;
 

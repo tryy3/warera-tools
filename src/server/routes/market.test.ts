@@ -1,46 +1,12 @@
-import { createClient } from "@libsql/client";
-import { drizzle } from "drizzle-orm/libsql";
 import { Hono } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
-import { mkdtempSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { beforeEach, describe, expect, it } from "vite-plus/test";
+import { beforeAll, beforeEach, describe, expect, it } from "vite-plus/test";
 import type { Db } from "../../db/client";
+import { createTestDb, truncateAllTables } from "../../db/test/postgres";
 import { insertItemMarketTransactionsIgnoreConflicts } from "../../db/item-market-transactions";
-import * as schema from "../../db/schema";
 import type { ItemMarketTransaction } from "../../warera/transactions";
 import { errorPayload } from "../errors";
 import { marketRoutes } from "./market";
-
-async function createDb(): Promise<Db> {
-  const dir = mkdtempSync(join(tmpdir(), "market-route-"));
-  const client = createClient({ url: `file:${join(dir, "test.db")}` });
-  await client.execute(`
-    CREATE TABLE item_market_transactions (
-      id text PRIMARY KEY NOT NULL,
-      money real NOT NULL,
-      item_code text NOT NULL,
-      quantity integer NOT NULL,
-      seller_id text NOT NULL,
-      buyer_id text NOT NULL,
-      transaction_type text NOT NULL,
-      item_id text NOT NULL,
-      item_type text,
-      item_state integer,
-      item_max_state integer,
-      item_quantity integer,
-      item_last_acquisition_at integer,
-      skills text,
-      offer_created_at integer,
-      created_at integer NOT NULL,
-      updated_at integer,
-      payload text,
-      ingested_at integer NOT NULL
-    )
-  `);
-  return drizzle(client, { schema });
-}
 
 function makeTx(overrides: Partial<ItemMarketTransaction> = {}): ItemMarketTransaction {
   return {
@@ -82,14 +48,14 @@ type MyTradesBody = {
   range: string;
   chunks: Array<{
     side: "buy" | "sell";
-    unitPrice: number;
+    unitPrice: string;
     totalQty: number;
-    totalMoney: number;
+    totalMoney: string;
     startAt: string;
     endAt: string;
     fillCount: number;
   }>;
-  realized: { pnl: number | null; sellQty: number; buyQty: number };
+  realized: { pnl: string | null; sellQty: number; buyQty: number };
   historyIncomplete: boolean;
   fillCount: number;
 };
@@ -97,8 +63,12 @@ type MyTradesBody = {
 describe("GET /:itemCode/my-trades", () => {
   let db: Db;
 
+  beforeAll(async () => {
+    ({ db } = await createTestDb());
+  });
+
   beforeEach(async () => {
-    db = await createDb();
+    await truncateAllTables(db);
   });
 
   it("400s when playerId is missing", async () => {
@@ -122,7 +92,7 @@ describe("GET /:itemCode/my-trades", () => {
       playerId: "player1",
       range: "7d",
       chunks: [],
-      realized: { pnl: 0, sellQty: 0, buyQty: 0 },
+      realized: { pnl: "0", sellQty: 0, buyQty: 0 },
       historyIncomplete: false,
       fillCount: 0,
     });
@@ -166,23 +136,23 @@ describe("GET /:itemCode/my-trades", () => {
     expect(body.range).toBe("7d");
     expect(body.fillCount).toBe(2);
     expect(body.historyIncomplete).toBe(false);
-    expect(body.realized).toEqual({ pnl: 50, sellQty: 10, buyQty: 10 });
+    expect(body.realized).toEqual({ pnl: "50", sellQty: 10, buyQty: 10 });
 
     expect(body.chunks).toHaveLength(2);
     expect(body.chunks[0]).toMatchObject({
       side: "buy",
-      unitPrice: 10,
+      unitPrice: "10",
       totalQty: 10,
-      totalMoney: 100,
+      totalMoney: "100",
       fillCount: 1,
       startAt: buyAt.toISOString(),
       endAt: buyAt.toISOString(),
     });
     expect(body.chunks[1]).toMatchObject({
       side: "sell",
-      unitPrice: 15,
+      unitPrice: "15",
       totalQty: 10,
-      totalMoney: 150,
+      totalMoney: "150",
       fillCount: 1,
       startAt: sellAt.toISOString(),
       endAt: sellAt.toISOString(),

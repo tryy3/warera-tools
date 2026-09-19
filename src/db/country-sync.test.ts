@@ -1,33 +1,10 @@
-import { createClient } from "@libsql/client";
-import { drizzle } from "drizzle-orm/libsql";
-import { mkdtempSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { beforeEach, describe, expect, it } from "vite-plus/test";
+import { beforeAll, beforeEach, describe, expect, it } from "vite-plus/test";
 import type { WareraCountryRow } from "../warera/countries";
 import type { Db } from "./client";
+import { createTestDb, truncateAllTables } from "./test/postgres";
 import { syncCountriesFromWarera } from "./country-sync";
 import * as schema from "./schema";
 import { seedDefaultCountries } from "./seed-countries";
-
-async function createMemoryDb(): Promise<Db> {
-  // Temp file DB: libsql :memory: loses schema across drizzle transactions.
-  const dir = mkdtempSync(join(tmpdir(), "country-sync-"));
-  const client = createClient({ url: `file:${join(dir, "test.db")}` });
-  await client.execute(`
-    CREATE TABLE countries (
-      id TEXT PRIMARY KEY NOT NULL,
-      name TEXT NOT NULL UNIQUE,
-      tax_rate REAL NOT NULL,
-      iso_code TEXT,
-      source TEXT NOT NULL DEFAULT 'manual',
-      synced_at INTEGER,
-      created_at INTEGER NOT NULL,
-      updated_at INTEGER NOT NULL
-    )
-  `);
-  return drizzle(client, { schema });
-}
 
 async function insertCountry(
   db: Db,
@@ -65,8 +42,12 @@ const NOW = new Date("2026-08-01T12:00:00.000Z");
 describe("syncCountriesFromWarera", () => {
   let db: Db;
 
+  beforeAll(async () => {
+    ({ db } = await createTestDb());
+  });
+
   beforeEach(async () => {
-    db = await createMemoryDb();
+    await truncateAllTables(db);
   });
 
   it("inserts when empty", async () => {
@@ -175,8 +156,12 @@ describe("syncCountriesFromWarera", () => {
 describe("seedDefaultCountries", () => {
   let db: Db;
 
+  beforeAll(async () => {
+    ({ db } = await createTestDb());
+  });
+
   beforeEach(async () => {
-    db = await createMemoryDb();
+    await truncateAllTables(db);
   });
 
   it("inserts Sweden bootstrap only when empty", async () => {

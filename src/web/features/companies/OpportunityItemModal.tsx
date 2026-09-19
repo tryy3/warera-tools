@@ -2,9 +2,10 @@ import { useEffect, useId, useRef, useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { formatDisplayNumber } from "@/lib/formatDisplayNumber";
+import { moneyToNumber } from "@/money/decimal";
 import { GoldIcon } from "../../components/GoldIcon";
 import { ItemIcon } from "../../components/ItemIcon";
+import { formatMoneyDisplay } from "../../lib/formatMoneyDisplay";
 import { useItemPriceBoard } from "./sessionPrices/item-price-board-context";
 import type { Opportunity } from "./types";
 
@@ -12,13 +13,9 @@ function formatItem(code: string): string {
   return code.replace(/([A-Z])/g, " $1").replace(/^./, (c) => c.toUpperCase());
 }
 
-function formatNum(value: number | null | undefined, digits = 4): string {
-  if (value == null || !Number.isFinite(value)) return "—";
-  return formatDisplayNumber(value, digits);
-}
-
-function priceDraft(price: number | null | undefined): string {
-  return price != null && Number.isFinite(price) ? String(price) : "";
+function priceDraft(price: string | number | null | undefined): string {
+  const n = moneyToNumber(price);
+  return n != null ? String(n) : "";
 }
 
 type OpportunityItemModalProps = {
@@ -64,8 +61,8 @@ export function OpportunityItemModal({ open, opportunity, onClose }: Opportunity
     if (buy != null && !Number.isFinite(buy)) return;
     if (sell != null && !Number.isFinite(sell)) return;
 
-    const liveBuy = live?.buyPrice;
-    const liveSell = live?.sellPrice;
+    const liveBuy = moneyToNumber(live?.buyPrice);
+    const liveSell = moneyToNumber(live?.sellPrice);
     board.setItemPrices(itemCode, {
       buy: buy != null && (liveBuy == null || buy !== liveBuy) ? buy : undefined,
       sell: sell != null && (liveSell == null || sell !== liveSell) ? sell : undefined,
@@ -76,8 +73,8 @@ export function OpportunityItemModal({ open, opportunity, onClose }: Opportunity
     if (!itemCode) return;
     board.resetItem(itemCode);
     if (live) {
-      setBuyDraft(live.buyPrice != null ? String(live.buyPrice) : "");
-      setSellDraft(live.sellPrice != null ? String(live.sellPrice) : "");
+      setBuyDraft(priceDraft(live.buyPrice));
+      setSellDraft(priceDraft(live.sellPrice));
     }
   }
 
@@ -106,7 +103,7 @@ export function OpportunityItemModal({ open, opportunity, onClose }: Opportunity
                 {live?.buyPrice != null ? (
                   <span className="inline-flex items-center gap-1.5">
                     <GoldIcon />
-                    {formatNum(live.buyPrice)}
+                    {formatMoneyDisplay(live.buyPrice)}
                   </span>
                 ) : (
                   "—"
@@ -121,7 +118,7 @@ export function OpportunityItemModal({ open, opportunity, onClose }: Opportunity
                 {live?.sellPrice != null ? (
                   <span className="inline-flex items-center gap-1.5">
                     <GoldIcon />
-                    {formatNum(live.sellPrice)}
+                    {formatMoneyDisplay(live.sellPrice)}
                   </span>
                 ) : (
                   "—"
@@ -136,7 +133,7 @@ export function OpportunityItemModal({ open, opportunity, onClose }: Opportunity
                 {opportunity.profitPerPp != null ? (
                   <span className="inline-flex items-center gap-1.5">
                     <GoldIcon />
-                    {formatNum(opportunity.profitPerPp)}
+                    {formatMoneyDisplay(opportunity.profitPerPp)}
                   </span>
                 ) : (
                   "—"
@@ -151,7 +148,7 @@ export function OpportunityItemModal({ open, opportunity, onClose }: Opportunity
                 {opportunity.roughDailyValue != null ? (
                   <span className="inline-flex items-center gap-1.5">
                     <GoldIcon />
-                    {formatNum(opportunity.roughDailyValue, 2)}
+                    {formatMoneyDisplay(opportunity.roughDailyValue, 2)}
                   </span>
                 ) : (
                   "—"

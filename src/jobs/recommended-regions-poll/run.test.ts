@@ -1,46 +1,20 @@
-import { createClient } from "@libsql/client";
-import { drizzle } from "drizzle-orm/libsql";
-import { mkdtempSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { beforeEach, describe, expect, it, vi } from "vite-plus/test";
+import { beforeAll, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 import type { Db } from "../../db/client";
+import { createTestDb, truncateAllTables } from "../../db/test/postgres";
 import { getRecommendedRegion } from "../../db/recommended-regions";
 import { getRegion } from "../../db/regions";
-import * as schema from "../../db/schema";
 import { listProducibleRecipes } from "../../economy/recipes";
 import { runRecommendedRegionsPoll } from "./run";
 
-async function createDb(): Promise<Db> {
-  const dir = mkdtempSync(join(tmpdir(), "rec-poll-"));
-  const client = createClient({ url: `file:${join(dir, "test.db")}` });
-  await client.execute(`
-    CREATE TABLE recommended_regions (
-      item_code TEXT PRIMARY KEY NOT NULL,
-      region_id TEXT NOT NULL,
-      region_name TEXT,
-      bonus REAL,
-      payload TEXT,
-      fetched_at INTEGER NOT NULL
-    )
-  `);
-  await client.execute(`
-    CREATE TABLE regions (
-      id TEXT PRIMARY KEY NOT NULL,
-      name TEXT,
-      country_code TEXT,
-      payload TEXT,
-      fetched_at INTEGER,
-      enqueued_at INTEGER NOT NULL
-    )
-  `);
-  return drizzle(client, { schema });
-}
-
 describe("runRecommendedRegionsPoll", () => {
   let db: Db;
+
+  beforeAll(async () => {
+    ({ db } = await createTestDb());
+  });
+
   beforeEach(async () => {
-    db = await createDb();
+    await truncateAllTables(db);
   });
 
   it("upserts each recipe item and enqueues region ids", async () => {

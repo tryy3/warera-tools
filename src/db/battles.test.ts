@@ -1,12 +1,8 @@
-import { createClient } from "@libsql/client";
 import { eq } from "drizzle-orm";
-import { drizzle } from "drizzle-orm/libsql";
-import { mkdtempSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { beforeEach, describe, expect, it } from "vite-plus/test";
+import { beforeAll, beforeEach, describe, expect, it } from "vite-plus/test";
 import type { ParsedBattle } from "../warera/battles";
 import type { Db } from "./client";
+import { createTestDb, truncateAllTables } from "./test/postgres";
 import {
   listActiveTrackedBattles,
   markBattleEnded,
@@ -15,38 +11,6 @@ import {
   upsertBattleFromParsed,
 } from "./battles";
 import * as schema from "./schema";
-
-async function createDb(): Promise<Db> {
-  const dir = mkdtempSync(join(tmpdir(), "battles-"));
-  const client = createClient({ url: `file:${join(dir, "test.db")}` });
-  await client.execute(`
-    CREATE TABLE battles (
-      id TEXT PRIMARY KEY NOT NULL,
-      war_id TEXT,
-      type TEXT,
-      is_active INTEGER NOT NULL DEFAULT 1,
-      attacker_country_id TEXT,
-      defender_country_id TEXT,
-      attacker_region_id TEXT,
-      defender_region_id TEXT,
-      rounds_to_win INTEGER,
-      current_round_id TEXT,
-      current_round_number INTEGER,
-      attacker_won_rounds INTEGER,
-      defender_won_rounds INTEGER,
-      attacker_mu_orders TEXT,
-      defender_mu_orders TEXT,
-      sticky_mu_ids TEXT,
-      rounds_history TEXT,
-      started_at_game INTEGER,
-      ended_at INTEGER,
-      finalized_at INTEGER,
-      fetched_at INTEGER,
-      payload TEXT
-    )
-  `);
-  return drizzle(client, { schema });
-}
 
 function sampleBattle(overrides: Partial<ParsedBattle> = {}): ParsedBattle {
   return {
@@ -90,8 +54,13 @@ function sampleBattle(overrides: Partial<ParsedBattle> = {}): ParsedBattle {
 
 describe("battles db", () => {
   let db: Db;
+
+  beforeAll(async () => {
+    ({ db } = await createTestDb());
+  });
+
   beforeEach(async () => {
-    db = await createDb();
+    await truncateAllTables(db);
   });
 
   it("upserts then lists only active tracked battles", async () => {

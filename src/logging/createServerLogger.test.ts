@@ -44,8 +44,7 @@ function baseConfig(overrides: Partial<AppConfig> = {}): AppConfig {
     nodeEnv: "test",
     host: "127.0.0.1",
     port: 8787,
-    tursoDatabaseUrl: "file:test.db",
-    tursoAuthToken: undefined,
+    databaseUrl: "postgres://user:pass@localhost:5432/warera",
     wareraApiBaseUrl: "https://api2.warera.io/trpc",
     wareraApiKey: undefined,
     wareraMaxRequestsPerMinute: 120,
@@ -71,6 +70,12 @@ describe("MASK_KEYS", () => {
   it("includes Sentry DSN fields", () => {
     expect(MASK_KEYS).toContain("SENTRY_DSN");
     expect(MASK_KEYS).toContain("dsn");
+  });
+
+  it("includes database connection fields", () => {
+    expect(MASK_KEYS).toContain("DATABASE_URL");
+    expect(MASK_KEYS).toContain("databaseUrl");
+    expect(MASK_KEYS).toContain("connectionString");
   });
 });
 

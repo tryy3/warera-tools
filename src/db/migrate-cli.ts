@@ -3,6 +3,6 @@ import { createDb } from "./client";
 import { migrateDb } from "./migrate";
 
 const config = loadConfig();
-const { db, client } = createDb(config);
+const { db, pool } = createDb(config);
 await migrateDb(db);
-client.close();
+await pool.end();

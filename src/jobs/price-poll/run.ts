@@ -2,6 +2,7 @@ import {
   getLatestPrices,
   insertPricePoll,
   insertPriceSnapshots,
+  toPriceSnapshotRow,
   type PriceSnapshotRow,
 } from "../../db/prices";
 import type { Db } from "../../db/client";
@@ -53,16 +54,18 @@ export async function runPricePoll(options: {
         "top orders fetch failed",
       );
     }
-    rows.push({
-      itemCode,
-      marketPrice: market[itemCode] ?? null,
-      buyMin: buy.min,
-      buyMax: buy.max,
-      buyAvg: buy.avg,
-      sellMin: sell.min,
-      sellMax: sell.max,
-      sellAvg: sell.avg,
-    });
+    rows.push(
+      toPriceSnapshotRow({
+        itemCode,
+        marketPrice: market[itemCode] ?? null,
+        buyMin: buy.min,
+        buyMax: buy.max,
+        buyAvg: buy.avg,
+        sellMin: sell.min,
+        sellMax: sell.max,
+        sellAvg: sell.avg,
+      }),
+    );
   }
 
   const status = orderErrors === 0 ? "success" : "partial";

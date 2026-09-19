@@ -6,6 +6,7 @@ import {
   equipmentTierShortLabel,
 } from "@/equipment/catalog";
 import { formatDisplayNumber } from "@/lib/formatDisplayNumber";
+import { moneyToNumber } from "@/money/decimal";
 import { api } from "../../api";
 import { GoldIcon } from "../../components/GoldIcon";
 import { loadEquipmentCountryId, saveEquipmentCountryId } from "../../lib/equipmentPrefs";
@@ -34,15 +35,20 @@ function tradesLabelForWindow(windowMs: number | null): string {
   return `Trades (${formatWindow(windowMs)})`;
 }
 
-function formatNum(value: number | null | undefined, digits = 4): string {
-  if (value == null || !Number.isFinite(value)) return "—";
-  return formatDisplayNumber(value, digits);
+function formatNum(value: string | number | null | undefined, digits = 4): string {
+  const n = moneyToNumber(value);
+  if (n == null) return "—";
+  return formatDisplayNumber(n, digits);
 }
 
-function sellerNetFromMarket(marketMedian: number | null, taxRate: number | null): number | null {
-  if (marketMedian == null || !Number.isFinite(marketMedian)) return null;
+function sellerNetFromMarket(
+  marketMedian: string | number | null,
+  taxRate: number | null,
+): number | null {
+  const median = moneyToNumber(marketMedian);
+  if (median == null) return null;
   if (taxRate == null || !Number.isFinite(taxRate)) return null;
-  return marketMedian / (1 + taxRate);
+  return median / (1 + taxRate);
 }
 
 function groupByTier(items: OverviewItem[]): Array<{
@@ -70,16 +76,16 @@ function groupByTier(items: OverviewItem[]): Array<{
 function tierStripStats(
   tier: GearTierId | null,
   tierItems: OverviewItem[],
-  scrapPrice: number | null,
+  scrapPrice: string | number | null,
 ): {
   scrapQty: number | null;
   scrapFloor: number | null;
   trades: number;
 } {
   const scrapQty = tier != null ? scrapAmountForTier(tier) : null;
-  const fromItems = tierItems.find((i) => i.scrapFloor != null)?.scrapFloor ?? null;
-  const scrapFloor =
-    fromItems ?? (scrapQty != null && scrapPrice != null ? scrapQty * scrapPrice : null);
+  const fromItems = moneyToNumber(tierItems.find((i) => i.scrapFloor != null)?.scrapFloor);
+  const scrapP = moneyToNumber(scrapPrice);
+  const scrapFloor = fromItems ?? (scrapQty != null && scrapP != null ? scrapQty * scrapP : null);
   const trades = tierItems.reduce((sum, i) => sum + i.trades, 0);
   return { scrapQty, scrapFloor, trades };
 }
@@ -95,7 +101,7 @@ function TierStatsStrip({
   tier: GearTierId | null;
   scrapFloor: number | null;
   scrapQty: number | null;
-  scrapPrice: number | null;
+  scrapPrice: string | number | null;
   trades: number;
   tradesLabel: string;
 }) {
@@ -134,7 +140,7 @@ function TierStatsStrip({
             {scrapPrice != null ? (
               <>
                 <GoldIcon />
-                {formatDisplayNumber(scrapPrice)}
+                {formatNum(scrapPrice)}
               </>
             ) : (
               <span className="text-muted-foreground">—</span>
@@ -154,7 +160,7 @@ function TierStatsStrip({
 
 export function EquipmentOverviewPage() {
   const [items, setItems] = useState<OverviewItem[]>([]);
-  const [scrapPrice, setScrapPrice] = useState<number | null>(null);
+  const [scrapPrice, setScrapPrice] = useState<string | null>(null);
   const [scrapedAt, setScrapedAt] = useState<string | null>(null);
   const [windowMs, setWindowMs] = useState<number | null>(null);
   const [countries, setCountries] = useState<Country[]>([]);

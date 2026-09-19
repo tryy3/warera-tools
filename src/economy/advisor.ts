@@ -19,7 +19,9 @@ import {
 import { enqueueRegions, getRegionsByIds, upsertRegionFetched } from "../db/regions";
 import type { Db } from "../db/client";
 import { runPricePoll } from "../jobs/price-poll/run";
+import { formatDisplayNumber } from "../lib/formatDisplayNumber";
 import type { Logger } from "../logging/logger";
+import { Decimal } from "../money/decimal";
 import { fetchIncomeTaxRateForCompany } from "../skills/job-wage";
 import {
   fetchBestRecommendedRegion,
@@ -36,19 +38,23 @@ import { loadCompanyPackForUser } from "./load-company-pack";
 
 const WORKER_ENRICH_CHUNK = 3;
 
+function formatMoneyLabel(value: Decimal): string {
+  return formatDisplayNumber(value);
+}
+
 export type SwitchRecommendation = {
   itemCode: string;
   bestRegionId: string | null;
   bestRegionName: string | null;
   bestRegionCountryCode: string | null;
   bestBonus: number;
-  profitPerPp: number;
-  dailyValue: number;
-  dailyDelta: number;
+  profitPerPp: Decimal;
+  dailyValue: Decimal;
+  dailyDelta: Decimal;
   retask: boolean;
   relocate: boolean;
   transferConcrete: number;
-  transferGold: number;
+  transferGold: Decimal;
   paybackDays: number | null;
   profitFormula: string;
   aeFormula: string;
@@ -72,8 +78,8 @@ export type CompanyAdvisorRow = {
   bonusDetails: ProductionBonusDetails | null;
   profitBreakdown: ProfitPpBreakdown | null;
   aeBreakdown: AeDailyBreakdown | null;
-  currentProfitPerPp: number | null;
-  currentDailyValue: number | null;
+  currentProfitPerPp: Decimal | null;
+  currentDailyValue: Decimal | null;
   bestSwitch: SwitchRecommendation | null;
   workers: AdvisorWorker[];
   workersStatus: "ok" | "unavailable";
@@ -280,7 +286,7 @@ export async function buildAdvisor(options: {
   };
   const opportunitiesBase = listMarketOpportunities(bookPrices);
   // Transfer cost: buy concrete at top buy (stock/bid side).
-  const concretePrice = bookPrices.buy.concrete ?? bookPrices.sell.concrete ?? 0;
+  const concretePrice = bookPrices.buy.concrete ?? bookPrices.sell.concrete ?? new Decimal(0);
 
   cacheStats.recommendedHit = recommendedByItem.size;
   cacheStats.recommendedMiss = Math.max(0, recipeCodes.length - recommendedByItem.size);
@@ -428,7 +434,7 @@ export async function buildAdvisor(options: {
       const bonus = region?.bonus ?? currentBonus;
       const ae = explainAeDaily(company.aeLevel, bonus, breakdown.profitPerPp);
       const dailyValue = ae.dailyValue;
-      const dailyDelta = currentDaily == null ? dailyValue : dailyValue - currentDaily;
+      const dailyDelta = currentDaily == null ? dailyValue : dailyValue.minus(currentDaily);
 
       const retask = company.itemCode != null && company.itemCode !== recipe.itemCode;
       const relocate =
@@ -440,7 +446,7 @@ export async function buildAdvisor(options: {
       if (region == null && !needsRetask) continue;
       if (region == null && needsRelocate) continue;
       if (!needsRetask && !needsRelocate) continue;
-      if (!(dailyDelta > 0.0001)) continue;
+      if (!dailyDelta.gt(0.0001)) continue;
 
       const transfer = transferCostGold(concretePrice, {
         retask: needsRetask,
@@ -467,13 +473,15 @@ export async function buildAdvisor(options: {
         aeFormula: ae.formula,
         transferFormula: transfer.formula,
         paybackFormula:
-          days == null ? null : `${transfer.gold} G transfer ÷ ${dailyDelta} G/day delta`,
+          days == null
+            ? null
+            : `${formatMoneyLabel(transfer.gold)} G transfer ÷ ${formatMoneyLabel(dailyDelta)} G/day delta`,
       };
 
       if (
         !bestSwitch ||
-        candidate.dailyDelta > bestSwitch.dailyDelta ||
-        (candidate.dailyDelta === bestSwitch.dailyDelta &&
+        candidate.dailyDelta.gt(bestSwitch.dailyDelta) ||
+        (candidate.dailyDelta.equals(bestSwitch.dailyDelta) &&
           (candidate.paybackDays ?? Infinity) < (bestSwitch.paybackDays ?? Infinity))
       ) {
         bestSwitch = candidate;

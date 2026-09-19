@@ -28,6 +28,7 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      # Integration tests use Testcontainers Postgres (Docker on ubuntu-latest).
       - name: Run tests
         run: pnpm exec vp test
 

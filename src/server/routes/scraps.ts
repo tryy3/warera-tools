@@ -3,10 +3,11 @@ import { getLatestItemMarketPrice } from "../../db/prices";
 import type { Db } from "../../db/client";
 import { runPricePoll } from "../../jobs/price-poll/run";
 import type { Logger } from "../../logging/logger";
+import { serializeMoney } from "../../money/decimal";
 import type { WareraRequester } from "../../warera/prices";
 import { HttpError } from "../errors";
 
-export type ScrapPricePayload = { price: number; fetchedAt: string };
+export type ScrapPricePayload = { price: string; fetchedAt: string };
 export type ScrapPriceResponse = ScrapPricePayload & { stale?: boolean };
 
 export type ScrapsRouteDeps = {
@@ -24,7 +25,7 @@ export async function resolveScrapPrice(
   if (!options.force) {
     const hit = await getLatestItemMarketPrice(db, "scraps");
     if (hit) {
-      return { price: hit.price, fetchedAt: hit.fetchedAt.toISOString() };
+      return { price: serializeMoney(hit.price)!, fetchedAt: hit.fetchedAt.toISOString() };
     }
   }
 
@@ -34,12 +35,12 @@ export async function resolveScrapPrice(
     if (!hit) {
       throw new Error("Price poll completed but scraps price is missing");
     }
-    return { price: hit.price, fetchedAt: hit.fetchedAt.toISOString() };
+    return { price: serializeMoney(hit.price)!, fetchedAt: hit.fetchedAt.toISOString() };
   } catch (err) {
     const fallback = await getLatestItemMarketPrice(db, "scraps");
     if (fallback) {
       return {
-        price: fallback.price,
+        price: serializeMoney(fallback.price)!,
         fetchedAt: fallback.fetchedAt.toISOString(),
         stale: true,
       };

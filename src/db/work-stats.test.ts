@@ -1,48 +1,10 @@
-import { createClient } from "@libsql/client";
 import { and, asc, eq } from "drizzle-orm";
-import { drizzle } from "drizzle-orm/libsql";
-import { mkdtempSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { beforeEach, describe, expect, it } from "vite-plus/test";
+import { beforeAll, beforeEach, describe, expect, it } from "vite-plus/test";
 import type { CompanyWorkDay, WorkerWorkDay } from "../warera/work-stats";
 import type { Db } from "./client";
-import * as schema from "./schema";
+import { createTestDb, truncateAllTables } from "./test/postgres";
 import { companyWorkStats, workerWorkStats } from "./schema";
 import { upsertCompanyWorkDays, upsertWorkerWorkDays } from "./work-stats";
-
-async function createDb(): Promise<Db> {
-  const dir = mkdtempSync(join(tmpdir(), "work-stats-"));
-  const client = createClient({ url: `file:${join(dir, "test.db")}` });
-  await client.execute(`
-    CREATE TABLE company_work_stats (
-      company_id TEXT NOT NULL,
-      daily_date TEXT NOT NULL,
-      automated_engine REAL,
-      employee_prod REAL,
-      self_work REAL,
-      total REAL,
-      wage REAL,
-      payload TEXT,
-      fetched_at INTEGER NOT NULL,
-      PRIMARY KEY (company_id, daily_date)
-    )
-  `);
-  await client.execute(`
-    CREATE TABLE worker_work_stats (
-      company_id TEXT NOT NULL,
-      worker_id TEXT NOT NULL,
-      daily_date TEXT NOT NULL,
-      employee_prod REAL,
-      total REAL,
-      wage REAL,
-      payload TEXT,
-      fetched_at INTEGER NOT NULL,
-      PRIMARY KEY (company_id, worker_id, daily_date)
-    )
-  `);
-  return drizzle(client, { schema });
-}
 
 async function listCompanyRows(db: Db, companyId: string) {
   return db
@@ -63,8 +25,12 @@ async function listWorkerRows(db: Db, companyId: string, workerId: string) {
 describe("work-stats db", () => {
   let db: Db;
 
+  beforeAll(async () => {
+    ({ db } = await createTestDb());
+  });
+
   beforeEach(async () => {
-    db = await createDb();
+    await truncateAllTables(db);
   });
 
   it("upserts two company days and overwrites same date on re-poll", async () => {

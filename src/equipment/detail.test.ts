@@ -36,21 +36,21 @@ describe("buildEquipmentDetail", () => {
 
     expect(detail.itemCode).toBe("chest4");
     expect(detail.tier).toBe("purple");
-    expect(detail.scrapPrice).toBe(0.2);
+    expect(detail.scrapPrice!.toNumber()).toBe(0.2);
     expect(detail.taxRate).toBe(0.01);
     expect(detail.countryId).toBe("sweden");
     expect(detail.lowestObserved).toEqual({ armor: 22 });
     expect(detail.skillKeys).toEqual(["armor"]);
     expect(detail.activeBands).toEqual([{ key: "armor", target: 22, band: 1 }]);
     // Only armor 22 (±1) in 24h: id a (40). id b is 24 → out of band.
-    expect(detail.marketMedian).toBe(40);
+    expect(detail.marketMedian!.toNumber()).toBe(40);
     expect(detail.trades).toBe(1);
-    expect(detail.sellerNet).toBeCloseTo(40 / 1.01, 5);
-    expect(detail.scrapFloor).toBe(162 * scrapPrice);
+    expect(detail.sellerNet!.toNumber()).toBeCloseTo(40 / 1.01, 5);
+    expect(detail.scrapFloor!.toNumber()).toBe(162 * scrapPrice);
     expect(detail.recommend).not.toBeNull();
-    expect(detail.recommend!.scrapFloor).toBeCloseTo(32.4, 5);
-    expect(detail.recommend!.breakEvenIncl).toBeCloseTo(32.4 * 1.01, 5);
-    expect(detail.recommend!.attractiveIncl).toBeCloseTo(32.4 * 1.01 * 1.05, 5);
+    expect(detail.recommend!.scrapFloor.toNumber()).toBeCloseTo(32.4, 5);
+    expect(detail.recommend!.breakEvenIncl.toNumber()).toBeCloseTo(32.4 * 1.01, 5);
+    expect(detail.recommend!.attractiveIncl.toNumber()).toBeCloseTo(32.4 * 1.01 * 1.05, 5);
   });
 
   it("filters market median by provided skill bands within 24h window", () => {
@@ -74,7 +74,7 @@ describe("buildEquipmentDetail", () => {
     });
 
     expect(detail.activeBands).toEqual([{ key: "armor", target: 22, band: 0 }]);
-    expect(detail.marketMedian).toBe(40);
+    expect(detail.marketMedian!.toNumber()).toBe(40);
     expect(detail.trades).toBe(1);
   });
 
@@ -96,7 +96,13 @@ describe("buildEquipmentDetail", () => {
       now: NOW,
     });
 
-    expect(detail.dailyMedians).toEqual([
+    expect(
+      detail.dailyMedians.map((row) => ({
+        day: row.day,
+        median: row.median.toNumber(),
+        trades: row.trades,
+      })),
+    ).toEqual([
       { day: "2026-08-04", median: 40, trades: 2 },
       { day: "2026-08-05", median: 44, trades: 1 },
     ]);
@@ -119,7 +125,13 @@ describe("buildEquipmentDetail", () => {
       now: NOW,
     });
 
-    expect(detail.ladder).toEqual([
+    expect(
+      detail.ladder.map((row) => ({
+        bucketLabel: row.bucketLabel,
+        median: row.median.toNumber(),
+        trades: row.trades,
+      })),
+    ).toEqual([
       { bucketLabel: "20", median: 35, trades: 2 },
       { bucketLabel: "22", median: 50, trades: 1 },
       { bucketLabel: "24", median: 70, trades: 1 },
@@ -161,7 +173,13 @@ describe("buildEquipmentDetail", () => {
 
     expect(detail.skillKeys).toEqual(["attack", "criticalChance"]);
     // Other band (criticalChance=13) excludes id c; ladder by attack
-    expect(detail.ladder).toEqual([
+    expect(
+      detail.ladder.map((row) => ({
+        bucketLabel: row.bucketLabel,
+        median: row.median.toNumber(),
+        trades: row.trades,
+      })),
+    ).toEqual([
       { bucketLabel: "88", median: 100, trades: 1 },
       { bucketLabel: "90", median: 120, trades: 1 },
     ]);
@@ -179,7 +197,7 @@ describe("buildEquipmentDetail", () => {
     });
     expect(noTax.sellerNet).toBeNull();
     expect(noTax.recommend).toBeNull();
-    expect(noTax.scrapFloor).toBe(32.4);
+    expect(noTax.scrapFloor!.toNumber()).toBe(32.4);
 
     const noScrap = buildEquipmentDetail({
       itemCode: "chest4",
@@ -192,7 +210,7 @@ describe("buildEquipmentDetail", () => {
     });
     expect(noScrap.scrapFloor).toBeNull();
     expect(noScrap.recommend).toBeNull();
-    expect(noScrap.sellerNet).toBeCloseTo(40 / 1.01, 5);
+    expect(noScrap.sellerNet!.toNumber()).toBeCloseTo(40 / 1.01, 5);
 
     const unknown = buildEquipmentDetail({
       itemCode: "unknownWeapon",
@@ -222,7 +240,7 @@ describe("buildEquipmentDetail", () => {
       skills: [{ key: "armor", target: 22, band: 0 }],
       now: NOW,
     });
-    expect(detail.marketMedian).toBe(40);
+    expect(detail.marketMedian!.toNumber()).toBe(40);
     expect(detail.trades).toBe(1);
     expect(detail.lowestObserved).toEqual({ armor: 22 });
   });
