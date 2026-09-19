@@ -68,9 +68,9 @@ describe("buildCraftCompare", () => {
     });
 
     expect(result.scrapQty).toBe(1460);
-    expect(result.scrapValue).toBeCloseTo(1460 * 0.2, 10);
-    expect(result.steelCostRandom).toBeCloseTo(32 * 1.5, 10);
-    expect(result.steelCostSpecific).toBeCloseTo(64 * 1.5, 10);
+    expect(result.scrapValue!.toNumber()).toBeCloseTo(1460 * 0.2, 10);
+    expect(result.steelCostRandom!.toNumber()).toBeCloseTo(32 * 1.5, 10);
+    expect(result.steelCostSpecific!.toNumber()).toBeCloseTo(64 * 1.5, 10);
     expect(result.itemCount).toBe(6);
     expect(result.pricedItemCount).toBe(2);
 
@@ -78,10 +78,10 @@ describe("buildCraftCompare", () => {
     const jetMinExcl = 500 / 1.01;
     const jetMaxExcl = 600 / 1.01;
     const jetMedExcl = (500 / 1.01 + 600 / 1.01) / 2;
-    expect(jet.minExcl).toBeCloseTo(jetMinExcl, 10);
-    expect(jet.maxExcl).toBeCloseTo(jetMaxExcl, 10);
-    expect(jet.medianExcl).toBeCloseTo(jetMedExcl, 10);
-    expect(jet.medianAdvantage).toBeCloseTo(jetMedExcl - 64 * 1.5 - 1460 * 0.2, 10);
+    expect(jet.minExcl!.toNumber()).toBeCloseTo(jetMinExcl, 10);
+    expect(jet.maxExcl!.toNumber()).toBeCloseTo(jetMaxExcl, 10);
+    expect(jet.medianExcl!.toNumber()).toBeCloseTo(jetMedExcl, 10);
+    expect(jet.medianAdvantage!.toNumber()).toBeCloseTo(jetMedExcl - 64 * 1.5 - 1460 * 0.2, 10);
     expect(jet.trades).toBe(2);
 
     // unpriced specific rows still present
@@ -89,9 +89,9 @@ describe("buildCraftCompare", () => {
 
     // sorted by median advantage desc; nulls last
     const medians = result.specific.map((r) => r.medianAdvantage);
-    const defined = medians.filter((v) => v != null) as number[];
+    const defined = medians.filter((v) => v != null);
     for (let i = 1; i < defined.length; i++) {
-      expect(defined[i]! <= defined[i - 1]!).toBe(true);
+      expect(defined[i]!.lte(defined[i - 1]!)).toBe(true);
     }
     expect(result.specific.at(-1)!.medianAdvantage).toBeNull();
   });
@@ -111,10 +111,13 @@ describe("buildCraftCompare", () => {
     const jetMed = 505 / 1.01;
     const helmMed = 303 / 1.01;
     const typical = (jetMed + helmMed) / 2;
-    expect(result.random.medianExcl).toBeCloseTo(typical, 10);
-    expect(result.random.minExcl).toBeCloseTo(Math.min(jetMed, helmMed), 10);
-    expect(result.random.maxExcl).toBeCloseTo(Math.max(jetMed, helmMed), 10);
-    expect(result.random.medianAdvantage).toBeCloseTo(typical - 32 * 1.5 - 1460 * 0.2, 10);
+    expect(result.random.medianExcl!.toNumber()).toBeCloseTo(typical, 10);
+    expect(result.random.minExcl!.toNumber()).toBeCloseTo(Math.min(jetMed, helmMed), 10);
+    expect(result.random.maxExcl!.toNumber()).toBeCloseTo(Math.max(jetMed, helmMed), 10);
+    expect(result.random.medianAdvantage!.toNumber()).toBeCloseTo(
+      typical - 32 * 1.5 - 1460 * 0.2,
+      10,
+    );
     expect(result.random.trades).toBe(2);
   });
 

@@ -211,8 +211,8 @@ describe("buildAdvisor caching", () => {
       explainAeDaily(6, 0.5, steelOpp!.profitPerPp!).dailyValue,
     );
     for (let i = 1; i < result.opportunities.length; i++) {
-      expect(result.opportunities[i - 1]!.profitPerPp!).toBeGreaterThanOrEqual(
-        result.opportunities[i]!.profitPerPp!,
+      expect(result.opportunities[i - 1]!.profitPerPp!.toNumber()).toBeGreaterThanOrEqual(
+        result.opportunities[i]!.profitPerPp!.toNumber(),
       );
     }
   });

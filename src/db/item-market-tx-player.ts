@@ -1,11 +1,11 @@
 import { and, asc, eq, or } from "drizzle-orm";
-import { moneyToNumber } from "../money/decimal";
+import type { Decimal } from "../money/decimal";
 import type { Db } from "./client";
 import { itemMarketTransactions } from "./schema";
 
 export type PlayerItemFillRow = {
   id: string;
-  money: number;
+  money: Decimal;
   quantity: number;
   buyerId: string;
   sellerId: string;
@@ -37,9 +37,5 @@ export async function listPlayerItemFills(
       ),
     )
     .orderBy(asc(itemMarketTransactions.createdAt));
-  return rows.map((r) => {
-    const money = moneyToNumber(r.money);
-    if (money == null) throw new Error(`item_market_transactions.money missing for ${r.id}`);
-    return { ...r, money };
-  });
+  return rows;
 }

@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { formatDisplayNumber } from "@/lib/formatDisplayNumber";
+import { moneyToNumber } from "@/money/decimal";
 import { skillValueFromLevel } from "@/skills/values";
 import type { EnrichedProducerRow } from "../../../economy/portfolio";
 import { wagePair } from "../../../economy/workers";
@@ -57,9 +58,10 @@ function defaultCreateDraft(simCount: number): SimWorkerDraft {
 
 const companiesRoute = getRouteApi("/companies");
 
-function formatNum(value: number | null | undefined, digits = 4): string {
-  if (value == null || !Number.isFinite(value)) return "—";
-  return formatDisplayNumber(value, digits);
+function formatNum(value: string | number | null | undefined, digits = 4): string {
+  const n = moneyToNumber(value);
+  if (n == null) return "—";
+  return formatDisplayNumber(n, digits);
 }
 
 function formatItem(code: string): string {
@@ -120,17 +122,18 @@ function GoldAmount({
   prefix = "",
   suffix = "",
 }: {
-  value: number | null | undefined;
+  value: string | number | null | undefined;
   digits?: number;
   prefix?: string;
   suffix?: string;
 }) {
-  if (value == null || !Number.isFinite(value)) return "—";
+  const n = moneyToNumber(value);
+  if (n == null) return "—";
   return (
     <span className="inline-flex items-center gap-1.5">
       <GoldIcon />
       {prefix}
-      {formatDisplayNumber(value, digits)}
+      {formatDisplayNumber(n, digits)}
       {suffix}
     </span>
   );
@@ -184,30 +187,30 @@ function GoldAmountInline({
   className,
   variant = "signed",
 }: {
-  value: number | null | undefined;
+  value: string | number | null | undefined;
   digits?: number;
   className?: string;
   /** `cost` always shows as −amount (red). `signed` uses +/− and green/red by sign. */
   variant?: "signed" | "cost";
 }) {
-  if (value == null || !Number.isFinite(value)) return "—";
+  const n = moneyToNumber(value);
+  if (n == null) return "—";
 
   if (variant === "cost") {
     return (
       <span className={`inline-flex items-center gap-1 text-destructive ${className ?? ""}`}>
-        <GoldIcon />−{formatDisplayNumber(Math.abs(value), digits)}
+        <GoldIcon />−{formatDisplayNumber(Math.abs(n), digits)}
       </span>
     );
   }
 
-  const tone =
-    value > 0 ? "text-success" : value < 0 ? "text-destructive" : "text-muted-foreground";
-  const sign = value > 0 ? "+" : "";
+  const tone = n > 0 ? "text-success" : n < 0 ? "text-destructive" : "text-muted-foreground";
+  const sign = n > 0 ? "+" : "";
   return (
     <span className={`inline-flex items-center gap-1 ${tone} ${className ?? ""}`}>
       <GoldIcon />
       {sign}
-      {formatDisplayNumber(value, digits)}
+      {formatDisplayNumber(n, digits)}
     </span>
   );
 }

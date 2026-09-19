@@ -45,7 +45,10 @@ describe("pruneJobRuns", () => {
     await pruneJobRuns(db, "j1", 2);
     const remaining = await db.select().from(schema.jobRuns).where(eq(schema.jobRuns.jobId, "j1"));
     expect(remaining).toHaveLength(2);
-    expect(remaining.map((r) => r.startedAt.getTime()).sort()).toEqual([base + 3000, base + 4000]);
+    expect(remaining.map((r) => r.startedAt.getTime()).toSorted((a, b) => a - b)).toEqual([
+      base + 3000,
+      base + 4000,
+    ]);
   });
 
   it("deletes all rows when keep is 0", async () => {

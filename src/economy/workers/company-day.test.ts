@@ -26,15 +26,15 @@ describe("companyDay", () => {
     });
 
     expect(r.aeDailyPp).toBeCloseTo(ae.dailyPp, 6);
-    expect(r.aeDailyValue).toBeCloseTo(ae.dailyValue, 6);
+    expect(r.aeDailyValue).toBeCloseTo(ae.dailyValue.toNumber(), 6);
     expect(r.selfWorkDailyPp).toBe(0);
     expect(r.selfWorkDailyValue).toBe(0);
     expect(r.workers).toEqual([]);
     expect(r.workerWageCostPerDay).toBe(0);
     expect(r.workerRevenuePerDay).toBe(0);
     expect(r.totalPpPerDay).toBeCloseTo(ae.dailyPp, 6);
-    expect(r.netPerDay).toBeCloseTo(ae.dailyValue, 6);
-    expect(r.netPerDayAtMaxWorkerFidelity).toBeCloseTo(ae.dailyValue, 6);
+    expect(r.netPerDay).toBeCloseTo(ae.dailyValue.toNumber(), 6);
+    expect(r.netPerDayAtMaxWorkerFidelity).toBeCloseTo(ae.dailyValue.toNumber(), 6);
     expect(r.maxGrossWagePerPp).toBeCloseTo(profitPerPp * (1 + productionBonus), 6);
   });
 

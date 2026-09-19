@@ -1,40 +1,41 @@
 export type Opportunity = {
   itemCode: string;
-  marketPrice: number;
-  buyPrice: number | null;
-  sellPrice: number;
-  inputCost: number;
-  unitProfit: number;
+  /** Wire money string (from Decimal JSON). */
+  marketPrice: string;
+  buyPrice: string | null;
+  sellPrice: string;
+  inputCost: string;
+  unitProfit: string;
   consumedPp: number;
-  profitPerPp: number | null;
+  profitPerPp: string | null;
   formula: string;
   bestBonus: number | null;
   bestRegionId: string | null;
   bestRegionName: string | null;
-  roughDailyValue: number | null;
+  roughDailyValue: string | null;
   referenceAeLevel: number;
 };
 
 export type AeDailyBreakdown = {
   aeLevel: number;
   bonus: number;
-  profitPerPp: number;
+  profitPerPp: string;
   hoursPerDay: number;
   ppPerHour: number;
   dailyPp: number;
-  dailyValue: number;
+  dailyValue: string;
   formula: string;
 };
 
 export type ProfitPpBreakdown = {
   itemCode: string;
-  marketPrice: number;
-  buyPrice: number | null;
-  sellPrice: number;
-  inputCost: number;
-  unitProfit: number;
+  marketPrice: string;
+  buyPrice: string | null;
+  sellPrice: string;
+  inputCost: string;
+  unitProfit: string;
   consumedPp: number;
-  profitPerPp: number | null;
+  profitPerPp: string | null;
   missingInputs: string[];
   formula: string;
 };
@@ -54,13 +55,13 @@ export type SwitchRecommendation = {
   bestRegionName: string | null;
   bestRegionCountryCode: string | null;
   bestBonus: number;
-  profitPerPp: number;
-  dailyValue: number;
-  dailyDelta: number;
+  profitPerPp: string;
+  dailyValue: string;
+  dailyDelta: string;
   retask: boolean;
   relocate: boolean;
   transferConcrete: number;
-  transferGold: number;
+  transferGold: string;
   paybackDays: number | null;
   profitFormula: string;
   aeFormula: string;
@@ -92,8 +93,8 @@ export type CompanyAdvisorRow = {
   bonusDetails: ProductionBonusDetails | null;
   profitBreakdown: ProfitPpBreakdown | null;
   aeBreakdown: AeDailyBreakdown | null;
-  currentProfitPerPp: number | null;
-  currentDailyValue: number | null;
+  currentProfitPerPp: string | null;
+  currentDailyValue: string | null;
   bestSwitch: SwitchRecommendation | null;
   workers: AdvisorWorker[];
   workersStatus: "ok" | "unavailable";

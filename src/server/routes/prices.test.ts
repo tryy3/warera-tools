@@ -76,14 +76,14 @@ describe("GET /history", () => {
     const body = (await res.json()) as {
       itemCode: string;
       range: string;
-      latest: { marketPrice: number; topBuy: number; topSell: number };
+      latest: { marketPrice: string; topBuy: string; topSell: string };
       points: unknown[];
     };
     expect(body.itemCode).toBe("steel");
     expect(body.range).toBe("7d");
-    expect(body.latest.marketPrice).toBe(1.6);
-    expect(body.latest.topBuy).toBe(1.5);
-    expect(body.latest.topSell).toBe(1.7);
+    expect(body.latest.marketPrice).toBe("1.6");
+    expect(body.latest.topBuy).toBe("1.5");
+    expect(body.latest.topSell).toBe("1.7");
     expect(body.points).toHaveLength(1);
   });
 

@@ -1,17 +1,17 @@
 import { desc, eq, sql } from "drizzle-orm";
-import { moneyToNumber } from "../money/decimal";
+import { isFiniteMoney, parseMoney, type Decimal } from "../money/decimal";
 import type { Db } from "./client";
-import { pricePolls, priceSnapshots } from "./schema";
+import { pricePolls, priceSnapshots, type PricePollStatus } from "./schema";
 
 export type PriceSnapshotRow = {
   itemCode: string;
-  marketPrice: number | null;
-  buyMin: number | null;
-  buyMax: number | null;
-  buyAvg: number | null;
-  sellMin: number | null;
-  sellMax: number | null;
-  sellAvg: number | null;
+  marketPrice: Decimal | null;
+  buyMin: Decimal | null;
+  buyMax: Decimal | null;
+  buyAvg: Decimal | null;
+  sellMin: Decimal | null;
+  sellMax: Decimal | null;
+  sellAvg: Decimal | null;
 };
 
 export type LatestPrices = {
@@ -21,11 +21,34 @@ export type LatestPrices = {
   items: PriceSnapshotRow[];
 };
 
+/** Coerce WarEra/API numbers into Decimal rows for insert. */
+export function toPriceSnapshotRow(row: {
+  itemCode: string;
+  marketPrice: Decimal | number | string | null;
+  buyMin: Decimal | number | string | null;
+  buyMax: Decimal | number | string | null;
+  buyAvg: Decimal | number | string | null;
+  sellMin: Decimal | number | string | null;
+  sellMax: Decimal | number | string | null;
+  sellAvg: Decimal | number | string | null;
+}): PriceSnapshotRow {
+  return {
+    itemCode: row.itemCode,
+    marketPrice: parseMoney(row.marketPrice),
+    buyMin: parseMoney(row.buyMin),
+    buyMax: parseMoney(row.buyMax),
+    buyAvg: parseMoney(row.buyAvg),
+    sellMin: parseMoney(row.sellMin),
+    sellMax: parseMoney(row.sellMax),
+    sellAvg: parseMoney(row.sellAvg),
+  };
+}
+
 export async function insertPricePoll(
   db: Db,
   values: {
     recordedAt: Date;
-    status: string;
+    status: PricePollStatus;
     error?: string | null;
     itemCount: number;
   },
@@ -47,11 +70,12 @@ export async function insertPricePoll(
 export async function insertPriceSnapshots(
   db: Db,
   pollId: number,
-  rows: PriceSnapshotRow[],
+  rows: Array<Parameters<typeof toPriceSnapshotRow>[0]>,
 ): Promise<void> {
   if (rows.length === 0) return;
+  const normalized = rows.map(toPriceSnapshotRow);
   await db.insert(priceSnapshots).values(
-    rows.map((row) => ({
+    normalized.map((row) => ({
       pollId,
       itemCode: row.itemCode,
       marketPrice: row.marketPrice,
@@ -121,13 +145,13 @@ export async function getLatestPrices(db: Db): Promise<LatestPrices | null> {
     status: first.status,
     items: rows.map((r) => ({
       itemCode: r.itemCode,
-      marketPrice: moneyToNumber(r.marketPrice),
-      buyMin: moneyToNumber(r.buyMin),
-      buyMax: moneyToNumber(r.buyMax),
-      buyAvg: moneyToNumber(r.buyAvg),
-      sellMin: moneyToNumber(r.sellMin),
-      sellMax: moneyToNumber(r.sellMax),
-      sellAvg: moneyToNumber(r.sellAvg),
+      marketPrice: r.marketPrice,
+      buyMin: r.buyMin,
+      buyMax: r.buyMax,
+      buyAvg: r.buyAvg,
+      sellMin: r.sellMin,
+      sellMax: r.sellMax,
+      sellAvg: r.sellAvg,
     })),
   };
 }
@@ -135,21 +159,21 @@ export async function getLatestPrices(db: Db): Promise<LatestPrices | null> {
 export async function getLatestItemMarketPrice(
   db: Db,
   itemCode: string,
-): Promise<{ price: number; fetchedAt: Date; stale?: boolean } | null> {
+): Promise<{ price: Decimal; fetchedAt: Date; stale?: boolean } | null> {
   const latest = await getLatestPrices(db);
   if (!latest) return null;
   const row = latest.items.find((i) => i.itemCode === itemCode);
-  if (row?.marketPrice == null || !Number.isFinite(row.marketPrice)) return null;
+  if (!isFiniteMoney(row?.marketPrice)) return null;
   return {
     price: row.marketPrice,
     fetchedAt: latest.recordedAt,
   };
 }
 
-export function marketPriceMap(latest: LatestPrices): Record<string, number> {
-  const out: Record<string, number> = {};
+export function marketPriceMap(latest: LatestPrices): Record<string, Decimal> {
+  const out: Record<string, Decimal> = {};
   for (const item of latest.items) {
-    if (item.marketPrice != null && Number.isFinite(item.marketPrice)) {
+    if (isFiniteMoney(item.marketPrice)) {
       out[item.itemCode] = item.marketPrice;
     }
   }
@@ -157,10 +181,10 @@ export function marketPriceMap(latest: LatestPrices): Record<string, number> {
 }
 
 /** Top buy (best bid) — Market UI "Buy". */
-export function buyPriceMap(latest: LatestPrices): Record<string, number> {
-  const out: Record<string, number> = {};
+export function buyPriceMap(latest: LatestPrices): Record<string, Decimal> {
+  const out: Record<string, Decimal> = {};
   for (const item of latest.items) {
-    if (item.buyMax != null && Number.isFinite(item.buyMax)) {
+    if (isFiniteMoney(item.buyMax)) {
       out[item.itemCode] = item.buyMax;
     }
   }
@@ -168,10 +192,10 @@ export function buyPriceMap(latest: LatestPrices): Record<string, number> {
 }
 
 /** Top sell (best ask) — Market UI "Sell". */
-export function sellPriceMap(latest: LatestPrices): Record<string, number> {
-  const out: Record<string, number> = {};
+export function sellPriceMap(latest: LatestPrices): Record<string, Decimal> {
+  const out: Record<string, Decimal> = {};
   for (const item of latest.items) {
-    if (item.sellMin != null && Number.isFinite(item.sellMin)) {
+    if (isFiniteMoney(item.sellMin)) {
       out[item.itemCode] = item.sellMin;
     }
   }

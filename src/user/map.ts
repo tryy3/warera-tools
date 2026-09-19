@@ -1,6 +1,8 @@
 import type { CompanyPackEntry } from "../db/company-packs";
 import { calculateProfitPerPp } from "../economy/profit";
 import { goldPerAePerDayFromProfit } from "../growth/income";
+import type { Decimal } from "../money/decimal";
+import { isFiniteMoney } from "../money/decimal";
 import { calculateDailyIncome, type SkillsCompany, type SkillsLevels } from "../skills/income";
 import type { SkillsJob } from "../skills/job-wage";
 import { ECO_SKILL_IDS } from "../skills/values";
@@ -15,7 +17,7 @@ export type MapUserInput = {
   lite: UserLiteSkills;
   job: SkillsJob;
   packEntries: CompanyPackEntry[];
-  prices: Record<string, number>;
+  prices: Record<string, Decimal>;
 };
 
 function mapSkills(
@@ -33,10 +35,10 @@ function mapSkills(
   return skills;
 }
 
-function companyProfitPerPp(itemCode: string | null, prices: Record<string, number>): number {
+function companyProfitPerPp(itemCode: string | null, prices: Record<string, Decimal>): number {
   if (itemCode == null) return 0;
   const ppp = calculateProfitPerPp(itemCode, prices)?.profitPerPp;
-  return ppp != null && Number.isFinite(ppp) ? ppp : 0;
+  return isFiniteMoney(ppp) ? ppp.toNumber() : 0;
 }
 
 function companyGoldPerAePerDay(profitPerPp: number, productionBonus: number): number {
@@ -46,7 +48,7 @@ function companyGoldPerAePerDay(profitPerPp: number, productionBonus: number): n
 
 function mapCompanies(
   packEntries: CompanyPackEntry[],
-  prices: Record<string, number>,
+  prices: Record<string, Decimal>,
 ): UserCompany[] {
   return packEntries.map((entry) => {
     const productionBonus = entry.productionBonus ?? 0;

@@ -1,5 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { formatDisplayNumber } from "@/lib/formatDisplayNumber";
+import { moneyToNumber } from "@/money/decimal";
 import { GoldIcon } from "../../components/GoldIcon";
 import type { MyTradesResponse } from "./types";
 
@@ -10,16 +11,16 @@ function formatSignedGold(value: number, digits = 4): string {
   return abs;
 }
 
-function RealizedPnl({ value }: { value: number | null }) {
-  if (value == null || !Number.isFinite(value)) {
+function RealizedPnl({ value }: { value: string | number | null }) {
+  const n = moneyToNumber(value);
+  if (n == null) {
     return <span className="text-muted-foreground">—</span>;
   }
-  const tone =
-    value > 0 ? "text-success" : value < 0 ? "text-destructive" : "text-muted-foreground";
+  const tone = n > 0 ? "text-success" : n < 0 ? "text-destructive" : "text-muted-foreground";
   return (
     <span className={`inline-flex items-center gap-1.5 font-mono ${tone}`}>
       <GoldIcon />
-      {formatSignedGold(value)}
+      {formatSignedGold(n)}
     </span>
   );
 }
@@ -83,8 +84,8 @@ export function MyTradesStrip({
   }
 
   const empty = data.chunks.length === 0;
-  const showPnl =
-    !empty || data.realized.sellQty > 0 || (data.realized.pnl != null && data.realized.pnl !== 0);
+  const pnl = moneyToNumber(data.realized.pnl);
+  const showPnl = !empty || data.realized.sellQty > 0 || (pnl != null && pnl !== 0);
 
   if (empty) {
     return (

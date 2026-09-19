@@ -182,3 +182,23 @@ One-shot script (e.g. `scripts/migrate-turso-to-postgres.ts`):
 - Whether money Drizzle mapping is a custom column type vs explicit map in db modules
 - Testcontainers reuse strategy under Vitest
 - Script CLI flags (dry-run, table filter) if useful
+
+## Implementation notes
+
+### Client-side money math (Task 7)
+
+Domain/DB money is `Decimal`; API JSON money is `string | null` via `serializeMoney` / Decimal `toJSON`. Web wire types use strings; display and charts use `moneyToNumber` / `parseMoney` at the boundary. No new “round to 3dp” display policy.
+
+Files that still do money arithmetic on the client (now via `Decimal` / `parseMoney` / `moneyToNumber` bridges):
+
+- `src/web/features/companies/sessionPrices/effective.ts` — rebuild book prices, recompute opportunity P/L
+- `src/web/features/companies/sim/derive.ts` — company-day / portfolio inputs from advisor + book
+- `src/web/features/companies/OpportunityItemModal.tsx` — override draft vs live price compare
+- `src/web/features/growth/GrowthPage.tsx` — bootstrap prices + profit/PP into growth plan
+- `src/web/features/equipment-market/taxExcl.ts` — incl→excl from tax
+- `src/web/features/equipment-market/EquipmentOverviewPage.tsx` — scrap floor / seller net
+- `src/web/features/equipment-market/EquipmentDetailPage.tsx` — market vs recommend deltas
+- `src/web/features/battle-build/useLoadoutQuotes.ts` — sum quoted medians
+- `src/web/features/market/MarketPriceChart.tsx` / `EquipmentTrendChart.tsx` / `EquipmentLadderChart.tsx` — chart `number` series only
+
+Narrow number bridges remain in `companyDay` / `skills/income` / growth plan inputs (`toNumber()` at call sites). WarEra ingest parsers still emit `number`; `moneyNumeric.toDriver` / insert helpers coerce with `parseMoney`.

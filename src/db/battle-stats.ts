@@ -1,9 +1,15 @@
+import { parseMoney, type Decimal } from "../money/decimal";
 import type { Db } from "./client";
-import { battleLootSnapshots, battlePolls, battleScoreboardSnapshots } from "./schema";
+import {
+  battleLootSnapshots,
+  battlePolls,
+  battleScoreboardSnapshots,
+  type PricePollStatus,
+} from "./schema";
 
 export type BattlePollInsert = {
   recordedAt: Date;
-  status: string;
+  status: PricePollStatus;
   error?: string | null;
   activeBattlePages?: number | null;
   battleCount: number;
@@ -34,8 +40,8 @@ export type BattleLootSnapshotRow = {
   muId: string;
   totalDmg: number | null;
   hits: number | null;
-  totalMoneyFromBounty: number | null;
-  totalMoneyFromContract: number | null;
+  totalMoneyFromBounty: Decimal | number | null;
+  totalMoneyFromContract: Decimal | number | null;
   case1Count: number | null;
   case2Count: number | null;
   poolLoot: unknown[] | null;
@@ -91,7 +97,12 @@ export async function insertBattleScoreboardSnapshots(
 export async function insertBattleLootSnapshots(
   db: Db,
   pollId: number,
-  rows: BattleLootSnapshotRow[],
+  rows: Array<
+    Omit<BattleLootSnapshotRow, "totalMoneyFromBounty" | "totalMoneyFromContract"> & {
+      totalMoneyFromBounty: Decimal | number | string | null;
+      totalMoneyFromContract: Decimal | number | string | null;
+    }
+  >,
 ): Promise<void> {
   if (rows.length === 0) return;
   await db.insert(battleLootSnapshots).values(
@@ -102,8 +113,8 @@ export async function insertBattleLootSnapshots(
       muId: row.muId,
       totalDmg: row.totalDmg,
       hits: row.hits,
-      totalMoneyFromBounty: row.totalMoneyFromBounty,
-      totalMoneyFromContract: row.totalMoneyFromContract,
+      totalMoneyFromBounty: parseMoney(row.totalMoneyFromBounty),
+      totalMoneyFromContract: parseMoney(row.totalMoneyFromContract),
       case1Count: row.case1Count,
       case2Count: row.case2Count,
       poolLoot: row.poolLoot,

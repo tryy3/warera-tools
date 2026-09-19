@@ -18,6 +18,7 @@ import type { UserCompany, UserResponse } from "@/user";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
+import { moneyToNumber } from "@/money/decimal";
 import { GoldIcon } from "../../components/GoldIcon";
 import { ItemIcon } from "../../components/ItemIcon";
 import { buildGrowthSearch } from "../../lib/growthSearch";
@@ -190,16 +191,17 @@ export function GrowthPage() {
 
   const loading = (userQuery.isFetching && !user) || (bootstrapQuery.isFetching && !bootstrap);
 
-  const steelPrice = bootstrap?.prices.steel ?? null;
-  const concretePrice = bootstrap?.prices.concrete ?? null;
+  const steelPrice = moneyToNumber(bootstrap?.prices.steel);
+  const concretePrice = moneyToNumber(bootstrap?.prices.concrete);
   const pricesMissing =
     bootstrap != null &&
     (steelPrice == null || concretePrice == null || steelPrice <= 0 || concretePrice <= 0);
 
-  const selectedProfitPerPp =
+  const selectedProfitPerPp = moneyToNumber(
     bootstrap?.opportunitiesLite.find((o) => o.itemCode === newItemCode)?.profitPerPp ??
-    bootstrap?.bestItem?.profitPerPp ??
-    null;
+      bootstrap?.bestItem?.profitPerPp ??
+      null,
+  );
 
   const plans: Record<FocusedPath, GrowthPlanResult | null> = {
     cheapest: null,

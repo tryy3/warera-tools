@@ -57,9 +57,9 @@ describe("getItemPriceHistory", () => {
     expect(history).not.toBeNull();
     expect(history!.range).toBe("7d");
     expect(history!.points).toHaveLength(2); // excludes 8d-old point
-    expect(history!.latest?.marketPrice).toBe(1.65);
-    expect(history!.latest?.topBuy).toBe(1.55);
-    expect(history!.latest?.topSell).toBe(1.7);
+    expect(history!.latest?.marketPrice?.toNumber()).toBe(1.65);
+    expect(history!.latest?.topBuy?.toNumber()).toBe(1.55);
+    expect(history!.latest?.topSell?.toNumber()).toBe(1.7);
     // baseline ~now-24h → 1.5; baseline ~now-7d → 1.0
     expect(history!.change24h).toEqual({
       absolute: expect.closeTo(0.15, 8),
@@ -114,7 +114,7 @@ describe("getItemPriceHistory", () => {
     const history = await getItemPriceHistory(db, "steel", "7d", now);
     expect(history).not.toBeNull();
     expect(history!.points).toHaveLength(1);
-    expect(history!.latest?.marketPrice).toBe(2.5);
+    expect(history!.latest?.marketPrice?.toNumber()).toBe(2.5);
   });
 
   it("filters history by item code", async () => {
@@ -125,6 +125,6 @@ describe("getItemPriceHistory", () => {
     const grain = await getItemPriceHistory(db, "grain", "7d", now);
     expect(grain).not.toBeNull();
     expect(grain!.points).toHaveLength(1);
-    expect(grain!.latest?.marketPrice).toBe(0.5);
+    expect(grain!.latest?.marketPrice?.toNumber()).toBe(0.5);
   });
 });

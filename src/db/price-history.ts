@@ -1,15 +1,15 @@
 import { and, asc, desc, eq, gte, inArray, lte } from "drizzle-orm";
 import { calculatePriceChange, type PriceChange } from "../market/change";
 import { rangeToMs, type PriceHistoryRange } from "../market/ranges";
-import { moneyToNumber } from "../money/decimal";
+import type { Decimal } from "../money/decimal";
 import type { Db } from "./client";
 import { pricePolls, priceSnapshots } from "./schema";
 
 export type PriceHistoryPoint = {
   recordedAt: Date;
-  marketPrice: number | null;
-  topBuy: number | null;
-  topSell: number | null;
+  marketPrice: Decimal | null;
+  topBuy: Decimal | null;
+  topSell: Decimal | null;
 };
 
 export type ItemPriceHistory = {
@@ -25,15 +25,15 @@ const OK_STATUSES = ["success", "partial"] as const;
 
 function mapRow(row: {
   recordedAt: Date;
-  marketPrice: Parameters<typeof moneyToNumber>[0];
-  buyMax: Parameters<typeof moneyToNumber>[0];
-  sellMin: Parameters<typeof moneyToNumber>[0];
+  marketPrice: Decimal | null;
+  buyMax: Decimal | null;
+  sellMin: Decimal | null;
 }): PriceHistoryPoint {
   return {
     recordedAt: row.recordedAt,
-    marketPrice: moneyToNumber(row.marketPrice),
-    topBuy: moneyToNumber(row.buyMax),
-    topSell: moneyToNumber(row.sellMin),
+    marketPrice: row.marketPrice,
+    topBuy: row.buyMax,
+    topSell: row.sellMin,
   };
 }
 
@@ -41,7 +41,7 @@ async function latestBaselineAtOrBefore(
   db: Db,
   itemCode: string,
   atOrBefore: Date,
-): Promise<number | null> {
+): Promise<Decimal | null> {
   const rows = await db
     .select({ marketPrice: priceSnapshots.marketPrice })
     .from(priceSnapshots)
@@ -55,7 +55,7 @@ async function latestBaselineAtOrBefore(
     )
     .orderBy(desc(pricePolls.recordedAt), desc(pricePolls.id))
     .limit(1);
-  return moneyToNumber(rows[0]?.marketPrice);
+  return rows[0]?.marketPrice ?? null;
 }
 
 export async function getItemPriceHistory(

@@ -6,6 +6,7 @@ import {
   type LoadoutItem,
   type LoadoutSlotId,
 } from "@/battle-build/slots";
+import { moneyToNumber } from "@/money/decimal";
 import { quoteBattleBuild } from "../../query/quoteBattleBuild";
 
 const QUOTE_DEBOUNCE_MS = 300;
@@ -39,8 +40,9 @@ export function sumLoadoutQuotes(quotes: QuoteLineResult[]): {
   let total = 0;
   let quotedCount = 0;
   for (const quote of quotes) {
-    if (quote.median == null || !Number.isFinite(quote.median)) continue;
-    total += quote.median;
+    const median = moneyToNumber(quote.median as never);
+    if (median == null) continue;
+    total += median;
     quotedCount += 1;
   }
   return { total, quotedCount };

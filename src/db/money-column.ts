@@ -7,8 +7,7 @@ export const moneyNumeric = customType<{ data: Decimal; driverData: string }>({
     return "numeric(20, 6)";
   },
   toDriver(value: Decimal | number | string): string {
-    // Coerce number/string so callers not yet on Decimal (Task 7) don't hit
-    // Number#toFixed() default (0 fraction digits) and round money away.
+    // Coerce number/string at WarEra ingest boundaries (parsers still emit numbers).
     const parsed = parseMoney(value);
     if (!parsed) throw new Error(`Invalid money value for driver: ${String(value)}`);
     return parsed.toFixed();

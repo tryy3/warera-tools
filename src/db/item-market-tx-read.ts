@@ -1,11 +1,12 @@
 import { and, eq, gte, inArray } from "drizzle-orm";
-import { moneyToNumber } from "../money/decimal";
+import { parseMoney, type Decimal } from "../money/decimal";
 import type { Db } from "./client";
 import { itemMarketTransactions } from "./schema";
 
 export type ItemMarketTxRow = {
   id: string;
-  money: number;
+  /** Decimal from DB; tests may pass numbers (coerced at domain boundaries). */
+  money: Decimal | number;
   itemCode: string;
   skills: Record<string, unknown> | null;
   createdAt: Date;
@@ -13,20 +14,22 @@ export type ItemMarketTxRow = {
 
 function mapTxRow(r: {
   id: string;
-  money: Parameters<typeof moneyToNumber>[0];
+  money: Decimal;
   itemCode: string;
   skills: Record<string, unknown> | null;
   createdAt: Date;
 }): ItemMarketTxRow {
-  const money = moneyToNumber(r.money);
-  if (money == null) throw new Error(`item_market_transactions.money missing for ${r.id}`);
   return {
     id: r.id,
-    money,
+    money: r.money,
     itemCode: r.itemCode,
     skills: r.skills ?? null,
     createdAt: r.createdAt,
   };
+}
+
+export function txMoney(row: ItemMarketTxRow): Decimal {
+  return parseMoney(row.money)!;
 }
 
 export async function listItemMarketTxSince(

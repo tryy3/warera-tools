@@ -5,8 +5,9 @@ import { Chart } from "@tanstack/react-charts";
 import { scaleUtc } from "d3-scale";
 import { useMemo } from "react";
 import { formatDisplayNumber } from "@/lib/formatDisplayNumber";
+import { moneyToNumber } from "@/money/decimal";
 
-type DailyMedian = { day: string; median: number; trades: number };
+type DailyMedian = { day: string; median: string | number; trades: number };
 
 type ChartRow = {
   date: Date;
@@ -20,22 +21,26 @@ export function EquipmentTrendChart({
   itemLabel,
 }: {
   dailyMedians: DailyMedian[];
-  scrapFloor?: number | null;
+  scrapFloor?: string | number | null;
   itemLabel: string;
 }) {
   const rows = useMemo<ChartRow[]>(
     () =>
-      dailyMedians
-        .filter((p) => Number.isFinite(p.median))
-        .map((p) => ({
-          date: new Date(`${p.day}T00:00:00.000Z`),
-          median: p.median,
-          trades: p.trades,
-        })),
+      dailyMedians.flatMap((p) => {
+        const median = moneyToNumber(p.median);
+        if (median == null) return [];
+        return [
+          {
+            date: new Date(`${p.day}T00:00:00.000Z`),
+            median,
+            trades: p.trades,
+          },
+        ];
+      }),
     [dailyMedians],
   );
 
-  const floor = scrapFloor != null && Number.isFinite(scrapFloor) ? scrapFloor : null;
+  const floor = moneyToNumber(scrapFloor);
 
   const definition = useMemo(
     () =>

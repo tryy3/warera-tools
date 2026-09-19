@@ -82,14 +82,14 @@ describe("mapGrowthBootstrap", () => {
     expect(result.startBalance).toBe(0);
     expect(result.steel).toBe(0);
     expect(result.concrete).toBe(0);
-    expect(result.prices).toEqual({ steel: 20, concrete: 5 });
+    expect(result.prices).toEqual({ steel: "20", concrete: "5" });
     expect(result.opportunitiesLite).toEqual([
-      { itemCode: "steel", profitPerPp: 0.5 },
-      { itemCode: "iron", profitPerPp: 0.2 },
+      { itemCode: "steel", profitPerPp: "0.5" },
+      { itemCode: "iron", profitPerPp: "0.2" },
     ]);
     expect(result.bestItem).toEqual({
       itemCode: "steel",
-      profitPerPp: 0.5,
+      profitPerPp: "0.5",
       suggestedBonus: 0,
     });
     expect(result).not.toHaveProperty("companies");
@@ -142,8 +142,8 @@ describe("buildGrowthBootstrap", () => {
     expect(result.steel).toBe(0);
     expect(result.concrete).toBe(0);
     expect(result.recordedAt).toBe("2026-08-01T12:00:00.000Z");
-    expect(result.prices.steel).toBe(20);
-    expect(result.prices.concrete).toBe(5);
+    expect(result.prices.steel).toBe("20");
+    expect(result.prices.concrete).toBe("5");
     expect(result.bestItem?.suggestedBonus).toBe(0);
     expect(result).not.toHaveProperty("opportunities");
     expect(request).not.toHaveBeenCalled();

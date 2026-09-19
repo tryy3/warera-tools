@@ -1,13 +1,16 @@
 import { and, desc, eq } from "drizzle-orm";
+import { parseMoney, type Decimal } from "../money/decimal";
 import type { Db } from "./client";
-import { donationPolls, donationSnapshots } from "./schema";
+import { donationPolls, donationSnapshots, type PricePollStatus } from "./schema";
 
 export function donationFingerprintKey(scopeType: string, scopeId: string, userId: string): string {
   return `${scopeType}:${scopeId}:${userId}`;
 }
 
-export function donationAmountFingerprint(amount: number | { toString(): string } | null): string {
-  return amount == null ? "null" : String(amount);
+export function donationAmountFingerprint(amount: Decimal | number | string | null): string {
+  if (amount == null) return "null";
+  const parsed = parseMoney(amount);
+  return parsed == null ? "null" : parsed.toFixed();
 }
 
 /** keys are `${scopeType}:${scopeId}:${userId}` */
@@ -55,7 +58,7 @@ export type DonationSnapshotRow = {
   scopeId: string;
   userId: string;
   donationRowId: string | null;
-  amount: number | null;
+  amount: Decimal | number | null;
   donationCreatedAt: Date | null;
   donationUpdatedAt: Date | null;
   payload: Record<string, unknown> | null;
@@ -65,7 +68,7 @@ export async function insertDonationPoll(
   db: Db,
   values: {
     recordedAt: Date;
-    status: string;
+    status: PricePollStatus;
     error?: string | null;
     scopeCount: number;
     rowCount: number;
@@ -89,7 +92,11 @@ export async function insertDonationPoll(
 export async function insertDonationSnapshots(
   db: Db,
   pollId: number,
-  rows: DonationSnapshotRow[],
+  rows: Array<
+    Omit<DonationSnapshotRow, "amount"> & {
+      amount: Decimal | number | string | null;
+    }
+  >,
 ): Promise<void> {
   if (rows.length === 0) return;
   await db.insert(donationSnapshots).values(
@@ -99,7 +106,7 @@ export async function insertDonationSnapshots(
       scopeId: row.scopeId,
       userId: row.userId,
       donationRowId: row.donationRowId,
-      amount: row.amount,
+      amount: parseMoney(row.amount),
       donationCreatedAt: row.donationCreatedAt,
       donationUpdatedAt: row.donationUpdatedAt,
       payload: row.payload,

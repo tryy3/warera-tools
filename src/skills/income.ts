@@ -1,4 +1,5 @@
 import { aeDailyValue } from "../economy/profit";
+import { Decimal } from "../money/decimal";
 import { type EcoSkillId, skillValueFromLevel } from "./values";
 
 export type SkillsLevels = Record<EcoSkillId, number>;
@@ -88,7 +89,7 @@ export function calculateDailyIncome(input: {
   const ranked = input.companies
     .map((c) => ({
       id: c.id,
-      daily: aeDailyValue(c.aeLevel, c.productionBonus, c.profitPerPp),
+      daily: aeDailyValue(c.aeLevel, c.productionBonus, new Decimal(c.profitPerPp)).toNumber(),
     }))
     .toSorted((a, b) => b.daily - a.daily);
 

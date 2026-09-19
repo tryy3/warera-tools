@@ -1,12 +1,18 @@
 import { describe, expect, it } from "vite-plus/test";
 import type { PlayerItemFillRow } from "../db/item-market-tx-player";
+import { parseMoney } from "../money/decimal";
 import { buildMyTrades } from "./buildMyTrades";
 
 function row(
-  partial: Partial<PlayerItemFillRow> &
-    Pick<PlayerItemFillRow, "id" | "money" | "quantity" | "buyerId" | "sellerId" | "createdAt">,
+  partial: Omit<Partial<PlayerItemFillRow>, "money"> &
+    Pick<PlayerItemFillRow, "id" | "quantity" | "buyerId" | "sellerId" | "createdAt"> & {
+      money: PlayerItemFillRow["money"] | number;
+    },
 ): PlayerItemFillRow {
-  return partial;
+  return {
+    ...partial,
+    money: parseMoney(partial.money)!,
+  };
 }
 
 describe("buildMyTrades", () => {
@@ -57,23 +63,19 @@ describe("buildMyTrades", () => {
 
     expect(result.realized.buyQty).toBe(10);
     expect(result.realized.sellQty).toBe(50);
-    expect(result.realized.pnl).toBe(10); // 60 proceeds - 50 cost
+    expect(result.realized.pnl!.toNumber()).toBe(10); // 60 proceeds - 50 cost
 
     // Old buy chunk filtered out; in-range sell + buy remain
     expect(result.chunks).toHaveLength(2);
     expect(result.chunks.map((c) => c.side)).toEqual(["sell", "buy"]);
-    expect(result.chunks[0]).toMatchObject({
-      side: "sell",
-      totalQty: 50,
-      totalMoney: 60,
-      fillCount: 1,
-    });
-    expect(result.chunks[1]).toMatchObject({
-      side: "buy",
-      totalQty: 10,
-      totalMoney: 20,
-      fillCount: 1,
-    });
+    expect(result.chunks[0]!.side).toBe("sell");
+    expect(result.chunks[0]!.totalQty).toBe(50);
+    expect(result.chunks[0]!.totalMoney.toNumber()).toBe(60);
+    expect(result.chunks[0]!.fillCount).toBe(1);
+    expect(result.chunks[1]!.side).toBe("buy");
+    expect(result.chunks[1]!.totalQty).toBe(10);
+    expect(result.chunks[1]!.totalMoney.toNumber()).toBe(20);
+    expect(result.chunks[1]!.fillCount).toBe(1);
   });
 
   it("flags historyIncomplete when sells lack matching buys", () => {
@@ -98,7 +100,7 @@ describe("buildMyTrades", () => {
     expect(result.historyIncomplete).toBe(true);
     expect(result.realized.sellQty).toBe(10);
     expect(result.realized.buyQty).toBe(0);
-    expect(result.realized.pnl).toBe(10); // optimistic: cost 0
+    expect(result.realized.pnl!.toNumber()).toBe(10); // optimistic: cost 0
   });
 
   it("includes chunk that overlaps range even if start is before since", () => {
@@ -149,7 +151,9 @@ describe("buildMyTrades", () => {
 
     expect(result.chunks).toEqual([]);
     expect(result.fillCount).toBe(0);
-    expect(result.realized).toEqual({ pnl: 0, sellQty: 0, buyQty: 0 });
+    expect(result.realized.pnl!.toNumber()).toBe(0);
+    expect(result.realized.sellQty).toBe(0);
+    expect(result.realized.buyQty).toBe(0);
     expect(result.historyIncomplete).toBe(false);
   });
 });

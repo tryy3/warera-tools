@@ -1,5 +1,6 @@
 import { median as calculateMedian } from "../equipment/median";
 import { matchesSkillBands, parseSkillNumbers, type SkillBand } from "../equipment/skills";
+import { parseMoney, type Decimal } from "../money/decimal";
 
 export type QuoteWindow = "24h" | "last10" | "thin";
 
@@ -11,14 +12,14 @@ export type QuoteLineInput = {
 
 export type QuoteLineResult = {
   id: string;
-  median: number | null;
+  median: Decimal | null;
   trades: number;
   window: QuoteWindow;
   widened: boolean;
 };
 
 export type QuoteTx = {
-  money: number;
+  money: Decimal | number;
   createdAtMs: number;
   skills: Record<string, number>;
 };
@@ -29,11 +30,15 @@ export const QUOTE_24H_MS = 24 * 60 * 60 * 1000;
 type ItemQuote = Omit<QuoteLineResult, "id">;
 type SufficientQuote = Omit<ItemQuote, "widened">;
 
+function moneyValues(txs: QuoteTx[]): Decimal[] {
+  return txs.map((transaction) => parseMoney(transaction.money)!);
+}
+
 function quoteSufficientMatches(matches: QuoteTx[], nowMs: number): SufficientQuote | null {
   const recent = matches.filter((transaction) => transaction.createdAtMs >= nowMs - QUOTE_24H_MS);
   if (recent.length >= QUOTE_MIN_TRADES) {
     return {
-      median: calculateMedian(recent.map((transaction) => transaction.money)),
+      median: calculateMedian(moneyValues(recent)),
       trades: recent.length,
       window: "24h",
     };
@@ -44,7 +49,7 @@ function quoteSufficientMatches(matches: QuoteTx[], nowMs: number): SufficientQu
       .toSorted((a, b) => b.createdAtMs - a.createdAtMs)
       .slice(0, QUOTE_MIN_TRADES);
     return {
-      median: calculateMedian(newest.map((transaction) => transaction.money)),
+      median: calculateMedian(moneyValues(newest)),
       trades: newest.length,
       window: "last10",
     };
@@ -75,7 +80,7 @@ export function quoteItem(input: {
 
   if (!skills) {
     return {
-      median: calculateMedian(exactMatches.map((transaction) => transaction.money)),
+      median: calculateMedian(moneyValues(exactMatches)),
       trades: exactMatches.length,
       window: "thin",
       widened: false,
@@ -88,7 +93,7 @@ export function quoteItem(input: {
   if (widenedQuote) return { ...widenedQuote, widened: true };
 
   return {
-    median: calculateMedian(widenedMatches.map((transaction) => transaction.money)),
+    median: calculateMedian(moneyValues(widenedMatches)),
     trades: widenedMatches.length,
     window: "thin",
     widened: true,

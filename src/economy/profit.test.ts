@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vite-plus/test";
+import { d } from "../money/test-helpers";
 import {
   aeDailyValue,
   calculateProfitPerPp,
@@ -16,10 +17,10 @@ describe("calculateProfitPerPp", () => {
     const prices = { steel: 1.62, iron: 0.08 };
     const result = calculateProfitPerPp("steel", prices);
     expect(result).not.toBeNull();
-    expect(result!.sellPrice).toBeCloseTo(1.62);
-    expect(result!.inputCost).toBeCloseTo(0.8);
-    expect(result!.unitProfit).toBeCloseTo(0.82);
-    expect(result!.profitPerPp).toBeCloseTo(0.082);
+    expect(result!.sellPrice.toNumber()).toBeCloseTo(1.62);
+    expect(result!.inputCost.toNumber()).toBeCloseTo(0.8);
+    expect(result!.unitProfit.toNumber()).toBeCloseTo(0.82);
+    expect(result!.profitPerPp!.toNumber()).toBeCloseTo(0.082);
   });
 
   it("uses sell(output) and buy(inputs) from book prices", () => {
@@ -27,15 +28,15 @@ describe("calculateProfitPerPp", () => {
       buy: { steel: 1.5, iron: 0.084 },
       sell: { steel: 1.62, iron: 0.086 },
     });
-    expect(result!.sellPrice).toBeCloseTo(1.62);
-    expect(result!.buyPrice).toBeCloseTo(1.5);
-    expect(result!.inputCost).toBeCloseTo(0.84);
-    expect(result!.profitPerPp).toBeCloseTo((1.62 - 0.84) / 10);
+    expect(result!.sellPrice.toNumber()).toBeCloseTo(1.62);
+    expect(result!.buyPrice!.toNumber()).toBeCloseTo(1.5);
+    expect(result!.inputCost.toNumber()).toBeCloseTo(0.84);
+    expect(result!.profitPerPp!.toNumber()).toBeCloseTo((1.62 - 0.84) / 10);
   });
 
   it("raw lead is sell price / 1 PP", () => {
     const result = calculateProfitPerPp("lead", { lead: 0.086 });
-    expect(result!.profitPerPp).toBeCloseTo(0.086);
+    expect(result!.profitPerPp!.toNumber()).toBeCloseTo(0.086);
   });
 
   it("embeds rounded numbers in profit formula", () => {
@@ -74,19 +75,21 @@ describe("listMarketOpportunities", () => {
       heavyAmmo: 2.4,
       cocain: 32,
     });
-    expect(list[0]!.profitPerPp).toBeGreaterThanOrEqual(list.at(-1)!.profitPerPp!);
+    expect(list[0]!.profitPerPp!.toNumber()).toBeGreaterThanOrEqual(
+      list.at(-1)!.profitPerPp!.toNumber(),
+    );
   });
 });
 
 describe("aeDailyValue / transfer", () => {
   it("computes AE daily value", () => {
-    expect(aeDailyValue(6, 0.5, 0.1)).toBeCloseTo(6 * 1.5 * 24 * 0.1);
+    expect(aeDailyValue(6, 0.5, 0.1).toNumber()).toBeCloseTo(6 * 1.5 * 24 * 0.1);
   });
 
   it("includes production bonus in explainAeDaily", () => {
     const explained = explainAeDaily(6, 0.505, 0.0856);
     expect(explained.dailyPp).toBeCloseTo(6 * 1.505 * 24);
-    expect(explained.dailyValue).toBeCloseTo(6 * 1.505 * 24 * 0.0856);
+    expect(explained.dailyValue.toNumber()).toBeCloseTo(6 * 1.505 * 24 * 0.0856);
     expect(explained.formula).toContain("50.5%");
   });
 
@@ -95,14 +98,13 @@ describe("aeDailyValue / transfer", () => {
     expect(explained.formula).toContain("0.0856");
     expect(explained.formula).not.toContain("0.08560533885010638");
     // numeric outputs remain full precision
-    expect(explained.dailyValue).toBeCloseTo(6 * 1.505 * 24 * 0.08560533885010638);
+    expect(explained.dailyValue.toNumber()).toBeCloseTo(6 * 1.505 * 24 * 0.08560533885010638);
   });
 
   it("transfer cost uses concrete price", () => {
-    expect(transferCostGold(1.6, { retask: true, relocate: true })).toMatchObject({
-      concreteUnits: 10,
-      gold: 16,
-    });
+    const result = transferCostGold(1.6, { retask: true, relocate: true });
+    expect(result.concreteUnits).toBe(10);
+    expect(result.gold.toNumber()).toBe(16);
   });
 
   it("payback days", () => {
@@ -114,25 +116,25 @@ describe("aeDailyValue / transfer", () => {
 describe("enrichMarketOpportunities", () => {
   const steak: ProfitPpBreakdown = {
     itemCode: "steak",
-    marketPrice: 3.7432,
-    buyPrice: 3.7,
-    sellPrice: 3.7432,
-    inputCost: 1.545,
-    unitProfit: 2.1982,
+    marketPrice: d(3.7432),
+    buyPrice: d(3.7),
+    sellPrice: d(3.7432),
+    inputCost: d(1.545),
+    unitProfit: d(2.1982),
     consumedPp: 20,
-    profitPerPp: 0.1099,
+    profitPerPp: d(0.1099),
     missingInputs: [],
     formula: "(3.7432 G sell − 1.545 G buy) / 20 PP",
   };
   const concrete: ProfitPpBreakdown = {
     itemCode: "concrete",
-    marketPrice: 1.6374,
-    buyPrice: 1.6,
-    sellPrice: 1.6374,
-    inputCost: 0.7933,
-    unitProfit: 0.8441,
+    marketPrice: d(1.6374),
+    buyPrice: d(1.6),
+    sellPrice: d(1.6374),
+    inputCost: d(0.7933),
+    unitProfit: d(0.8441),
     consumedPp: 10,
-    profitPerPp: 0.0844,
+    profitPerPp: d(0.0844),
     missingInputs: [],
     formula: "(1.6374 G sell − 0.7933 G buy) / 10 PP",
   };
@@ -146,16 +148,20 @@ describe("enrichMarketOpportunities", () => {
     expect(enriched.map((o) => o.itemCode)).toEqual(["steak", "concrete"]);
     expect(enriched[0]!.referenceAeLevel).toBe(OPPORTUNITY_REFERENCE_AE);
     expect(enriched[0]!.bestBonus).toBe(0.2);
-    expect(enriched[0]!.roughDailyValue).toBe(
-      explainAeDaily(OPPORTUNITY_REFERENCE_AE, 0.2, 0.1099).dailyValue,
-    );
+    expect(
+      enriched[0]!.roughDailyValue!.equals(
+        explainAeDaily(OPPORTUNITY_REFERENCE_AE, 0.2, 0.1099).dailyValue,
+      ),
+    ).toBe(true);
     expect(enriched[1]!.bestBonus).toBe(0.61);
     expect(enriched[1]!.bestRegionName).toBe("Tehran");
-    expect(enriched[1]!.roughDailyValue).toBe(
-      explainAeDaily(OPPORTUNITY_REFERENCE_AE, 0.61, 0.0844).dailyValue,
-    );
+    expect(
+      enriched[1]!.roughDailyValue!.equals(
+        explainAeDaily(OPPORTUNITY_REFERENCE_AE, 0.61, 0.0844).dailyValue,
+      ),
+    ).toBe(true);
     // Stronger bonus can yield higher daily despite lower G/PP
-    expect(enriched[1]!.roughDailyValue!).toBeGreaterThan(enriched[0]!.roughDailyValue!);
+    expect(enriched[1]!.roughDailyValue!.gt(enriched[0]!.roughDailyValue!)).toBe(true);
   });
 
   it("leaves bonus/daily null when region or bonus is unknown", () => {

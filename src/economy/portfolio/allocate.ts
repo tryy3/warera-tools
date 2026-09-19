@@ -1,8 +1,10 @@
+import { isFiniteMoney, parseMoney, type Decimal } from "../../money/decimal";
 import type { BookPrices } from "../profit";
 import type { CompanyAllocation, PortfolioAllocation, PortfolioCompanyInput } from "./types";
 
-function isValidPrice(price: number | undefined): price is number {
-  return price !== undefined && Number.isFinite(price);
+function bookPrice(bookSide: BookPrices["buy"], key: string): Decimal | null {
+  const parsed = parseMoney(bookSide[key]);
+  return isFiniteMoney(parsed) ? parsed : null;
 }
 
 function sumProfits(values: number[]): number {
@@ -98,22 +100,22 @@ export function allocatePortfolio(
     let marketBuyCashNaN = false;
     for (const [input, units] of Object.entries(state.marketBoughtByInput)) {
       if (units <= 0) continue;
-      const buyPrice = book.buy[input];
-      if (!isValidPrice(buyPrice)) {
+      const buyPrice = bookPrice(book.buy, input);
+      if (buyPrice == null) {
         marketBuyCashNaN = true;
       } else {
-        marketBuyCash += units * buyPrice;
+        marketBuyCash += units * buyPrice.toNumber();
       }
     }
     if (marketBuyCashNaN) marketBuyCash = NaN;
 
     let sellRevenueActual = 0;
     if (state.soldOut > 0) {
-      const sellPrice = state.itemCode != null ? book.sell[state.itemCode] : undefined;
-      if (!isValidPrice(sellPrice)) {
+      const sellPrice = state.itemCode != null ? bookPrice(book.sell, state.itemCode) : null;
+      if (sellPrice == null) {
         sellRevenueActual = NaN;
       } else {
-        sellRevenueActual = state.soldOut * sellPrice;
+        sellRevenueActual = state.soldOut * sellPrice.toNumber();
       }
     }
 
@@ -128,21 +130,21 @@ export function allocatePortfolio(
     let markToMarketNaN = false;
 
     if (state.unitsOut > 0 && state.itemCode != null) {
-      const sellPrice = book.sell[state.itemCode];
-      if (!isValidPrice(sellPrice)) {
+      const sellPrice = bookPrice(book.sell, state.itemCode);
+      if (sellPrice == null) {
         markToMarketNaN = true;
       } else {
-        markToMarketProfit += state.unitsOut * sellPrice;
+        markToMarketProfit += state.unitsOut * sellPrice.toNumber();
       }
     }
 
     for (const [input, demand] of Object.entries(state.inputDemand)) {
       if (demand <= 0) continue;
-      const buyPrice = book.buy[input];
-      if (!isValidPrice(buyPrice)) {
+      const buyPrice = bookPrice(book.buy, input);
+      if (buyPrice == null) {
         markToMarketNaN = true;
       } else {
-        markToMarketProfit -= demand * buyPrice;
+        markToMarketProfit -= demand * buyPrice.toNumber();
       }
     }
 

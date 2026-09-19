@@ -27,11 +27,11 @@ describe("buildEquipmentOverview", () => {
     const row = items[0]!;
     expect(row.itemCode).toBe("chest4");
     expect(row.tier).toBe("purple");
-    expect(row.marketMedian).toBe(45);
+    expect(row.marketMedian!.toNumber()).toBe(45);
     expect(row.trades).toBe(2);
     // purple = 162 scraps
-    expect(row.scrapFloor).toBe(162 * scrapPrice);
-    expect(row.spread).toBe(45 - 162 * scrapPrice);
+    expect(row.scrapFloor!.toNumber()).toBeCloseTo(162 * scrapPrice, 10);
+    expect(row.spread!.toNumber()).toBeCloseTo(45 - 162 * scrapPrice, 10);
   });
 
   it("does not invent zero-trade item codes", () => {
@@ -42,21 +42,17 @@ describe("buildEquipmentOverview", () => {
 
   it("returns null scrap floor and spread when scrap price or tier is missing", () => {
     const noScrap = buildEquipmentOverview([tx({ id: "a", itemCode: "chest4", money: 40 })], null);
-    expect(noScrap[0]).toMatchObject({
-      marketMedian: 40,
-      scrapFloor: null,
-      spread: null,
-    });
+    expect(noScrap[0]!.marketMedian!.toNumber()).toBe(40);
+    expect(noScrap[0]!.scrapFloor).toBeNull();
+    expect(noScrap[0]!.spread).toBeNull();
 
     const unknownTier = buildEquipmentOverview(
       [tx({ id: "b", itemCode: "unknownWeapon", money: 100 })],
       0.2,
     );
-    expect(unknownTier[0]).toMatchObject({
-      tier: null,
-      marketMedian: 100,
-      scrapFloor: null,
-      spread: null,
-    });
+    expect(unknownTier[0]!.tier).toBeNull();
+    expect(unknownTier[0]!.marketMedian!.toNumber()).toBe(100);
+    expect(unknownTier[0]!.scrapFloor).toBeNull();
+    expect(unknownTier[0]!.spread).toBeNull();
   });
 });
