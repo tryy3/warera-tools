@@ -71,6 +71,12 @@ describe("MASK_KEYS", () => {
     expect(MASK_KEYS).toContain("SENTRY_DSN");
     expect(MASK_KEYS).toContain("dsn");
   });
+
+  it("includes database connection fields", () => {
+    expect(MASK_KEYS).toContain("DATABASE_URL");
+    expect(MASK_KEYS).toContain("databaseUrl");
+    expect(MASK_KEYS).toContain("connectionString");
+  });
 });
 
 describe("createServerLogger", () => {

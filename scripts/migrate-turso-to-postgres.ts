@@ -26,7 +26,11 @@ import pg from "pg";
 
 const PAGE_SIZE = 1000;
 
-type ColTransform = "timestamp" | "bool" | "json" | "money";
+/** Postgres `job_status` enum values (jobs.last_status / job_runs.status). */
+const JOB_STATUS_VALUES = new Set(["success", "error", "running"]);
+const JOB_STATUS_FALLBACK = "error";
+
+type ColTransform = "timestamp" | "bool" | "json" | "money" | "job_status";
 
 type TableSpec = {
   name: string;
@@ -60,6 +64,7 @@ const TABLES: TableSpec[] = [
       enabled: "bool",
       last_started_at: "timestamp",
       last_finished_at: "timestamp",
+      last_status: "job_status",
       state: "json",
     },
     orderBy: "id",
@@ -67,7 +72,11 @@ const TABLES: TableSpec[] = [
   {
     name: "job_runs",
     columns: ["id", "job_id", "started_at", "finished_at", "status", "message", "duration_ms"],
-    transforms: { started_at: "timestamp", finished_at: "timestamp" },
+    transforms: {
+      started_at: "timestamp",
+      finished_at: "timestamp",
+      status: "job_status",
+    },
     orderBy: "id",
     serialColumn: "id",
   },
@@ -634,6 +643,15 @@ function transformValue(
     case "money": {
       return new Decimal(String(value)).toFixed();
     }
+    case "job_status": {
+      const raw = value == null ? null : String(value);
+      if (raw == null || raw === "") return null;
+      if (JOB_STATUS_VALUES.has(raw)) return raw;
+      console.warn(
+        `⚠ ${table}.${column}: unknown job_status ${JSON.stringify(raw)} → coercing to ${JOB_STATUS_FALLBACK}`,
+      );
+      return JOB_STATUS_FALLBACK;
+    }
     default: {
       const _exhaustive: never = kind;
       return _exhaustive;
@@ -682,6 +700,52 @@ async function truncateAll(pool: pg.Pool): Promise<void> {
   const names = TABLES.map((t) => `"${t.name}"`).join(", ");
   await pool.query(`TRUNCATE TABLE ${names} RESTART IDENTITY CASCADE`);
   console.log(`Truncated ${TABLES.length} tables (RESTART IDENTITY CASCADE)`);
+}
+
+/**
+ * Warn about legacy job_status values that are not in the PG enum.
+ * Unknown values are coerced to `error` during transform so cutover can proceed.
+ */
+async function preflightJobStatuses(turso: Client): Promise<void> {
+  const checks: Array<{ table: string; column: string }> = [
+    { table: "jobs", column: "last_status" },
+    { table: "job_runs", column: "status" },
+  ];
+
+  for (const { table, column } of checks) {
+    let rs;
+    try {
+      rs = await turso.execute(
+        `SELECT DISTINCT "${column}" AS v FROM "${table}" WHERE "${column}" IS NOT NULL`,
+      );
+    } catch (err) {
+      console.warn(`job_status preflight skipped for ${table}.${column}: ${String(err)}`);
+      continue;
+    }
+
+    const unknown = new Map<string, number>();
+    for (const row of rs.rows) {
+      const raw = row.v;
+      if (raw == null) continue;
+      const v = String(raw);
+      if (!JOB_STATUS_VALUES.has(v)) {
+        unknown.set(v, (unknown.get(v) ?? 0) + 1);
+      }
+    }
+
+    if (unknown.size === 0) {
+      console.log(`job_status preflight ${table}.${column}: all values ok`);
+      continue;
+    }
+
+    const report = [...unknown.entries()]
+      .map(([v]) => JSON.stringify(v))
+      .sort()
+      .join(", ");
+    console.warn(
+      `⚠ job_status preflight ${table}.${column}: unknown values [${report}] will be coerced to ${JOB_STATUS_FALLBACK}`,
+    );
+  }
 }
 
 async function copyTable(
@@ -806,6 +870,8 @@ async function main(): Promise<void> {
     if (truncate) {
       await truncateAll(pool);
     }
+
+    await preflightJobStatuses(turso);
 
     console.log("");
     console.log(

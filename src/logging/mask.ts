@@ -8,6 +8,8 @@ export const MASK_KEYS = [
   "cookie",
   "WARERA_API_KEY",
   "DATABASE_URL",
+  "databaseUrl",
+  "connectionString",
   "DISCORD_WEBHOOK_URL",
   "SENTRY_DSN",
   "dsn",
