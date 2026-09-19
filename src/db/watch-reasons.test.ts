@@ -1,12 +1,7 @@
-import { createClient } from "@libsql/client";
-import { drizzle } from "drizzle-orm/libsql";
 import { eq } from "drizzle-orm";
-import { mkdtempSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { beforeEach, describe, expect, it } from "vite-plus/test";
+import { beforeAll, beforeEach, describe, expect, it } from "vite-plus/test";
 import type { Db } from "./client";
-import * as schema from "./schema";
+import { createTestDb, truncateAllTables } from "./test/postgres";
 import { countryWatchReasons, muWatchReasons, playerWatchReasons } from "./schema";
 import {
   MANUAL_SOURCE_ID,
@@ -27,42 +22,6 @@ import {
   listMuWatchReasons,
   reconcileFollowPlayerMu,
 } from "./watch-reasons";
-
-async function createDb(): Promise<Db> {
-  const dir = mkdtempSync(join(tmpdir(), "watch-reasons-"));
-  const client = createClient({ url: `file:${join(dir, "test.db")}` });
-  await client.execute(`
-    CREATE TABLE player_watch_reasons (
-      player_id TEXT NOT NULL,
-      reason TEXT NOT NULL,
-      source_id TEXT NOT NULL,
-      last_touched_at INTEGER NOT NULL,
-      created_at INTEGER NOT NULL,
-      PRIMARY KEY (player_id, reason, source_id)
-    )
-  `);
-  await client.execute(`
-    CREATE TABLE mu_watch_reasons (
-      mu_id TEXT NOT NULL,
-      reason TEXT NOT NULL,
-      source_id TEXT NOT NULL,
-      last_touched_at INTEGER NOT NULL,
-      created_at INTEGER NOT NULL,
-      PRIMARY KEY (mu_id, reason, source_id)
-    )
-  `);
-  await client.execute(`
-    CREATE TABLE country_watch_reasons (
-      country_id TEXT NOT NULL,
-      reason TEXT NOT NULL,
-      source_id TEXT NOT NULL,
-      last_touched_at INTEGER NOT NULL,
-      created_at INTEGER NOT NULL,
-      PRIMARY KEY (country_id, reason, source_id)
-    )
-  `);
-  return drizzle(client, { schema });
-}
 
 async function countPlayerRows(db: Db): Promise<number> {
   const rows = await db.select({ id: playerWatchReasons.playerId }).from(playerWatchReasons);
@@ -88,8 +47,13 @@ async function muRowsForMu(db: Db, muId: string) {
 
 describe("watch-reasons db", () => {
   let db: Db;
+
+  beforeAll(async () => {
+    ({ db } = await createTestDb());
+  });
+
   beforeEach(async () => {
-    db = await createDb();
+    await truncateAllTables(db);
   });
 
   it("lists distinct followed player ids sorted by id", async () => {

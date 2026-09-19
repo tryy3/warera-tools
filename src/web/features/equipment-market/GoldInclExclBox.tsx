@@ -1,16 +1,18 @@
 import { formatDisplayNumber } from "@/lib/formatDisplayNumber";
+import { moneyToNumber } from "@/money/decimal";
 import { GoldIcon } from "../../components/GoldIcon";
 
 export const EQUIPMENT_GOLD_DIGITS = 3;
 
-function GoldLine({ value }: { value: number | null | undefined }) {
-  if (value == null || !Number.isFinite(value)) {
+function GoldLine({ value }: { value: string | number | null | undefined }) {
+  const n = moneyToNumber(value);
+  if (n == null) {
     return <span className="text-muted-foreground">—</span>;
   }
   return (
     <span className="inline-flex items-center gap-1 font-mono">
       <GoldIcon />
-      {formatDisplayNumber(value, EQUIPMENT_GOLD_DIGITS)}
+      {formatDisplayNumber(n, EQUIPMENT_GOLD_DIGITS)}
     </span>
   );
 }
@@ -21,8 +23,8 @@ export function GoldInclExclBox({
   excl,
 }: {
   label: string;
-  incl: number | null | undefined;
-  excl: number | null | undefined;
+  incl: string | number | null | undefined;
+  excl: string | number | null | undefined;
 }) {
   return (
     <div className="rounded-md border border-border/60 bg-background/40 px-3 py-2">

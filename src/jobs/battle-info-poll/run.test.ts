@@ -1,11 +1,7 @@
-import { createClient } from "@libsql/client";
 import { eq } from "drizzle-orm";
-import { drizzle } from "drizzle-orm/libsql";
-import { mkdtempSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { beforeEach, describe, expect, it, vi } from "vite-plus/test";
+import { beforeAll, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 import type { Db } from "../../db/client";
+import { createTestDb, truncateAllTables } from "../../db/test/postgres";
 import {
   MANUAL_SOURCE_ID,
   WATCH_REASON_MANUAL,
@@ -14,125 +10,6 @@ import {
 } from "../../db/watch-reasons";
 import * as schema from "../../db/schema";
 import { runBattleInfoPoll } from "./run";
-
-async function createDb(): Promise<Db> {
-  const dir = mkdtempSync(join(tmpdir(), "battle-info-poll-"));
-  const client = createClient({ url: `file:${join(dir, "test.db")}` });
-  await client.execute(`
-    CREATE TABLE mus (
-      id TEXT PRIMARY KEY NOT NULL,
-      name TEXT,
-      avatar_url TEXT,
-      country_id TEXT,
-      region_id TEXT,
-      owner_user_id TEXT,
-      mercenary_reputation REAL,
-      level INTEGER,
-      created_at_game INTEGER,
-      roles TEXT,
-      active_upgrade_levels TEXT,
-      payload TEXT,
-      enqueued_at INTEGER NOT NULL,
-      fetched_at INTEGER
-    )
-  `);
-  await client.execute(`
-    CREATE TABLE mu_members (
-      mu_id TEXT NOT NULL REFERENCES mus(id),
-      user_id TEXT NOT NULL,
-      role TEXT,
-      updated_at INTEGER NOT NULL,
-      PRIMARY KEY (mu_id, user_id)
-    )
-  `);
-  await client.execute(`
-    CREATE TABLE mu_watch_reasons (
-      mu_id TEXT NOT NULL,
-      reason TEXT NOT NULL,
-      source_id TEXT NOT NULL,
-      last_touched_at INTEGER NOT NULL,
-      created_at INTEGER NOT NULL,
-      PRIMARY KEY (mu_id, reason, source_id)
-    )
-  `);
-  await client.execute(`
-    CREATE TABLE battles (
-      id TEXT PRIMARY KEY NOT NULL,
-      war_id TEXT,
-      type TEXT,
-      is_active INTEGER NOT NULL DEFAULT 1,
-      attacker_country_id TEXT,
-      defender_country_id TEXT,
-      attacker_region_id TEXT,
-      defender_region_id TEXT,
-      rounds_to_win INTEGER,
-      current_round_id TEXT,
-      current_round_number INTEGER,
-      attacker_won_rounds INTEGER,
-      defender_won_rounds INTEGER,
-      attacker_mu_orders TEXT,
-      defender_mu_orders TEXT,
-      sticky_mu_ids TEXT,
-      rounds_history TEXT,
-      started_at_game INTEGER,
-      ended_at INTEGER,
-      finalized_at INTEGER,
-      fetched_at INTEGER,
-      payload TEXT
-    )
-  `);
-  await client.execute(`
-    CREATE TABLE battle_polls (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      recorded_at INTEGER NOT NULL,
-      status TEXT NOT NULL,
-      error TEXT,
-      active_battle_pages INTEGER,
-      battle_count INTEGER NOT NULL DEFAULT 0,
-      loot_snapshot_count INTEGER NOT NULL DEFAULT 0,
-      finalized_count INTEGER NOT NULL DEFAULT 0
-    )
-  `);
-  await client.execute(`
-    CREATE TABLE battle_scoreboard_snapshots (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      poll_id INTEGER NOT NULL REFERENCES battle_polls(id),
-      battle_id TEXT NOT NULL,
-      round_id TEXT,
-      round_number INTEGER,
-      round_is_active INTEGER,
-      attacker_points REAL,
-      defender_points REAL,
-      attacker_damages REAL,
-      defender_damages REAL,
-      attacker_hit_count INTEGER,
-      defender_hit_count INTEGER,
-      ticks_count INTEGER,
-      next_tick_at INTEGER,
-      round_started_at_game INTEGER,
-      recorded_at INTEGER NOT NULL
-    )
-  `);
-  await client.execute(`
-    CREATE TABLE battle_loot_snapshots (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      poll_id INTEGER NOT NULL REFERENCES battle_polls(id),
-      battle_id TEXT NOT NULL,
-      user_id TEXT NOT NULL,
-      mu_id TEXT NOT NULL,
-      total_dmg REAL,
-      hits INTEGER,
-      total_money_from_bounty REAL,
-      total_money_from_contract REAL,
-      case1_count INTEGER,
-      case2_count INTEGER,
-      pool_loot TEXT,
-      payload TEXT,
-      recorded_at INTEGER NOT NULL
-    )
-  `);
-  return drizzle(client, { schema });
-}
 
 const REASON_AT = new Date("2026-09-01T00:00:00.000Z");
 
@@ -267,8 +144,13 @@ function makeLogger() {
 
 describe("runBattleInfoPoll", () => {
   let db: Db;
+
+  beforeAll(async () => {
+    ({ db } = await createTestDb());
+  });
+
   beforeEach(async () => {
-    db = await createDb();
+    await truncateAllTables(db);
   });
 
   it("happy path: upserts watched battle, writes scoreboard + loot, status success", async () => {

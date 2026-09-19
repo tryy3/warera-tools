@@ -1,8 +1,8 @@
 import { and, desc, eq, gt, notExists, or } from "drizzle-orm";
-import { alias } from "drizzle-orm/sqlite-core";
+import { alias } from "drizzle-orm/pg-core";
 import type { ParsedFightState } from "../warera/fight-state";
 import type { Db } from "./client";
-import { muMembers, userFightPolls, userFightSnapshots } from "./schema";
+import { muMembers, userFightPolls, userFightSnapshots, type PricePollStatus } from "./schema";
 
 export type UserFightSnapshotRow = ParsedFightState & {
   muId: string;
@@ -62,7 +62,7 @@ export async function insertUserFightPoll(
   db: Db,
   values: {
     recordedAt: Date;
-    status: string;
+    status: PricePollStatus;
     error?: string | null;
     userCount: number;
     muCount: number;

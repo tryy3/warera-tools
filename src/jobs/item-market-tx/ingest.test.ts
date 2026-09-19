@@ -1,13 +1,8 @@
-import { createClient } from "@libsql/client";
-import { drizzle } from "drizzle-orm/libsql";
-import { mkdtempSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { beforeEach, describe, expect, it, vi } from "vite-plus/test";
+import { beforeAll, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 import type { Db } from "../../db/client";
+import { createTestDb, truncateAllTables } from "../../db/test/postgres";
 import { insertItemMarketTransactionsIgnoreConflicts } from "../../db/item-market-transactions";
 import * as itemMarketTransactions from "../../db/item-market-transactions";
-import * as schema from "../../db/schema";
 import type { Logger } from "../../logging/logger";
 import type { ItemMarketTransaction, ItemMarketTransactionsPage } from "../../warera/transactions";
 import { isItemMarketTxPollEnabled, resetItemMarketTxHandoffForTests } from "./handoff";
@@ -23,35 +18,6 @@ const silentLogger = {
   fatal: () => {},
   child: () => silentLogger,
 } as unknown as Logger;
-
-async function createDb(): Promise<Db> {
-  const dir = mkdtempSync(join(tmpdir(), "item-market-ingest-"));
-  const client = createClient({ url: `file:${join(dir, "test.db")}` });
-  await client.execute(`
-    CREATE TABLE item_market_transactions (
-      id text PRIMARY KEY NOT NULL,
-      money real NOT NULL,
-      item_code text NOT NULL,
-      quantity integer NOT NULL,
-      seller_id text NOT NULL,
-      buyer_id text NOT NULL,
-      transaction_type text NOT NULL,
-      item_id text NOT NULL,
-      item_type text,
-      item_state integer,
-      item_max_state integer,
-      item_quantity integer,
-      item_last_acquisition_at integer,
-      skills text,
-      offer_created_at integer,
-      created_at integer NOT NULL,
-      updated_at integer,
-      payload text,
-      ingested_at integer NOT NULL
-    )
-  `);
-  return drizzle(client, { schema });
-}
 
 function makeTx(overrides: Partial<ItemMarketTransaction> = {}): ItemMarketTransaction {
   return {
@@ -80,9 +46,13 @@ function makeTx(overrides: Partial<ItemMarketTransaction> = {}): ItemMarketTrans
 describe("walkItemMarketTransactions", () => {
   let db: Db;
 
+  beforeAll(async () => {
+    ({ db } = await createTestDb());
+  });
+
   beforeEach(async () => {
     resetItemMarketTxHandoffForTests();
-    db = await createDb();
+    await truncateAllTables(db);
   });
 
   it("backfill enables handoff after first successful page even if later stop", async () => {

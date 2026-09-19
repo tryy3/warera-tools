@@ -44,7 +44,7 @@ Docs are local at `node_modules/vite-plus/docs` or online at https://viteplus.de
 
 ## Architecture
 
-Single package, one Node process: Hono API + static SPA + in-process Croner jobs. Turso (libSQL) + Drizzle. No auth yet (Tailscale / localhost); plan BetterAuth when adding auth. Production: Docker (`Dockerfile` + `docker-compose.example.yml`) — see README Deploy.
+Single package, one Node process: Hono API + static SPA + in-process Croner jobs. Postgres (Pigsty) via pg Pool + Drizzle. No auth yet (Tailscale / localhost); plan BetterAuth when adding auth. Production: Docker (`Dockerfile` + `docker-compose.example.yml`) — see README Deploy.
 
 | Area | Location |
 | --- | --- |

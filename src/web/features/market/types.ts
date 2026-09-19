@@ -6,21 +6,21 @@ export type LatestPricesResponse = {
   status: string;
   items: Array<{
     itemCode: string;
-    marketPrice: number | null;
-    buyMin: number | null;
-    buyMax: number | null;
-    buyAvg: number | null;
-    sellMin: number | null;
-    sellMax: number | null;
-    sellAvg: number | null;
+    marketPrice: string | null;
+    buyMin: string | null;
+    buyMax: string | null;
+    buyAvg: string | null;
+    sellMin: string | null;
+    sellMax: string | null;
+    sellAvg: string | null;
   }>;
 };
 
 export type PriceHistoryPointDto = {
   recordedAt: string;
-  marketPrice: number | null;
-  topBuy: number | null;
-  topSell: number | null;
+  marketPrice: string | null;
+  topBuy: string | null;
+  topSell: string | null;
 };
 
 export type PriceChangeDto = { absolute: number; percent: number };
@@ -38,9 +38,9 @@ export type LatestPriceItem = LatestPricesResponse["items"][number];
 
 export type MyTradesChunkDto = {
   side: "buy" | "sell";
-  unitPrice: number;
+  unitPrice: string;
   totalQty: number;
-  totalMoney: number;
+  totalMoney: string;
   startAt: string;
   endAt: string;
   fillCount: number;
@@ -51,7 +51,7 @@ export type MyTradesResponse = {
   playerId: string;
   range: PriceHistoryRange;
   chunks: MyTradesChunkDto[];
-  realized: { pnl: number | null; sellQty: number; buyQty: number };
+  realized: { pnl: string | null; sellQty: number; buyQty: number };
   historyIncomplete: boolean;
   fillCount: number;
 };

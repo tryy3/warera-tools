@@ -1,6 +1,6 @@
 import { desc, eq, inArray } from "drizzle-orm";
 import type { Db } from "./client";
-import { muMembers, userProfilePolls, userProfileSnapshots } from "./schema";
+import { muMembers, userProfilePolls, userProfileSnapshots, type PricePollStatus } from "./schema";
 import { listDistinctWatchedMuIds } from "./watch-reasons";
 
 export const USER_PROFILE_JOB_MAX_AGE_MS = 10 * 60 * 1000;
@@ -102,7 +102,7 @@ export async function insertUserProfilePoll(
   db: Db,
   values: {
     recordedAt: Date;
-    status: string;
+    status: PricePollStatus;
     error?: string | null;
     userCount: number;
     muCount: number;

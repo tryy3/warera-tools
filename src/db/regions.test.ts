@@ -1,11 +1,6 @@
-import { createClient } from "@libsql/client";
-import { drizzle } from "drizzle-orm/libsql";
-import { mkdtempSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { beforeEach, describe, expect, it } from "vite-plus/test";
+import { beforeAll, beforeEach, describe, expect, it } from "vite-plus/test";
 import type { Db } from "./client";
-import * as schema from "./schema";
+import { createTestDb, truncateAllTables } from "./test/postgres";
 import {
   enqueueRegion,
   getRegion,
@@ -17,26 +12,15 @@ import {
   upsertRegionsFetched,
 } from "./regions";
 
-async function createDb(): Promise<Db> {
-  const dir = mkdtempSync(join(tmpdir(), "regions-"));
-  const client = createClient({ url: `file:${join(dir, "test.db")}` });
-  await client.execute(`
-    CREATE TABLE regions (
-      id TEXT PRIMARY KEY NOT NULL,
-      name TEXT,
-      country_code TEXT,
-      payload TEXT,
-      fetched_at INTEGER,
-      enqueued_at INTEGER NOT NULL
-    )
-  `);
-  return drizzle(client, { schema });
-}
-
 describe("regions db", () => {
   let db: Db;
+
+  beforeAll(async () => {
+    ({ db } = await createTestDb());
+  });
+
   beforeEach(async () => {
-    db = await createDb();
+    await truncateAllTables(db);
   });
 
   it("enqueues once and is idempotent", async () => {

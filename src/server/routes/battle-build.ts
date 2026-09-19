@@ -6,6 +6,7 @@ import type { Db } from "../../db/client";
 import { listItemMarketTxForItemCodes } from "../../db/item-market-tx-read";
 import { parseSkillNumbers } from "../../equipment/skills";
 import type { Logger } from "../../logging/logger";
+import { serializeMoney } from "../../money/decimal";
 import { fetchCurrentEquipment, parseInventoryEquipment } from "../../warera/inventory";
 import type { WareraRequester } from "../../warera/prices";
 import { HttpError } from "../errors";
@@ -105,8 +106,12 @@ export function battleBuildRoutes(deps: BattleBuildRouteDeps) {
     }
 
     const quotedAt = new Date();
+    const results = quoteBatch(items, txsByCode, quotedAt.getTime());
     return c.json({
-      results: quoteBatch(items, txsByCode, quotedAt.getTime()),
+      results: results.map((r) => ({
+        ...r,
+        median: serializeMoney(r.median),
+      })),
       quotedAt: quotedAt.toISOString(),
     });
   });

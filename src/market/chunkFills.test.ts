@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vite-plus/test";
+import { Decimal, moneyEquals } from "../money/decimal";
 import { chunkFills, type PlayerFill } from "./chunkFills";
 
 function fill(
@@ -18,9 +19,9 @@ describe("chunkFills", () => {
     ]);
     expect(chunks).toHaveLength(1);
     expect(chunks[0]!.totalQty).toBe(1500);
-    expect(chunks[0]!.totalMoney).toBe(60);
+    expect(moneyEquals(chunks[0]!.totalMoney, new Decimal(60))).toBe(true);
     expect(chunks[0]!.fillCount).toBe(2);
-    expect(chunks[0]!.unitPrice).toBeCloseTo(60 / 1500, 10);
+    expect(moneyEquals(chunks[0]!.unitPrice, new Decimal(60).div(1500))).toBe(true);
   });
 
   it("splits when gap > 1h", () => {
@@ -93,9 +94,9 @@ describe("chunkFills", () => {
     expect(buyChunk).toBeDefined();
     expect(sellChunk).toBeDefined();
     expect(buyChunk!.totalQty).toBe(1500);
-    expect(buyChunk!.totalMoney).toBe(60);
+    expect(moneyEquals(buyChunk!.totalMoney, new Decimal(60))).toBe(true);
     expect(buyChunk!.fillCount).toBe(2);
-    expect(buyChunk!.unitPrice).toBeCloseTo(price, 10);
+    expect(moneyEquals(buyChunk!.unitPrice, new Decimal(price))).toBe(true);
     expect(sellChunk!.totalQty).toBe(1000);
     expect(sellChunk!.fillCount).toBe(1);
   });

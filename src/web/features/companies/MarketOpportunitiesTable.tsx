@@ -20,8 +20,10 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { formatDisplayNumber } from "@/lib/formatDisplayNumber";
+import { moneyToNumber } from "@/money/decimal";
 import { GoldIcon } from "../../components/GoldIcon";
 import { ItemIcon } from "../../components/ItemIcon";
+import { formatMoneyDisplay } from "../../lib/formatMoneyDisplay";
 import { OpportunityItemModal } from "./OpportunityItemModal";
 import { nullsLastSortingFn } from "./nullsLastSortingFn";
 import { useItemPriceBoard } from "./sessionPrices/item-price-board-context";
@@ -40,21 +42,27 @@ function formatItem(code: string): string {
   return code.replace(/([A-Z])/g, " $1").replace(/^./, (c) => c.toUpperCase());
 }
 
-function formatNum(value: number | null | undefined, digits = 4): string {
-  if (value == null || !Number.isFinite(value)) return "—";
-  return formatDisplayNumber(value, digits);
+function formatNum(value: string | number | null | undefined, digits = 4): string {
+  return formatMoneyDisplay(value, digits);
 }
 
-function toSortableNumber(value: number | null | undefined): number | undefined {
-  return value != null && Number.isFinite(value) ? value : undefined;
+function toSortableNumber(value: string | number | null | undefined): number | undefined {
+  return moneyToNumber(value) ?? undefined;
 }
 
-function GoldAmount({ value, digits = 4 }: { value: number | null | undefined; digits?: number }) {
-  if (value == null || !Number.isFinite(value)) return "—";
+function GoldAmount({
+  value,
+  digits = 4,
+}: {
+  value: string | number | null | undefined;
+  digits?: number;
+}) {
+  const n = moneyToNumber(value);
+  if (n == null) return "—";
   return (
     <span className="inline-flex items-center gap-1.5">
       <GoldIcon />
-      {formatDisplayNumber(value, digits)}
+      {formatDisplayNumber(n, digits)}
     </span>
   );
 }
@@ -71,15 +79,13 @@ function PriceCell({
   dirty,
   tone,
 }: {
-  value: number | null | undefined;
-  live: number | null | undefined;
+  value: string | number | null | undefined;
+  live: string | number | null | undefined;
   dirty: boolean;
   tone: "buy" | "sell";
 }) {
-  const title =
-    dirty && live != null && Number.isFinite(live)
-      ? `Live: ${formatDisplayNumber(live, 4)} G`
-      : undefined;
+  const liveN = moneyToNumber(live);
+  const title = dirty && liveN != null ? `Live: ${formatDisplayNumber(liveN, 4)} G` : undefined;
   const color = dirty ? "text-amber-200" : tone === "buy" ? "text-success" : "text-destructive";
   return (
     <span className={`font-mono ${color}`} title={title}>

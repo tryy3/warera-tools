@@ -12,17 +12,35 @@ import type { CompanySimState, SimWorker } from "./types";
 
 const OWNER = { entrepreneurshipLevel: 4, productionSkillLevel: 6 };
 
+function moneyWire(value: string | number | null | undefined, fallback: string): string {
+  if (value == null) return fallback;
+  return typeof value === "number" ? String(value) : value;
+}
+
 function profitBreakdown(
-  partial: Partial<ProfitPpBreakdown> & Pick<ProfitPpBreakdown, "itemCode">,
+  partial: Partial<
+    Omit<
+      ProfitPpBreakdown,
+      "marketPrice" | "buyPrice" | "sellPrice" | "inputCost" | "unitProfit" | "profitPerPp"
+    >
+  > &
+    Pick<ProfitPpBreakdown, "itemCode"> & {
+      marketPrice?: string | number;
+      buyPrice?: string | number | null;
+      sellPrice?: string | number;
+      inputCost?: string | number;
+      unitProfit?: string | number;
+      profitPerPp?: string | number | null;
+    },
 ): ProfitPpBreakdown {
   return {
-    marketPrice: partial.marketPrice ?? 2,
-    buyPrice: partial.buyPrice ?? 1.9,
-    sellPrice: partial.sellPrice ?? partial.marketPrice ?? 2,
-    inputCost: partial.inputCost ?? 0.8,
-    unitProfit: partial.unitProfit ?? 1.2,
+    marketPrice: moneyWire(partial.marketPrice, "2"),
+    buyPrice: partial.buyPrice === null ? null : moneyWire(partial.buyPrice, "1.9"),
+    sellPrice: moneyWire(partial.sellPrice ?? partial.marketPrice, "2"),
+    inputCost: moneyWire(partial.inputCost, "0.8"),
+    unitProfit: moneyWire(partial.unitProfit, "1.2"),
     consumedPp: partial.consumedPp ?? 10,
-    profitPerPp: partial.profitPerPp ?? 0.12,
+    profitPerPp: partial.profitPerPp === null ? null : moneyWire(partial.profitPerPp, "0.12"),
     missingInputs: partial.missingInputs ?? [],
     formula: partial.formula ?? "test",
     itemCode: partial.itemCode,
@@ -30,8 +48,14 @@ function profitBreakdown(
 }
 
 function row(
-  partial: Omit<Partial<CompanyAdvisorRow>, "company"> & {
+  partial: Omit<
+    Partial<CompanyAdvisorRow>,
+    "company" | "currentProfitPerPp" | "currentDailyValue" | "profitBreakdown"
+  > & {
     company: Partial<CompanyAdvisorRow["company"]> & Pick<CompanyAdvisorRow["company"], "id">;
+    currentProfitPerPp?: string | number | null;
+    currentDailyValue?: string | number | null;
+    profitBreakdown?: ReturnType<typeof profitBreakdown> | null;
   },
 ): CompanyAdvisorRow {
   const { company: c, ...rest } = partial;
@@ -49,8 +73,9 @@ function row(
     bonusDetails: rest.bonusDetails ?? null,
     profitBreakdown: rest.profitBreakdown ?? profitBreakdown({ itemCode: c.itemCode ?? "bread" }),
     aeBreakdown: rest.aeBreakdown ?? null,
-    currentProfitPerPp: rest.currentProfitPerPp ?? 0.12,
-    currentDailyValue: rest.currentDailyValue ?? null,
+    currentProfitPerPp: moneyWire(rest.currentProfitPerPp, "0.12"),
+    currentDailyValue:
+      rest.currentDailyValue == null ? null : moneyWire(rest.currentDailyValue, "0"),
     bestSwitch: rest.bestSwitch ?? null,
     workers: rest.workers ?? [],
     workersStatus: rest.workersStatus ?? "ok",

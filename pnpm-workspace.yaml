@@ -1,5 +1,9 @@
 allowBuilds:
+  # Optional native addons pulled in by testcontainers; JS fallbacks work for Podman/Docker local tests.
+  cpu-features: false
   esbuild: true
+  protobufjs: false
+  ssh2: false
 catalog:
   vite: npm:@voidzero-dev/vite-plus-core@0.3.0
   vite-plus: 0.3.0

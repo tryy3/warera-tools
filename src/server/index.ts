@@ -18,7 +18,7 @@ import { createApp } from "./app";
 async function main(): Promise<void> {
   const config = loadConfig();
   const logger = createLogger(config);
-  const { db, client } = createDb(config, logger);
+  const { db, pool } = createDb(config, logger);
 
   await migrateDb(db);
   await seedDefaultCountries(db);
@@ -54,13 +54,11 @@ async function main(): Promise<void> {
         console.error("shutdown flush failed", err);
       }
       server.close(() => {
-        client.close();
-        process.exit(0);
+        void pool.end().finally(() => process.exit(0));
       });
     })();
     setTimeout(() => {
-      client.close();
-      process.exit(0);
+      void pool.end().finally(() => process.exit(0));
     }, 5_000).unref();
   };
 

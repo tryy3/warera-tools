@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { equipmentTierShortLabel, formatEquipmentItem } from "@/equipment/catalog";
 import type { SkillBand } from "@/equipment/skills";
 import { formatDisplayNumber } from "@/lib/formatDisplayNumber";
+import { moneyToNumber } from "@/money/decimal";
 import { ApiError, api } from "../../api";
 import { GearItemIcon } from "../../components/GearItemIcon";
 import { GoldIcon } from "../../components/GoldIcon";
@@ -24,14 +25,15 @@ function pickDefaultCountryId(countries: Country[]): string {
   return countries.find((c) => c.isoCode === "SE")?.id ?? countries[0]?.id ?? "";
 }
 
-function GoldAmount({ value }: { value: number | null | undefined }) {
-  if (value == null || !Number.isFinite(value)) {
+function GoldAmount({ value }: { value: string | number | null | undefined }) {
+  const n = moneyToNumber(value);
+  if (n == null) {
     return <span className="text-muted-foreground">—</span>;
   }
   return (
     <span className="inline-flex items-center gap-1 font-mono">
       <GoldIcon />
-      {formatDisplayNumber(value, EQUIPMENT_GOLD_DIGITS)}
+      {formatDisplayNumber(n, EQUIPMENT_GOLD_DIGITS)}
     </span>
   );
 }
@@ -54,12 +56,15 @@ function detailUrl(itemCode: string, bands: SkillBand[] | null, countryId: strin
 }
 
 function marketVsRecommend(
-  marketMedian: number | null,
+  marketMedian: string | number | null,
   recommend: DetailResponse["recommend"],
 ): string | null {
-  if (marketMedian == null || recommend == null) return null;
-  const vsAttractive = marketMedian - recommend.attractiveIncl;
-  const vsBreakEven = marketMedian - recommend.breakEvenIncl;
+  const median = moneyToNumber(marketMedian);
+  const attractive = moneyToNumber(recommend?.attractiveIncl);
+  const breakEven = moneyToNumber(recommend?.breakEvenIncl);
+  if (median == null || attractive == null || breakEven == null) return null;
+  const vsAttractive = median - attractive;
+  const vsBreakEven = median - breakEven;
   if (Math.abs(vsAttractive) < 1e-9) return "Market equals attractive list";
   if (vsAttractive > 0) {
     return `Market ${formatDisplayNumber(vsAttractive, EQUIPMENT_GOLD_DIGITS)} above attractive`;

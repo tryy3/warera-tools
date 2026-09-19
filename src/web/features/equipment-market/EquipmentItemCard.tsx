@@ -2,42 +2,46 @@ import { Link } from "@tanstack/react-router";
 import type { GearTierId } from "@/calculator";
 import { formatEquipmentItem } from "@/equipment/catalog";
 import { formatDisplayNumber } from "@/lib/formatDisplayNumber";
+import { moneyToNumber } from "@/money/decimal";
 import { GearItemIcon } from "../../components/GearItemIcon";
 import { GoldIcon } from "../../components/GoldIcon";
 
-function formatSpread(spread: number | null | undefined): string {
-  if (spread == null || !Number.isFinite(spread)) return "—";
-  const abs = formatDisplayNumber(Math.abs(spread));
-  if (spread > 0) return `+${abs}`;
-  if (spread < 0) return `-${abs}`;
+function formatSpread(spread: string | number | null | undefined): string {
+  const n = moneyToNumber(spread);
+  if (n == null) return "—";
+  const abs = formatDisplayNumber(Math.abs(n));
+  if (n > 0) return `+${abs}`;
+  if (n < 0) return `-${abs}`;
   return abs;
 }
 
-function GoldValue({ value }: { value: number | null | undefined }) {
-  if (value == null || !Number.isFinite(value)) {
+function GoldValue({ value }: { value: string | number | null | undefined }) {
+  const n = moneyToNumber(value);
+  if (n == null) {
     return <span className="text-muted-foreground">—</span>;
   }
   return (
     <span className="inline-flex items-center gap-1 font-mono">
       <GoldIcon />
-      {formatDisplayNumber(value)}
+      {formatDisplayNumber(n)}
     </span>
   );
 }
 
-function spreadClass(spread: number | null): string {
-  if (spread == null || !Number.isFinite(spread)) return "text-muted-foreground";
-  if (spread >= 10) return "font-mono text-success";
-  if (spread < 3) return "font-mono text-destructive";
+function spreadClass(spread: string | number | null): string {
+  const n = moneyToNumber(spread);
+  if (n == null) return "text-muted-foreground";
+  if (n >= 10) return "font-mono text-success";
+  if (n < 3) return "font-mono text-destructive";
   return "font-mono";
 }
 
 type Props = {
   itemCode: string;
   tier: GearTierId | null;
-  marketMedian: number | null;
+  marketMedian: string | number | null;
   sellerNet: number | null;
-  spread: number | null;
+  spread: string | number | null;
   trades: number;
   tradesLabel: string;
 };

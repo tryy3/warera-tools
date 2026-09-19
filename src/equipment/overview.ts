@@ -1,34 +1,36 @@
 import type { GearTierId } from "../calculator";
 import { scrapAmountForTier } from "../calculator";
-import type { ItemMarketTxRow } from "../db/item-market-tx-read";
+import { txMoney, type ItemMarketTxRow } from "../db/item-market-tx-read";
+import { isFiniteMoney, parseMoney, type Decimal } from "../money/decimal";
 import { tierFromItemCode } from "./catalog";
 import { median } from "./median";
 
 export type OverviewItemRow = {
   itemCode: string;
   tier: GearTierId | null;
-  marketMedian: number | null;
-  scrapFloor: number | null;
-  spread: number | null;
+  marketMedian: Decimal | null;
+  scrapFloor: Decimal | null;
+  spread: Decimal | null;
   trades: number;
 };
 
 export type OverviewResult = {
   windowMs: number;
-  scrapPrice: number | null;
+  scrapPrice: Decimal | null;
   scrapedAt: string | null;
   items: OverviewItemRow[];
 };
 
 export function buildEquipmentOverview(
   txs: ItemMarketTxRow[],
-  scrapPrice: number | null,
+  scrapPrice: Decimal | number | null,
 ): OverviewResult["items"] {
-  const byCode = new Map<string, number[]>();
+  const scrap = parseMoney(scrapPrice);
+  const byCode = new Map<string, Decimal[]>();
   for (const tx of txs) {
     const list = byCode.get(tx.itemCode);
-    if (list) list.push(tx.money);
-    else byCode.set(tx.itemCode, [tx.money]);
+    if (list) list.push(txMoney(tx));
+    else byCode.set(tx.itemCode, [txMoney(tx)]);
   }
 
   const items: OverviewItemRow[] = [];
@@ -36,8 +38,9 @@ export function buildEquipmentOverview(
     const tier = tierFromItemCode(itemCode);
     const marketMedian = median(moneys);
     const scrapFloor =
-      tier != null && scrapPrice != null ? scrapAmountForTier(tier) * scrapPrice : null;
-    const spread = marketMedian != null && scrapFloor != null ? marketMedian - scrapFloor : null;
+      tier != null && isFiniteMoney(scrap) ? scrap.times(scrapAmountForTier(tier)) : null;
+    const spread =
+      marketMedian != null && scrapFloor != null ? marketMedian.minus(scrapFloor) : null;
     items.push({
       itemCode,
       tier,

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vite-plus/test";
-import { runCostBook, sumRealizedPnl } from "./costBook";
+import { d } from "../money/test-helpers";
 import type { PlayerFill } from "./chunkFills";
+import { runCostBook, sumRealizedPnl } from "./costBook";
 
 describe("runCostBook", () => {
   it("realizes FIFO PnL on sell", () => {
@@ -23,9 +24,11 @@ describe("runCostBook", () => {
     const result = runCostBook(fills);
     expect(result.historyIncomplete).toBe(false);
     expect(result.realized).toHaveLength(1);
-    expect(result.realized[0]!.cost).toBe(50); // 50 * 1.0
-    expect(result.realized[0]!.pnl).toBe(10);
-    expect(result.openLots).toEqual([{ qty: 50, unitPrice: 1 }]);
+    expect(result.realized[0]!.cost.toNumber()).toBe(50); // 50 * 1.0
+    expect(result.realized[0]!.pnl.toNumber()).toBe(10);
+    expect(result.openLots).toHaveLength(1);
+    expect(result.openLots[0]!.qty).toBe(50);
+    expect(result.openLots[0]!.unitPrice.toNumber()).toBe(1);
   });
 
   it("flags incomplete when sell exceeds buys", () => {
@@ -50,21 +53,21 @@ describe("sumRealizedPnl", () => {
         {
           at: new Date("2026-09-01T12:00:00Z"),
           qty: 1,
-          proceeds: 2,
-          cost: 1,
-          pnl: 1,
+          proceeds: d(2),
+          cost: d(1),
+          pnl: d(1),
         },
         {
           at: new Date("2026-08-01T12:00:00Z"),
           qty: 1,
-          proceeds: 2,
-          cost: 1,
-          pnl: 1,
+          proceeds: d(2),
+          cost: d(1),
+          pnl: d(1),
         },
       ],
       new Date("2026-09-01T00:00:00Z"),
       new Date("2026-09-02T00:00:00Z"),
     );
-    expect(total).toBe(1);
+    expect(total.toNumber()).toBe(1);
   });
 });

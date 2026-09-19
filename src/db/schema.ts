@@ -1,42 +1,56 @@
-import { index, integer, primaryKey, real, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import {
+  boolean,
+  doublePrecision,
+  index,
+  integer,
+  jsonb,
+  pgEnum,
+  pgTable,
+  primaryKey,
+  serial,
+  text,
+  timestamp,
+} from "drizzle-orm/pg-core";
+import { moneyNumeric } from "./money-column";
 
 export const jobStatuses = ["success", "error", "running"] as const;
 export type JobStatus = (typeof jobStatuses)[number];
+export const jobStatusEnum = pgEnum("job_status", jobStatuses);
 
-export const jobs = sqliteTable("jobs", {
+export const jobs = pgTable("jobs", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),
   description: text("description").notNull().default(""),
-  enabled: integer("enabled", { mode: "boolean" }).notNull().default(true),
+  enabled: boolean("enabled").notNull().default(true),
   cron: text("cron").notNull(),
   maxRuns: integer("max_runs"),
-  lastStartedAt: integer("last_started_at", { mode: "timestamp_ms" }),
-  lastFinishedAt: integer("last_finished_at", { mode: "timestamp_ms" }),
-  lastStatus: text("last_status"),
+  lastStartedAt: timestamp("last_started_at", { withTimezone: true, mode: "date" }),
+  lastFinishedAt: timestamp("last_finished_at", { withTimezone: true, mode: "date" }),
+  lastStatus: jobStatusEnum("last_status"),
   lastError: text("last_error"),
-  state: text("state", { mode: "json" }).$type<Record<string, unknown> | null>(),
+  state: jsonb("state").$type<Record<string, unknown> | null>(),
 });
 
-export const jobRuns = sqliteTable(
+export const jobRuns = pgTable(
   "job_runs",
   {
-    id: integer("id").primaryKey({ autoIncrement: true }),
+    id: serial("id").primaryKey(),
     jobId: text("job_id")
       .notNull()
       .references(() => jobs.id),
-    startedAt: integer("started_at", { mode: "timestamp_ms" }).notNull(),
-    finishedAt: integer("finished_at", { mode: "timestamp_ms" }),
-    status: text("status").notNull(),
+    startedAt: timestamp("started_at", { withTimezone: true, mode: "date" }).notNull(),
+    finishedAt: timestamp("finished_at", { withTimezone: true, mode: "date" }),
+    status: jobStatusEnum("status").notNull(),
     message: text("message"),
     durationMs: integer("duration_ms"),
   },
   (t) => [index("job_runs_job_id_started_at_id_idx").on(t.jobId, t.startedAt, t.id)],
 );
 
-export const cache = sqliteTable("cache", {
+export const cache = pgTable("cache", {
   key: text("key").primaryKey(),
-  payload: text("payload", { mode: "json" }).notNull(),
-  fetchedAt: integer("fetched_at", { mode: "timestamp_ms" }).notNull(),
+  payload: jsonb("payload").notNull(),
+  fetchedAt: timestamp("fetched_at", { withTimezone: true, mode: "date" }).notNull(),
   ttlSeconds: integer("ttl_seconds").notNull(),
   tags: text("tags"),
 });
@@ -44,99 +58,98 @@ export const cache = sqliteTable("cache", {
 export const countrySources = ["warera", "manual"] as const;
 export type CountrySource = (typeof countrySources)[number];
 
-export const countries = sqliteTable("countries", {
+export const countries = pgTable("countries", {
   id: text("id").primaryKey(),
   name: text("name").notNull().unique(),
-  taxRate: real("tax_rate").notNull(),
+  taxRate: doublePrecision("tax_rate").notNull(),
   isoCode: text("iso_code"),
   source: text("source").notNull().default("manual"),
-  syncedAt: integer("synced_at", { mode: "timestamp_ms" }),
-  createdAt: integer("created_at", { mode: "timestamp_ms" })
+  syncedAt: timestamp("synced_at", { withTimezone: true, mode: "date" }),
+  createdAt: timestamp("created_at", { withTimezone: true, mode: "date" })
     .notNull()
     .$defaultFn(() => new Date()),
-  updatedAt: integer("updated_at", { mode: "timestamp_ms" })
+  updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" })
     .notNull()
     .$defaultFn(() => new Date()),
 });
 
 export const pricePollStatuses = ["success", "partial", "error"] as const;
 export type PricePollStatus = (typeof pricePollStatuses)[number];
+export const pollStatusEnum = pgEnum("poll_status", pricePollStatuses);
 
-export const pricePolls = sqliteTable(
+export const pricePolls = pgTable(
   "price_polls",
   {
-    id: integer("id").primaryKey({ autoIncrement: true }),
-    recordedAt: integer("recorded_at", { mode: "timestamp_ms" }).notNull(),
-    status: text("status").notNull(),
+    id: serial("id").primaryKey(),
+    recordedAt: timestamp("recorded_at", { withTimezone: true, mode: "date" }).notNull(),
+    status: pollStatusEnum("status").notNull(),
     error: text("error"),
     itemCount: integer("item_count").notNull().default(0),
   },
   (t) => [index("price_polls_status_recorded_at_idx").on(t.status, t.recordedAt)],
 );
 
-export const priceSnapshots = sqliteTable("price_snapshots", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
+export const priceSnapshots = pgTable("price_snapshots", {
+  id: serial("id").primaryKey(),
   pollId: integer("poll_id")
     .notNull()
     .references(() => pricePolls.id),
   itemCode: text("item_code").notNull(),
-  marketPrice: real("market_price"),
-  buyMin: real("buy_min"),
-  buyMax: real("buy_max"),
-  buyAvg: real("buy_avg"),
-  sellMin: real("sell_min"),
-  sellMax: real("sell_max"),
-  sellAvg: real("sell_avg"),
+  marketPrice: moneyNumeric("market_price"),
+  buyMin: moneyNumeric("buy_min"),
+  buyMax: moneyNumeric("buy_max"),
+  buyAvg: moneyNumeric("buy_avg"),
+  sellMin: moneyNumeric("sell_min"),
+  sellMax: moneyNumeric("sell_max"),
+  sellAvg: moneyNumeric("sell_avg"),
 });
 
-export const recommendedRegions = sqliteTable("recommended_regions", {
+export const recommendedRegions = pgTable("recommended_regions", {
   itemCode: text("item_code").primaryKey(),
   regionId: text("region_id").notNull(),
   regionName: text("region_name"),
-  bonus: real("bonus"),
-  payload: text("payload", { mode: "json" }).$type<Record<string, unknown> | null>(),
-  fetchedAt: integer("fetched_at", { mode: "timestamp_ms" }).notNull(),
+  bonus: doublePrecision("bonus"),
+  payload: jsonb("payload").$type<Record<string, unknown> | null>(),
+  fetchedAt: timestamp("fetched_at", { withTimezone: true, mode: "date" }).notNull(),
 });
 
-export const regions = sqliteTable("regions", {
+export const regions = pgTable("regions", {
   id: text("id").primaryKey(),
   name: text("name"),
   countryCode: text("country_code"),
-  payload: text("payload", { mode: "json" }).$type<Record<string, unknown> | null>(),
-  fetchedAt: integer("fetched_at", { mode: "timestamp_ms" }),
-  enqueuedAt: integer("enqueued_at", { mode: "timestamp_ms" }).notNull(),
+  payload: jsonb("payload").$type<Record<string, unknown> | null>(),
+  fetchedAt: timestamp("fetched_at", { withTimezone: true, mode: "date" }),
+  enqueuedAt: timestamp("enqueued_at", { withTimezone: true, mode: "date" }).notNull(),
 });
 
-export const companyPacks = sqliteTable("company_packs", {
+export const companyPacks = pgTable("company_packs", {
   userId: text("user_id").primaryKey(),
-  payload: text("payload", { mode: "json" }).notNull().$type<unknown>(),
-  fetchedAt: integer("fetched_at", { mode: "timestamp_ms" }).notNull(),
+  payload: jsonb("payload").notNull().$type<unknown>(),
+  fetchedAt: timestamp("fetched_at", { withTimezone: true, mode: "date" }).notNull(),
   ttlSeconds: integer("ttl_seconds").notNull().default(600),
 });
 
 export const muPollStatuses = ["success", "partial", "error"] as const;
 export type MuPollStatus = (typeof muPollStatuses)[number];
 
-export const mus = sqliteTable("mus", {
+export const mus = pgTable("mus", {
   id: text("id").primaryKey(),
   name: text("name"),
   avatarUrl: text("avatar_url"),
   countryId: text("country_id"),
   regionId: text("region_id"),
   ownerUserId: text("owner_user_id"),
-  mercenaryReputation: real("mercenary_reputation"),
+  mercenaryReputation: doublePrecision("mercenary_reputation"),
   level: integer("level"),
-  createdAtGame: integer("created_at_game", { mode: "timestamp_ms" }),
-  roles: text("roles", { mode: "json" }).$type<Record<string, unknown> | null>(),
-  activeUpgradeLevels: text("active_upgrade_levels", {
-    mode: "json",
-  }).$type<Record<string, unknown> | null>(),
-  payload: text("payload", { mode: "json" }).$type<Record<string, unknown> | null>(),
-  enqueuedAt: integer("enqueued_at", { mode: "timestamp_ms" }).notNull(),
-  fetchedAt: integer("fetched_at", { mode: "timestamp_ms" }),
+  createdAtGame: timestamp("created_at_game", { withTimezone: true, mode: "date" }),
+  roles: jsonb("roles").$type<Record<string, unknown> | null>(),
+  activeUpgradeLevels: jsonb("active_upgrade_levels").$type<Record<string, unknown> | null>(),
+  payload: jsonb("payload").$type<Record<string, unknown> | null>(),
+  enqueuedAt: timestamp("enqueued_at", { withTimezone: true, mode: "date" }).notNull(),
+  fetchedAt: timestamp("fetched_at", { withTimezone: true, mode: "date" }),
 });
 
-export const muMembers = sqliteTable(
+export const muMembers = pgTable(
   "mu_members",
   {
     muId: text("mu_id")
@@ -144,17 +157,17 @@ export const muMembers = sqliteTable(
       .references(() => mus.id),
     userId: text("user_id").notNull(),
     role: text("role"),
-    updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" }).notNull(),
   },
   (t) => [primaryKey({ columns: [t.muId, t.userId] })],
 );
 
-export const muPolls = sqliteTable(
+export const muPolls = pgTable(
   "mu_polls",
   {
-    id: integer("id").primaryKey({ autoIncrement: true }),
-    recordedAt: integer("recorded_at", { mode: "timestamp_ms" }).notNull(),
-    status: text("status").notNull(),
+    id: serial("id").primaryKey(),
+    recordedAt: timestamp("recorded_at", { withTimezone: true, mode: "date" }).notNull(),
+    status: pollStatusEnum("status").notNull(),
     error: text("error"),
     muCount: integer("mu_count").notNull().default(0),
     memberCount: integer("member_count").notNull().default(0),
@@ -162,43 +175,43 @@ export const muPolls = sqliteTable(
   (t) => [index("mu_polls_status_recorded_at_idx").on(t.status, t.recordedAt)],
 );
 
-export const muStatSnapshots = sqliteTable(
+export const muStatSnapshots = pgTable(
   "mu_stat_snapshots",
   {
-    id: integer("id").primaryKey({ autoIncrement: true }),
+    id: serial("id").primaryKey(),
     pollId: integer("poll_id")
       .notNull()
       .references(() => muPolls.id),
     muId: text("mu_id").notNull(),
-    weeklyDamages: real("weekly_damages"),
+    weeklyDamages: doublePrecision("weekly_damages"),
     weeklyDamagesRank: integer("weekly_damages_rank"),
     weeklyDamagesTier: text("weekly_damages_tier"),
-    bounty: real("bounty"),
+    bounty: doublePrecision("bounty"),
     bountyRank: integer("bounty_rank"),
     bountyTier: text("bounty_tier"),
-    reputation: real("reputation"),
+    reputation: doublePrecision("reputation"),
     reputationRank: integer("reputation_rank"),
     reputationTier: text("reputation_tier"),
-    damages: real("damages"),
+    damages: doublePrecision("damages"),
     damagesRank: integer("damages_rank"),
     damagesTier: text("damages_tier"),
-    terrain: real("terrain"),
+    terrain: doublePrecision("terrain"),
     terrainRank: integer("terrain_rank"),
     terrainTier: text("terrain_tier"),
-    wealth: real("wealth"),
+    wealth: doublePrecision("wealth"),
     wealthRank: integer("wealth_rank"),
     wealthTier: text("wealth_tier"),
     levelingLevel: integer("leveling_level"),
-    levelingMonthlyDamages: real("leveling_monthly_damages"),
-    payload: text("payload", { mode: "json" }).$type<Record<string, unknown> | null>(),
+    levelingMonthlyDamages: doublePrecision("leveling_monthly_damages"),
+    payload: jsonb("payload").$type<Record<string, unknown> | null>(),
   },
   (t) => [index("mu_stat_snapshots_mu_poll_idx").on(t.muId, t.pollId)],
 );
 
-export const muMemberStatSnapshots = sqliteTable(
+export const muMemberStatSnapshots = pgTable(
   "mu_member_stat_snapshots",
   {
-    id: integer("id").primaryKey({ autoIncrement: true }),
+    id: serial("id").primaryKey(),
     pollId: integer("poll_id")
       .notNull()
       .references(() => muPolls.id),
@@ -211,17 +224,17 @@ export const muMemberStatSnapshots = sqliteTable(
     totalHelpCount: integer("total_help_count"),
     monthlyHelpCount: integer("monthly_help_count"),
     weeklyHelpCount: integer("weekly_help_count"),
-    payload: text("payload", { mode: "json" }).$type<Record<string, unknown> | null>(),
+    payload: jsonb("payload").$type<Record<string, unknown> | null>(),
   },
   (t) => [index("mu_member_stat_snapshots_mu_user_poll_idx").on(t.muId, t.userId, t.pollId)],
 );
 
-export const userProfilePolls = sqliteTable(
+export const userProfilePolls = pgTable(
   "user_profile_polls",
   {
-    id: integer("id").primaryKey({ autoIncrement: true }),
-    recordedAt: integer("recorded_at", { mode: "timestamp_ms" }).notNull(),
-    status: text("status").notNull(),
+    id: serial("id").primaryKey(),
+    recordedAt: timestamp("recorded_at", { withTimezone: true, mode: "date" }).notNull(),
+    status: pollStatusEnum("status").notNull(),
     error: text("error"),
     userCount: integer("user_count").notNull().default(0),
     muCount: integer("mu_count").notNull().default(0),
@@ -229,33 +242,35 @@ export const userProfilePolls = sqliteTable(
   (t) => [index("user_profile_polls_status_recorded_at_idx").on(t.status, t.recordedAt)],
 );
 
-export const userProfileSnapshots = sqliteTable(
+export const userProfileSnapshots = pgTable(
   "user_profile_snapshots",
   {
-    id: integer("id").primaryKey({ autoIncrement: true }),
+    id: serial("id").primaryKey(),
     pollId: integer("poll_id")
       .notNull()
       .references(() => userProfilePolls.id),
     userId: text("user_id").notNull(),
-    recordedAt: integer("recorded_at", { mode: "timestamp_ms" }).notNull(),
+    recordedAt: timestamp("recorded_at", { withTimezone: true, mode: "date" }).notNull(),
     username: text("username"),
     avatarUrl: text("avatar_url"),
     countryId: text("country_id"),
     muId: text("mu_id"),
     companyId: text("company_id"),
     partyId: text("party_id"),
-    isActive: integer("is_active", { mode: "boolean" }),
-    lastConnectionAt: integer("last_connection_at", { mode: "timestamp_ms" }),
-    lastWorkAt: integer("last_work_at", { mode: "timestamp_ms" }),
-    lastHelpAskedAt: integer("last_help_asked_at", { mode: "timestamp_ms" }),
-    lastDailyRewardClaimedAt: integer("last_daily_reward_claimed_at", {
-      mode: "timestamp_ms",
+    isActive: boolean("is_active"),
+    lastConnectionAt: timestamp("last_connection_at", { withTimezone: true, mode: "date" }),
+    lastWorkAt: timestamp("last_work_at", { withTimezone: true, mode: "date" }),
+    lastHelpAskedAt: timestamp("last_help_asked_at", { withTimezone: true, mode: "date" }),
+    lastDailyRewardClaimedAt: timestamp("last_daily_reward_claimed_at", {
+      withTimezone: true,
+      mode: "date",
     }),
-    lastCompanyJoinedAt: integer("last_company_joined_at", { mode: "timestamp_ms" }),
-    lastDailyCalendarClaimedAt: integer("last_daily_calendar_claimed_at", {
-      mode: "timestamp_ms",
+    lastCompanyJoinedAt: timestamp("last_company_joined_at", { withTimezone: true, mode: "date" }),
+    lastDailyCalendarClaimedAt: timestamp("last_daily_calendar_claimed_at", {
+      withTimezone: true,
+      mode: "date",
     }),
-    lastSkillsResetAt: integer("last_skills_reset_at", { mode: "timestamp_ms" }),
+    lastSkillsResetAt: timestamp("last_skills_reset_at", { withTimezone: true, mode: "date" }),
     level: integer("level"),
     totalXp: integer("total_xp"),
     dailyXpLeft: integer("daily_xp_left"),
@@ -264,9 +279,9 @@ export const userProfileSnapshots = sqliteTable(
     totalSkillPoints: integer("total_skill_points"),
     prestigeLevel: integer("prestige_level"),
     militaryRank: integer("military_rank"),
-    isPremium: integer("is_premium", { mode: "boolean" }),
+    isPremium: boolean("is_premium"),
     premiumMonthsCount: integer("premium_months_count"),
-    createdAtGame: integer("created_at_game", { mode: "timestamp_ms" }),
+    createdAtGame: timestamp("created_at_game", { withTimezone: true, mode: "date" }),
   },
   (t) => [
     index("user_profile_snapshots_user_recorded_at_idx").on(t.userId, t.recordedAt),
@@ -275,12 +290,12 @@ export const userProfileSnapshots = sqliteTable(
   ],
 );
 
-export const userFightPolls = sqliteTable(
+export const userFightPolls = pgTable(
   "user_fight_polls",
   {
-    id: integer("id").primaryKey({ autoIncrement: true }),
-    recordedAt: integer("recorded_at", { mode: "timestamp_ms" }).notNull(),
-    status: text("status").notNull(),
+    id: serial("id").primaryKey(),
+    recordedAt: timestamp("recorded_at", { withTimezone: true, mode: "date" }).notNull(),
+    status: pollStatusEnum("status").notNull(),
     error: text("error"),
     userCount: integer("user_count").notNull().default(0),
     muCount: integer("mu_count").notNull().default(0),
@@ -288,37 +303,37 @@ export const userFightPolls = sqliteTable(
   (t) => [index("user_fight_polls_status_recorded_at_idx").on(t.status, t.recordedAt)],
 );
 
-export const userFightSnapshots = sqliteTable(
+export const userFightSnapshots = pgTable(
   "user_fight_snapshots",
   {
-    id: integer("id").primaryKey({ autoIncrement: true }),
+    id: serial("id").primaryKey(),
     pollId: integer("poll_id")
       .notNull()
       .references(() => userFightPolls.id),
     userId: text("user_id").notNull(),
     muId: text("mu_id").notNull(),
-    recordedAt: integer("recorded_at", { mode: "timestamp_ms" }).notNull(),
+    recordedAt: timestamp("recorded_at", { withTimezone: true, mode: "date" }).notNull(),
     username: text("username").notNull(),
     level: integer("level").notNull(),
-    militaryRankBonus: real("military_rank_bonus").notNull(),
+    militaryRankBonus: doublePrecision("military_rank_bonus").notNull(),
     ammoLabel: text("ammo_label"),
     pillLabel: text("pill_label"),
-    pillEndsAt: integer("pill_ends_at", { mode: "timestamp_ms" }),
-    skillLevels: text("skill_levels", { mode: "json" }).notNull().$type<Record<string, number>>(),
-    lastSkillsResetAt: integer("last_skills_reset_at", { mode: "timestamp_ms" }),
+    pillEndsAt: timestamp("pill_ends_at", { withTimezone: true, mode: "date" }),
+    skillLevels: jsonb("skill_levels").notNull().$type<Record<string, number>>(),
+    lastSkillsResetAt: timestamp("last_skills_reset_at", { withTimezone: true, mode: "date" }),
     avatarUrl: text("avatar_url"),
-    atk: real("atk").notNull(),
-    precision: real("precision").notNull(),
-    critChance: real("crit_chance").notNull(),
-    critDamage: real("crit_damage").notNull(),
-    armor: real("armor").notNull(),
-    dodge: real("dodge").notNull(),
-    hp: real("hp").notNull(),
-    maxHp: real("max_hp").notNull(),
-    hunger: real("hunger").notNull(),
-    maxHunger: real("max_hunger").notNull(),
-    hpRegenPerHour: real("hp_regen_per_hour").notNull(),
-    hungerRegenPerHour: real("hunger_regen_per_hour").notNull(),
+    atk: doublePrecision("atk").notNull(),
+    precision: doublePrecision("precision").notNull(),
+    critChance: doublePrecision("crit_chance").notNull(),
+    critDamage: doublePrecision("crit_damage").notNull(),
+    armor: doublePrecision("armor").notNull(),
+    dodge: doublePrecision("dodge").notNull(),
+    hp: doublePrecision("hp").notNull(),
+    maxHp: doublePrecision("max_hp").notNull(),
+    hunger: doublePrecision("hunger").notNull(),
+    maxHunger: doublePrecision("max_hunger").notNull(),
+    hpRegenPerHour: doublePrecision("hp_regen_per_hour").notNull(),
+    hungerRegenPerHour: doublePrecision("hunger_regen_per_hour").notNull(),
     pillStatus: text("pill_status").notNull().$type<"active" | "debuff" | "ready">(),
   },
   (t) => [
@@ -328,57 +343,57 @@ export const userFightSnapshots = sqliteTable(
   ],
 );
 
-export const players = sqliteTable("players", {
+export const players = pgTable("players", {
   id: text("id").primaryKey(),
   username: text("username"),
   muId: text("mu_id"),
   workplaceCompanyId: text("workplace_company_id"),
-  payload: text("payload", { mode: "json" }).$type<Record<string, unknown> | null>(),
-  fetchedAt: integer("fetched_at", { mode: "timestamp_ms" }),
+  payload: jsonb("payload").$type<Record<string, unknown> | null>(),
+  fetchedAt: timestamp("fetched_at", { withTimezone: true, mode: "date" }),
 });
 
-export const playerWatchReasons = sqliteTable(
+export const playerWatchReasons = pgTable(
   "player_watch_reasons",
   {
     playerId: text("player_id").notNull(),
     reason: text("reason").notNull(),
     sourceId: text("source_id").notNull(),
-    lastTouchedAt: integer("last_touched_at", { mode: "timestamp_ms" }).notNull(),
-    createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+    lastTouchedAt: timestamp("last_touched_at", { withTimezone: true, mode: "date" }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull(),
   },
   (t) => [primaryKey({ columns: [t.playerId, t.reason, t.sourceId] })],
 );
 
-export const muWatchReasons = sqliteTable(
+export const muWatchReasons = pgTable(
   "mu_watch_reasons",
   {
     muId: text("mu_id").notNull(),
     reason: text("reason").notNull(),
     sourceId: text("source_id").notNull(),
-    lastTouchedAt: integer("last_touched_at", { mode: "timestamp_ms" }).notNull(),
-    createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+    lastTouchedAt: timestamp("last_touched_at", { withTimezone: true, mode: "date" }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull(),
   },
   (t) => [primaryKey({ columns: [t.muId, t.reason, t.sourceId] })],
 );
 
-export const countryWatchReasons = sqliteTable(
+export const countryWatchReasons = pgTable(
   "country_watch_reasons",
   {
     countryId: text("country_id").notNull(),
     reason: text("reason").notNull(),
     sourceId: text("source_id").notNull(),
-    lastTouchedAt: integer("last_touched_at", { mode: "timestamp_ms" }).notNull(),
-    createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+    lastTouchedAt: timestamp("last_touched_at", { withTimezone: true, mode: "date" }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull(),
   },
   (t) => [primaryKey({ columns: [t.countryId, t.reason, t.sourceId] })],
 );
 
-export const donationPolls = sqliteTable(
+export const donationPolls = pgTable(
   "donation_polls",
   {
-    id: integer("id").primaryKey({ autoIncrement: true }),
-    recordedAt: integer("recorded_at", { mode: "timestamp_ms" }).notNull(),
-    status: text("status").notNull(),
+    id: serial("id").primaryKey(),
+    recordedAt: timestamp("recorded_at", { withTimezone: true, mode: "date" }).notNull(),
+    status: pollStatusEnum("status").notNull(),
     error: text("error"),
     scopeCount: integer("scope_count").notNull().default(0),
     rowCount: integer("row_count").notNull().default(0),
@@ -386,10 +401,10 @@ export const donationPolls = sqliteTable(
   (t) => [index("donation_polls_status_recorded_at_idx").on(t.status, t.recordedAt)],
 );
 
-export const donationSnapshots = sqliteTable(
+export const donationSnapshots = pgTable(
   "donation_snapshots",
   {
-    id: integer("id").primaryKey({ autoIncrement: true }),
+    id: serial("id").primaryKey(),
     pollId: integer("poll_id")
       .notNull()
       .references(() => donationPolls.id),
@@ -397,52 +412,52 @@ export const donationSnapshots = sqliteTable(
     scopeId: text("scope_id").notNull(),
     userId: text("user_id").notNull(),
     donationRowId: text("donation_row_id"),
-    amount: real("amount"),
-    donationCreatedAt: integer("donation_created_at", { mode: "timestamp_ms" }),
-    donationUpdatedAt: integer("donation_updated_at", { mode: "timestamp_ms" }),
-    payload: text("payload", { mode: "json" }).$type<Record<string, unknown> | null>(),
+    amount: moneyNumeric("amount"),
+    donationCreatedAt: timestamp("donation_created_at", { withTimezone: true, mode: "date" }),
+    donationUpdatedAt: timestamp("donation_updated_at", { withTimezone: true, mode: "date" }),
+    payload: jsonb("payload").$type<Record<string, unknown> | null>(),
   },
   (t) => [
     index("donation_snapshots_scope_user_poll_idx").on(t.scopeType, t.scopeId, t.userId, t.pollId),
   ],
 );
 
-export const companyWorkStats = sqliteTable(
+export const companyWorkStats = pgTable(
   "company_work_stats",
   {
     companyId: text("company_id").notNull(),
     dailyDate: text("daily_date").notNull(),
-    automatedEngine: real("automated_engine"),
-    employeeProd: real("employee_prod"),
-    selfWork: real("self_work"),
-    total: real("total"),
-    wage: real("wage"),
-    payload: text("payload", { mode: "json" }).$type<Record<string, unknown> | null>(),
-    fetchedAt: integer("fetched_at", { mode: "timestamp_ms" }).notNull(),
+    automatedEngine: doublePrecision("automated_engine"),
+    employeeProd: doublePrecision("employee_prod"),
+    selfWork: doublePrecision("self_work"),
+    total: doublePrecision("total"),
+    wage: moneyNumeric("wage"),
+    payload: jsonb("payload").$type<Record<string, unknown> | null>(),
+    fetchedAt: timestamp("fetched_at", { withTimezone: true, mode: "date" }).notNull(),
   },
   (t) => [primaryKey({ columns: [t.companyId, t.dailyDate] })],
 );
 
-export const workerWorkStats = sqliteTable(
+export const workerWorkStats = pgTable(
   "worker_work_stats",
   {
     companyId: text("company_id").notNull(),
     workerId: text("worker_id").notNull(),
     dailyDate: text("daily_date").notNull(),
-    employeeProd: real("employee_prod"),
-    total: real("total"),
-    wage: real("wage"),
-    payload: text("payload", { mode: "json" }).$type<Record<string, unknown> | null>(),
-    fetchedAt: integer("fetched_at", { mode: "timestamp_ms" }).notNull(),
+    employeeProd: doublePrecision("employee_prod"),
+    total: doublePrecision("total"),
+    wage: moneyNumeric("wage"),
+    payload: jsonb("payload").$type<Record<string, unknown> | null>(),
+    fetchedAt: timestamp("fetched_at", { withTimezone: true, mode: "date" }).notNull(),
   },
   (t) => [primaryKey({ columns: [t.companyId, t.workerId, t.dailyDate] })],
 );
 
-export const itemMarketTransactions = sqliteTable(
+export const itemMarketTransactions = pgTable(
   "item_market_transactions",
   {
     id: text("id").primaryKey(),
-    money: real("money").notNull(),
+    money: moneyNumeric("money").notNull(),
     itemCode: text("item_code").notNull(),
     quantity: integer("quantity").notNull(),
     sellerId: text("seller_id").notNull(),
@@ -453,13 +468,16 @@ export const itemMarketTransactions = sqliteTable(
     itemState: integer("item_state"),
     itemMaxState: integer("item_max_state"),
     itemQuantity: integer("item_quantity"),
-    itemLastAcquisitionAt: integer("item_last_acquisition_at", { mode: "timestamp_ms" }),
-    skills: text("skills", { mode: "json" }).$type<Record<string, unknown> | null>(),
-    offerCreatedAt: integer("offer_created_at", { mode: "timestamp_ms" }),
-    createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
-    updatedAt: integer("updated_at", { mode: "timestamp_ms" }),
-    payload: text("payload", { mode: "json" }).$type<Record<string, unknown> | null>(),
-    ingestedAt: integer("ingested_at", { mode: "timestamp_ms" }).notNull(),
+    itemLastAcquisitionAt: timestamp("item_last_acquisition_at", {
+      withTimezone: true,
+      mode: "date",
+    }),
+    skills: jsonb("skills").$type<Record<string, unknown> | null>(),
+    offerCreatedAt: timestamp("offer_created_at", { withTimezone: true, mode: "date" }),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" }),
+    payload: jsonb("payload").$type<Record<string, unknown> | null>(),
+    ingestedAt: timestamp("ingested_at", { withTimezone: true, mode: "date" }).notNull(),
   },
   (t) => [
     index("item_market_tx_item_code_created_at_idx").on(t.itemCode, t.createdAt),
@@ -472,13 +490,13 @@ export const itemMarketTransactions = sqliteTable(
 export const battlePollStatuses = ["success", "partial", "error"] as const;
 export type BattlePollStatus = (typeof battlePollStatuses)[number];
 
-export const battles = sqliteTable(
+export const battles = pgTable(
   "battles",
   {
     id: text("id").primaryKey(),
     warId: text("war_id"),
     type: text("type"),
-    isActive: integer("is_active", { mode: "boolean" }).notNull().default(true),
+    isActive: boolean("is_active").notNull().default(true),
     attackerCountryId: text("attacker_country_id"),
     defenderCountryId: text("defender_country_id"),
     attackerRegionId: text("attacker_region_id"),
@@ -488,25 +506,25 @@ export const battles = sqliteTable(
     currentRoundNumber: integer("current_round_number"),
     attackerWonRounds: integer("attacker_won_rounds"),
     defenderWonRounds: integer("defender_won_rounds"),
-    attackerMuOrders: text("attacker_mu_orders", { mode: "json" }).$type<string[] | null>(),
-    defenderMuOrders: text("defender_mu_orders", { mode: "json" }).$type<string[] | null>(),
-    stickyMuIds: text("sticky_mu_ids", { mode: "json" }).$type<string[] | null>(),
-    roundsHistory: text("rounds_history", { mode: "json" }).$type<unknown[] | null>(),
-    startedAtGame: integer("started_at_game", { mode: "timestamp_ms" }),
-    endedAt: integer("ended_at", { mode: "timestamp_ms" }),
-    finalizedAt: integer("finalized_at", { mode: "timestamp_ms" }),
-    fetchedAt: integer("fetched_at", { mode: "timestamp_ms" }),
-    payload: text("payload", { mode: "json" }).$type<Record<string, unknown> | null>(),
+    attackerMuOrders: jsonb("attacker_mu_orders").$type<string[] | null>(),
+    defenderMuOrders: jsonb("defender_mu_orders").$type<string[] | null>(),
+    stickyMuIds: jsonb("sticky_mu_ids").$type<string[] | null>(),
+    roundsHistory: jsonb("rounds_history").$type<unknown[] | null>(),
+    startedAtGame: timestamp("started_at_game", { withTimezone: true, mode: "date" }),
+    endedAt: timestamp("ended_at", { withTimezone: true, mode: "date" }),
+    finalizedAt: timestamp("finalized_at", { withTimezone: true, mode: "date" }),
+    fetchedAt: timestamp("fetched_at", { withTimezone: true, mode: "date" }),
+    payload: jsonb("payload").$type<Record<string, unknown> | null>(),
   },
   (t) => [index("battles_is_active_idx").on(t.isActive)],
 );
 
-export const battlePolls = sqliteTable(
+export const battlePolls = pgTable(
   "battle_polls",
   {
-    id: integer("id").primaryKey({ autoIncrement: true }),
-    recordedAt: integer("recorded_at", { mode: "timestamp_ms" }).notNull(),
-    status: text("status").notNull(),
+    id: serial("id").primaryKey(),
+    recordedAt: timestamp("recorded_at", { withTimezone: true, mode: "date" }).notNull(),
+    status: pollStatusEnum("status").notNull(),
     error: text("error"),
     activeBattlePages: integer("active_battle_pages"),
     battleCount: integer("battle_count").notNull().default(0),
@@ -516,27 +534,27 @@ export const battlePolls = sqliteTable(
   (t) => [index("battle_polls_status_recorded_at_idx").on(t.status, t.recordedAt)],
 );
 
-export const battleScoreboardSnapshots = sqliteTable(
+export const battleScoreboardSnapshots = pgTable(
   "battle_scoreboard_snapshots",
   {
-    id: integer("id").primaryKey({ autoIncrement: true }),
+    id: serial("id").primaryKey(),
     pollId: integer("poll_id")
       .notNull()
       .references(() => battlePolls.id),
     battleId: text("battle_id").notNull(),
     roundId: text("round_id"),
     roundNumber: integer("round_number"),
-    roundIsActive: integer("round_is_active", { mode: "boolean" }),
-    attackerPoints: real("attacker_points"),
-    defenderPoints: real("defender_points"),
-    attackerDamages: real("attacker_damages"),
-    defenderDamages: real("defender_damages"),
+    roundIsActive: boolean("round_is_active"),
+    attackerPoints: doublePrecision("attacker_points"),
+    defenderPoints: doublePrecision("defender_points"),
+    attackerDamages: doublePrecision("attacker_damages"),
+    defenderDamages: doublePrecision("defender_damages"),
     attackerHitCount: integer("attacker_hit_count"),
     defenderHitCount: integer("defender_hit_count"),
     ticksCount: integer("ticks_count"),
-    nextTickAt: integer("next_tick_at", { mode: "timestamp_ms" }),
-    roundStartedAtGame: integer("round_started_at_game", { mode: "timestamp_ms" }),
-    recordedAt: integer("recorded_at", { mode: "timestamp_ms" }).notNull(),
+    nextTickAt: timestamp("next_tick_at", { withTimezone: true, mode: "date" }),
+    roundStartedAtGame: timestamp("round_started_at_game", { withTimezone: true, mode: "date" }),
+    recordedAt: timestamp("recorded_at", { withTimezone: true, mode: "date" }).notNull(),
   },
   (t) => [
     index("battle_scoreboard_snapshots_battle_poll_idx").on(t.battleId, t.pollId),
@@ -544,25 +562,25 @@ export const battleScoreboardSnapshots = sqliteTable(
   ],
 );
 
-export const battleLootSnapshots = sqliteTable(
+export const battleLootSnapshots = pgTable(
   "battle_loot_snapshots",
   {
-    id: integer("id").primaryKey({ autoIncrement: true }),
+    id: serial("id").primaryKey(),
     pollId: integer("poll_id")
       .notNull()
       .references(() => battlePolls.id),
     battleId: text("battle_id").notNull(),
     userId: text("user_id").notNull(),
     muId: text("mu_id").notNull(),
-    totalDmg: real("total_dmg"),
+    totalDmg: doublePrecision("total_dmg"),
     hits: integer("hits"),
-    totalMoneyFromBounty: real("total_money_from_bounty"),
-    totalMoneyFromContract: real("total_money_from_contract"),
+    totalMoneyFromBounty: moneyNumeric("total_money_from_bounty"),
+    totalMoneyFromContract: moneyNumeric("total_money_from_contract"),
     case1Count: integer("case1_count"),
     case2Count: integer("case2_count"),
-    poolLoot: text("pool_loot", { mode: "json" }).$type<unknown[] | null>(),
-    payload: text("payload", { mode: "json" }).$type<Record<string, unknown> | null>(),
-    recordedAt: integer("recorded_at", { mode: "timestamp_ms" }).notNull(),
+    poolLoot: jsonb("pool_loot").$type<unknown[] | null>(),
+    payload: jsonb("payload").$type<Record<string, unknown> | null>(),
+    recordedAt: timestamp("recorded_at", { withTimezone: true, mode: "date" }).notNull(),
   },
   (t) => [
     index("battle_loot_snapshots_battle_user_poll_idx").on(t.battleId, t.userId, t.pollId),

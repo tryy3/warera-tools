@@ -7,33 +7,35 @@ import {
   formatEquipmentItem,
 } from "@/equipment/catalog";
 import { formatDisplayNumber } from "@/lib/formatDisplayNumber";
+import { moneyToNumber } from "@/money/decimal";
 import { api } from "../../api";
 import { GoldIcon } from "../../components/GoldIcon";
 import type { CraftCompareResponse, CraftStatBlock } from "./types";
 
-function GoldValue({ value }: { value: number | null | undefined }) {
-  if (value == null || !Number.isFinite(value)) {
+function GoldValue({ value }: { value: string | number | null | undefined }) {
+  const n = moneyToNumber(value);
+  if (n == null) {
     return <span className="text-muted-foreground">—</span>;
   }
   return (
     <span className="inline-flex items-center gap-1 font-mono">
       <GoldIcon />
-      {formatDisplayNumber(value)}
+      {formatDisplayNumber(n)}
     </span>
   );
 }
 
-function DeltaValue({ value }: { value: number | null }) {
-  if (value == null || !Number.isFinite(value)) {
+function DeltaValue({ value }: { value: string | number | null | undefined }) {
+  const n = moneyToNumber(value);
+  if (n == null) {
     return <span className="font-mono text-muted-foreground">—</span>;
   }
-  const tone =
-    value > 0 ? "text-success" : value < 0 ? "text-destructive" : "text-muted-foreground";
+  const tone = n > 0 ? "text-success" : n < 0 ? "text-destructive" : "text-muted-foreground";
   return (
     <span className={`inline-flex items-center gap-1 font-mono ${tone}`}>
       <GoldIcon />
-      {value > 0 ? "+" : ""}
-      {formatDisplayNumber(value)}
+      {n > 0 ? "+" : ""}
+      {formatDisplayNumber(n)}
     </span>
   );
 }

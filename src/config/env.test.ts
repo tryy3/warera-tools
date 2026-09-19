@@ -1,10 +1,20 @@
 import { describe, expect, it } from "vite-plus/test";
 import { parseConfig } from "./env";
 
+const TEST_DATABASE_URL = "postgres://user:pass@localhost:5432/warera";
+
 describe("parseConfig", () => {
+  it("requires DATABASE_URL", () => {
+    expect(() => parseConfig({})).toThrow("DATABASE_URL is required");
+  });
+
+  it("parses databaseUrl from DATABASE_URL", () => {
+    expect(parseConfig({ DATABASE_URL: TEST_DATABASE_URL }).databaseUrl).toBe(TEST_DATABASE_URL);
+  });
+
   it("defaults host/port and rate limit", () => {
     const cfg = parseConfig({
-      TURSO_DATABASE_URL: "libsql://example.turso.io",
+      DATABASE_URL: TEST_DATABASE_URL,
     });
     expect(cfg.host).toBe("127.0.0.1");
     expect(cfg.port).toBe(8787);
@@ -14,7 +24,7 @@ describe("parseConfig", () => {
 
   it("parses PORT override", () => {
     const cfg = parseConfig({
-      TURSO_DATABASE_URL: "file:test.db",
+      DATABASE_URL: TEST_DATABASE_URL,
       PORT: "9000",
     });
     expect(cfg.port).toBe(9000);
@@ -23,13 +33,13 @@ describe("parseConfig", () => {
   it("defaults logMaskSecrets on in production and off otherwise", () => {
     expect(
       parseConfig({
-        TURSO_DATABASE_URL: "file:test.db",
+        DATABASE_URL: TEST_DATABASE_URL,
         NODE_ENV: "production",
       }).logMaskSecrets,
     ).toBe(true);
     expect(
       parseConfig({
-        TURSO_DATABASE_URL: "file:test.db",
+        DATABASE_URL: TEST_DATABASE_URL,
         NODE_ENV: "development",
       }).logMaskSecrets,
     ).toBe(false);
@@ -38,14 +48,14 @@ describe("parseConfig", () => {
   it("honors LOG_MASK_SECRETS override", () => {
     expect(
       parseConfig({
-        TURSO_DATABASE_URL: "file:test.db",
+        DATABASE_URL: TEST_DATABASE_URL,
         NODE_ENV: "production",
         LOG_MASK_SECRETS: "false",
       }).logMaskSecrets,
     ).toBe(false);
     expect(
       parseConfig({
-        TURSO_DATABASE_URL: "file:test.db",
+        DATABASE_URL: TEST_DATABASE_URL,
         NODE_ENV: "development",
         LOG_MASK_SECRETS: "true",
       }).logMaskSecrets,
@@ -53,20 +63,20 @@ describe("parseConfig", () => {
   });
 
   it("parses optional LOG_FILE", () => {
-    expect(parseConfig({ TURSO_DATABASE_URL: "file:test.db" }).logFile).toBeUndefined();
+    expect(parseConfig({ DATABASE_URL: TEST_DATABASE_URL }).logFile).toBeUndefined();
     expect(
       parseConfig({
-        TURSO_DATABASE_URL: "file:test.db",
+        DATABASE_URL: TEST_DATABASE_URL,
         LOG_FILE: "logs/app.log",
       }).logFile,
     ).toBe("logs/app.log");
   });
 
   it("parses optional SENTRY_DSN", () => {
-    expect(parseConfig({ TURSO_DATABASE_URL: "file:test.db" }).sentryDsn).toBeUndefined();
+    expect(parseConfig({ DATABASE_URL: TEST_DATABASE_URL }).sentryDsn).toBeUndefined();
     expect(
       parseConfig({
-        TURSO_DATABASE_URL: "file:test.db",
+        DATABASE_URL: TEST_DATABASE_URL,
         SENTRY_DSN: "https://key@o0.ingest.sentry.io/1",
       }).sentryDsn,
     ).toBe("https://key@o0.ingest.sentry.io/1");
@@ -75,19 +85,19 @@ describe("parseConfig", () => {
   it("defaults HOST to loopback except production → 0.0.0.0", () => {
     expect(
       parseConfig({
-        TURSO_DATABASE_URL: "file:test.db",
+        DATABASE_URL: TEST_DATABASE_URL,
         NODE_ENV: "development",
       }).host,
     ).toBe("127.0.0.1");
     expect(
       parseConfig({
-        TURSO_DATABASE_URL: "file:test.db",
+        DATABASE_URL: TEST_DATABASE_URL,
         NODE_ENV: "production",
       }).host,
     ).toBe("0.0.0.0");
     expect(
       parseConfig({
-        TURSO_DATABASE_URL: "file:test.db",
+        DATABASE_URL: TEST_DATABASE_URL,
         NODE_ENV: "production",
         HOST: "127.0.0.1",
       }).host,
@@ -97,13 +107,13 @@ describe("parseConfig", () => {
   it("sentryEnvironment falls back to nodeEnv and honors SENTRY_ENVIRONMENT", () => {
     expect(
       parseConfig({
-        TURSO_DATABASE_URL: "file:test.db",
+        DATABASE_URL: TEST_DATABASE_URL,
         NODE_ENV: "production",
       }).sentryEnvironment,
     ).toBe("production");
     expect(
       parseConfig({
-        TURSO_DATABASE_URL: "file:test.db",
+        DATABASE_URL: TEST_DATABASE_URL,
         NODE_ENV: "production",
         SENTRY_ENVIRONMENT: "staging",
       }).sentryEnvironment,

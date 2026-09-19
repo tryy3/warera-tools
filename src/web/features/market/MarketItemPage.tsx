@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { formatDisplayNumber } from "@/lib/formatDisplayNumber";
 import { PRICE_HISTORY_RANGES, type PriceHistoryRange } from "@/market/ranges";
+import { moneyToNumber } from "@/money/decimal";
 import { ApiError, api } from "../../api";
 import { GoldIcon } from "../../components/GoldIcon";
 import { ItemIcon } from "../../components/ItemIcon";
@@ -14,17 +15,19 @@ import type { MyTradesResponse, PriceChangeDto, PriceHistoryResponse } from "./t
 
 const marketItemRoute = getRouteApi("/market_/$itemCode");
 
-function formatNum(value: number | null | undefined, digits = 4): string {
-  if (value == null || !Number.isFinite(value)) return "—";
-  return formatDisplayNumber(value, digits);
+function formatNum(value: string | number | null | undefined, digits = 4): string {
+  const n = moneyToNumber(value);
+  if (n == null) return "—";
+  return formatDisplayNumber(n, digits);
 }
 
-function GoldAmount({ value }: { value: number | null | undefined }) {
-  if (value == null || !Number.isFinite(value)) return "—";
+function GoldAmount({ value }: { value: string | number | null | undefined }) {
+  const n = moneyToNumber(value);
+  if (n == null) return "—";
   return (
     <span className="inline-flex items-center gap-1.5">
       <GoldIcon />
-      {formatDisplayNumber(value)}
+      {formatDisplayNumber(n)}
     </span>
   );
 }
@@ -109,18 +112,22 @@ function formatChunkTimeSpan(startAt: string, endAt: string): string {
 }
 
 function chunksToTradeDots(chunks: MyTradesResponse["chunks"]): TradeDot[] {
-  return chunks.map((chunk) => {
+  return chunks.flatMap((chunk) => {
+    const price = moneyToNumber(chunk.unitPrice);
+    if (price == null) return [];
     const startMs = Date.parse(chunk.startAt);
     const endMs = Date.parse(chunk.endAt);
     const midMs = (startMs + endMs) / 2;
     const sideLabel = chunk.side === "buy" ? "Buy" : "Sell";
     const fillLabel = chunk.fillCount === 1 ? "1 fill" : `${chunk.fillCount} fills`;
-    return {
-      date: new Date(midMs),
-      price: chunk.unitPrice,
-      side: chunk.side,
-      label: `${sideLabel} ${chunk.totalQty} @ ${chunk.unitPrice} · ${fillLabel} · ${formatChunkTimeSpan(chunk.startAt, chunk.endAt)}`,
-    };
+    return [
+      {
+        date: new Date(midMs),
+        price,
+        side: chunk.side,
+        label: `${sideLabel} ${chunk.totalQty} @ ${chunk.unitPrice} · ${fillLabel} · ${formatChunkTimeSpan(chunk.startAt, chunk.endAt)}`,
+      },
+    ];
   });
 }
 

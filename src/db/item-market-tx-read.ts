@@ -1,14 +1,36 @@
 import { and, eq, gte, inArray } from "drizzle-orm";
+import { parseMoney, type Decimal } from "../money/decimal";
 import type { Db } from "./client";
 import { itemMarketTransactions } from "./schema";
 
 export type ItemMarketTxRow = {
   id: string;
-  money: number;
+  /** Decimal from DB; tests may pass numbers (coerced at domain boundaries). */
+  money: Decimal | number;
   itemCode: string;
   skills: Record<string, unknown> | null;
   createdAt: Date;
 };
+
+function mapTxRow(r: {
+  id: string;
+  money: Decimal;
+  itemCode: string;
+  skills: Record<string, unknown> | null;
+  createdAt: Date;
+}): ItemMarketTxRow {
+  return {
+    id: r.id,
+    money: r.money,
+    itemCode: r.itemCode,
+    skills: r.skills ?? null,
+    createdAt: r.createdAt,
+  };
+}
+
+export function txMoney(row: ItemMarketTxRow): Decimal {
+  return parseMoney(row.money)!;
+}
 
 export async function listItemMarketTxSince(
   db: Db,
@@ -31,10 +53,7 @@ export async function listItemMarketTxSince(
     })
     .from(itemMarketTransactions)
     .where(cond);
-  return rows.map((r) => ({
-    ...r,
-    skills: r.skills ?? null,
-  }));
+  return rows.map(mapTxRow);
 }
 
 export async function listItemMarketTxForItemCodes(
@@ -53,8 +72,5 @@ export async function listItemMarketTxForItemCodes(
     })
     .from(itemMarketTransactions)
     .where(inArray(itemMarketTransactions.itemCode, unique));
-  return rows.map((r) => ({
-    ...r,
-    skills: r.skills ?? null,
-  }));
+  return rows.map(mapTxRow);
 }

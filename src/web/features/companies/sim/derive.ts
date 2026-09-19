@@ -12,6 +12,7 @@ import {
   wagePair,
   type WagePair,
 } from "../../../../economy/workers";
+import { isFiniteMoney, moneyToNumber, parseMoney } from "../../../../money/decimal";
 import { effectiveProfitForItem } from "../sessionPrices/effective";
 import type { CompanyAdvisorRow } from "../types";
 import type { CompanyOverrides, CompanySimState, SimWorker } from "./types";
@@ -56,13 +57,15 @@ function isDirty(overrides: CompanyOverrides | undefined, assigned: SimWorker[])
 }
 
 function resolveProfitPerPp(row: CompanyAdvisorRow): number {
-  return row.currentProfitPerPp ?? row.profitBreakdown?.profitPerPp ?? 0;
+  return (
+    moneyToNumber(row.currentProfitPerPp) ?? moneyToNumber(row.profitBreakdown?.profitPerPp) ?? 0
+  );
 }
 
 function resolveInputCostPerUnit(row: CompanyAdvisorRow): number {
   const breakdown = row.profitBreakdown;
   if (breakdown == null) return 0;
-  return Number.isFinite(breakdown.inputCost) ? breakdown.inputCost : 0;
+  return moneyToNumber(breakdown.inputCost) ?? 0;
 }
 
 function unitsFromPp(itemCode: string | null, pp: number): number {
@@ -90,8 +93,8 @@ function sellPriceForEnrichment(
   soldOut: number,
 ): number {
   if (itemCode == null) return 0;
-  const price = book.sell[itemCode];
-  if (price !== undefined && Number.isFinite(price)) return price;
+  const price = parseMoney(book.sell[itemCode]);
+  if (isFiniteMoney(price)) return price.toNumber();
   return soldOut > 0 ? NaN : 0;
 }
 

@@ -8,7 +8,8 @@ Design: [`docs/superpowers/specs/2026-07-31-warera-toolkit-foundation-design.md`
 
 - [Nix](https://nixos.org/) with flakes + [direnv](https://direnv.net/) (recommended), **or** Node 22+ and pnpm
 - [Vite+](https://vite.plus) (`vp`) — install with `curl -fsSL https://vite.plus | bash` if missing
-- A [Turso](https://turso.tech/) database URL, or a local file DB for smoke tests (`file:local.db`)
+- PostgreSQL — set `DATABASE_URL` (production is typically Pigsty-managed Postgres on the operator host)
+- Docker (or Podman) for integration tests — Vitest uses Testcontainers Postgres (see [Check / test](#check--test))
 
 ### Nix / devenv note
 
@@ -33,7 +34,9 @@ vp install
 cp .env.example .env
 ```
 
-Edit `.env` — at minimum set `TURSO_DATABASE_URL` (e.g. `file:local.db` for local smoke). Full list of variables is in [`.env.example`](.env.example).
+Edit `.env` — at minimum set `DATABASE_URL` (Postgres connection string). Full list of variables is in [`.env.example`](.env.example).
+
+**Turso → Postgres cutover (operators):** step-by-step checklist in the [migration design](./docs/superpowers/specs/2026-09-18-turso-to-postgres-migration-design.md) (§ Cutover checklist). Download a Turso SQLite dump once, then copy locally: `pnpm run migrate:turso-to-postgres -- --sqlite ./turso-backup.db --truncate` (no live Turso reads). Archived SQLite migrations live under `drizzle-bak/`.
 
 ## Dev
 
@@ -53,9 +56,18 @@ API-only: `pnpm dev:server`. WebUI-only: `pnpm dev:web`.
 
 ```bash
 vp check               # fmt + lint + types
-vp test                # Vitest unit tests
+vp test                # Vitest (includes Postgres integration tests via Testcontainers)
 # or: pnpm check / pnpm test
 ```
+
+`vp test` needs a container runtime with a Docker-compatible API. GitHub Actions CI uses the hosted Docker socket. Locally with **Podman**, point Testcontainers at the rootless socket and disable Ryuk:
+
+```bash
+export DOCKER_HOST=unix:///run/user/$(id -u)/podman/podman.sock
+export TESTCONTAINERS_RYUK_DISABLED=true
+```
+
+Optional: set `TEST_DATABASE_URL` to a fixed Postgres instead of starting a container (see `src/db/test/postgres.ts`).
 
 ## Production / Deploy
 
@@ -64,14 +76,13 @@ Single Node process serves the API, static WebUI (`dist/web`), and Croner jobs.
 ### Docker (recommended)
 
 ```bash
-cp .env.example .env   # on the server; fill secrets
-# Turso: primary DB URL for production; Turso branch URL for local/dev dry-runs
+cp .env.example .env   # on the server; fill secrets (including DATABASE_URL)
 docker compose -f docker-compose.example.yml --env-file .env up -d --build
 ```
 
 - Listen: `HOST=0.0.0.0` / `PORT=8787` (compose sets these)
 - Access on Tailscale: `http://<tailscale-hostname>:8787`
-- Health: `GET /api/health` → `{ "ok": true }` (liveness only; Turso errors appear in logs/jobs)
+- Health: `GET /api/health` → `{ "ok": true }` (liveness only; DB errors appear in logs/jobs)
 - Migrations run automatically on boot
 - First boot may take longer while migrations run; the healthcheck start-period is 60s
 - If you set `LOG_FILE`, mount a writable volume for that path (the container runs as non-root)

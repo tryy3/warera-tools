@@ -1,34 +1,54 @@
 import { formatDisplayNumber } from "../lib/formatDisplayNumber";
+import { Decimal, isFiniteMoney, parseMoney } from "../money/decimal";
 import { getRecipe, listProducibleRecipes, type Recipe } from "./recipes";
+
+export type MoneyPriceMap = Record<string, Decimal | number | string>;
 
 /** Order-book prices: Buy = best bid, Sell = best ask (Market UI). */
 export type BookPrices = {
-  buy: Record<string, number>;
-  sell: Record<string, number>;
+  buy: MoneyPriceMap;
+  sell: MoneyPriceMap;
 };
+
+type StrictBook = {
+  buy: Record<string, Decimal>;
+  sell: Record<string, Decimal>;
+};
+
+function toMoneyRecord(map: MoneyPriceMap): Record<string, Decimal> {
+  const out: Record<string, Decimal> = {};
+  for (const [key, value] of Object.entries(map)) {
+    const parsed = parseMoney(value);
+    if (isFiniteMoney(parsed)) out[key] = parsed;
+  }
+  return out;
+}
+
+type MoneyInput = Decimal | number | string;
 
 export type ProfitPpBreakdown = {
   itemCode: string;
   /** @deprecated Prefer sellPrice; kept as output sell for older readers. */
-  marketPrice: number;
+  marketPrice: Decimal;
   /** Output item top buy (best bid), if known. */
-  buyPrice: number | null;
+  buyPrice: Decimal | null;
   /** Output item top sell (best ask) used as revenue. */
-  sellPrice: number;
-  inputCost: number;
-  unitProfit: number;
+  sellPrice: Decimal;
+  inputCost: Decimal;
+  unitProfit: Decimal;
   consumedPp: number;
-  profitPerPp: number | null;
+  profitPerPp: Decimal | null;
   missingInputs: string[];
   /** Human-readable formula using current numbers. */
   formula: string;
 };
 
-export function bookPricesFromMarket(market: Record<string, number>): BookPrices {
-  return { buy: market, sell: market };
+export function bookPricesFromMarket(market: MoneyPriceMap): BookPrices {
+  const prices = toMoneyRecord(market);
+  return { buy: prices, sell: prices };
 }
 
-function isBookPrices(prices: Record<string, number> | BookPrices): prices is BookPrices {
+function isBookPrices(prices: MoneyPriceMap | BookPrices): prices is BookPrices {
   return (
     prices != null &&
     typeof prices === "object" &&
@@ -39,25 +59,34 @@ function isBookPrices(prices: Record<string, number> | BookPrices): prices is Bo
   );
 }
 
-function asBook(prices: Record<string, number> | BookPrices): BookPrices {
-  return isBookPrices(prices) ? prices : bookPricesFromMarket(prices);
+function asBook(prices: MoneyPriceMap | BookPrices): StrictBook {
+  if (isBookPrices(prices)) {
+    return {
+      buy: toMoneyRecord(prices.buy),
+      sell: toMoneyRecord(prices.sell),
+    };
+  }
+  return {
+    buy: toMoneyRecord(prices),
+    sell: toMoneyRecord(prices),
+  };
 }
 
 export function calculateProfitPerPp(
   itemCode: string,
-  prices: Record<string, number> | BookPrices,
+  prices: MoneyPriceMap | BookPrices,
 ): ProfitPpBreakdown | null {
   const recipe = getRecipe(itemCode);
   if (!recipe) return null;
   return profitForRecipe(recipe, asBook(prices));
 }
 
-function formatInputs(recipe: Recipe, buy: Record<string, number>): string {
+function formatInputs(recipe: Recipe, buy: Record<string, Decimal>): string {
   if (recipe.inputs.length === 0) return "0 G buy";
   return recipe.inputs
     .map((input) => {
       const p = buy[input.itemCode];
-      const priceLabel = p != null && Number.isFinite(p) ? `${formatDisplayNumber(p)} G` : "? G";
+      const priceLabel = isFiniteMoney(p) ? `${formatDisplayNumber(p)} G` : "? G";
       return `${input.quantity} ${input.itemCode} × ${priceLabel}`;
     })
     .join(" + ");
@@ -66,23 +95,22 @@ function formatInputs(recipe: Recipe, buy: Record<string, number>): string {
 /**
  * Listing / optimistic: revenue = sell(output), costs = buy(inputs).
  */
-function profitForRecipe(recipe: Recipe, book: BookPrices): ProfitPpBreakdown {
+function profitForRecipe(recipe: Recipe, book: StrictBook): ProfitPpBreakdown {
   const sellPrice = book.sell[recipe.itemCode];
-  const buyPrice =
-    book.buy[recipe.itemCode] != null && Number.isFinite(book.buy[recipe.itemCode]!)
-      ? book.buy[recipe.itemCode]!
-      : null;
+  const buyCandidate = book.buy[recipe.itemCode];
+  const buyPrice = isFiniteMoney(buyCandidate) ? buyCandidate : null;
   const missingInputs: string[] = [];
   const inputsLabel = formatInputs(recipe, book.buy);
+  const nan = new Decimal(Number.NaN);
 
-  if (sellPrice == null || !Number.isFinite(sellPrice)) {
+  if (!isFiniteMoney(sellPrice)) {
     return {
       itemCode: recipe.itemCode,
-      marketPrice: Number.NaN,
+      marketPrice: nan,
       buyPrice,
-      sellPrice: Number.NaN,
-      inputCost: Number.NaN,
-      unitProfit: Number.NaN,
+      sellPrice: nan,
+      inputCost: nan,
+      unitProfit: nan,
       consumedPp: recipe.consumedPp,
       profitPerPp: null,
       missingInputs: [recipe.itemCode, ...recipe.inputs.map((i) => i.itemCode)],
@@ -90,14 +118,14 @@ function profitForRecipe(recipe: Recipe, book: BookPrices): ProfitPpBreakdown {
     };
   }
 
-  let inputCost = 0;
+  let inputCost = new Decimal(0);
   for (const input of recipe.inputs) {
     const p = book.buy[input.itemCode];
-    if (p == null || !Number.isFinite(p)) {
+    if (!isFiniteMoney(p)) {
       missingInputs.push(input.itemCode);
       continue;
     }
-    inputCost += input.quantity * p;
+    inputCost = inputCost.plus(p.times(input.quantity));
   }
 
   if (missingInputs.length > 0) {
@@ -107,7 +135,7 @@ function profitForRecipe(recipe: Recipe, book: BookPrices): ProfitPpBreakdown {
       buyPrice,
       sellPrice,
       inputCost,
-      unitProfit: Number.NaN,
+      unitProfit: nan,
       consumedPp: recipe.consumedPp,
       profitPerPp: null,
       missingInputs,
@@ -115,8 +143,8 @@ function profitForRecipe(recipe: Recipe, book: BookPrices): ProfitPpBreakdown {
     };
   }
 
-  const unitProfit = sellPrice - inputCost;
-  const profitPerPp = recipe.consumedPp > 0 ? unitProfit / recipe.consumedPp : null;
+  const unitProfit = sellPrice.minus(inputCost);
+  const profitPerPp = recipe.consumedPp > 0 ? unitProfit.div(recipe.consumedPp) : null;
   return {
     itemCode: recipe.itemCode,
     marketPrice: sellPrice,
@@ -131,14 +159,16 @@ function profitForRecipe(recipe: Recipe, book: BookPrices): ProfitPpBreakdown {
   };
 }
 
-export function listMarketOpportunities(
-  prices: Record<string, number> | BookPrices,
-): ProfitPpBreakdown[] {
+export function listMarketOpportunities(prices: MoneyPriceMap | BookPrices): ProfitPpBreakdown[] {
   const book = asBook(prices);
   return listProducibleRecipes()
     .map((r) => profitForRecipe(r, book))
     .filter((b) => b.profitPerPp != null)
-    .toSorted((a, b) => (b.profitPerPp ?? 0) - (a.profitPerPp ?? 0));
+    .toSorted((a, b) => {
+      const ap = a.profitPerPp ?? new Decimal(0);
+      const bp = b.profitPerPp ?? new Decimal(0);
+      return bp.comparedTo(ap);
+    });
 }
 
 export const OPPORTUNITY_REFERENCE_AE = 6;
@@ -153,7 +183,7 @@ export type MarketOpportunity = ProfitPpBreakdown & {
   bestBonus: number | null;
   bestRegionId: string | null;
   bestRegionName: string | null;
-  roughDailyValue: number | null;
+  roughDailyValue: Decimal | null;
   referenceAeLevel: number;
 };
 
@@ -165,7 +195,7 @@ export function enrichMarketOpportunities(
     const region = regionsByItem.get(o.itemCode);
     const bonus = region?.bonus;
     const hasBonus = bonus != null && Number.isFinite(bonus);
-    const hasPp = o.profitPerPp != null && Number.isFinite(o.profitPerPp);
+    const hasPp = isFiniteMoney(o.profitPerPp);
     return {
       ...o,
       bestBonus: hasBonus ? bonus : null,
@@ -184,62 +214,66 @@ export type AeDailyBreakdown = {
   aeLevel: number;
   /** Production bonus as fraction (0.505 = +50.5%). */
   bonus: number;
-  profitPerPp: number;
+  profitPerPp: Decimal;
   hoursPerDay: number;
   ppPerHour: number;
   dailyPp: number;
-  dailyValue: number;
+  dailyValue: Decimal;
   formula: string;
 };
 
 /** AE idle daily gold value. `bonus` is a fraction (0.35 = +35%). */
-export function aeDailyValue(aeLevel: number, bonus: number, profitPerPp: number): number {
+export function aeDailyValue(aeLevel: number, bonus: number, profitPerPp: MoneyInput): Decimal {
   return explainAeDaily(aeLevel, bonus, profitPerPp).dailyValue;
 }
 
 export function explainAeDaily(
   aeLevel: number,
   bonus: number,
-  profitPerPp: number,
+  profitPerPp: MoneyInput,
   hoursPerDay = 24,
 ): AeDailyBreakdown {
+  const pp = parseMoney(profitPerPp)!;
   const ppPerHour = aeLevel * (1 + bonus);
   const dailyPp = ppPerHour * hoursPerDay;
-  const dailyValue = dailyPp * profitPerPp;
+  const dailyValue = pp.times(dailyPp);
   const bonusPct = bonus * 100;
   return {
     aeLevel,
     bonus,
-    profitPerPp,
+    profitPerPp: pp,
     hoursPerDay,
     ppPerHour,
     dailyPp,
     dailyValue,
-    formula: `(${aeLevel} AE × (1 + ${formatDisplayNumber(bonusPct, 4)}% Bonus) × ${hoursPerDay}h) × ${formatDisplayNumber(profitPerPp)} G/PP`,
+    formula: `(${aeLevel} AE × (1 + ${formatDisplayNumber(bonusPct, 4)}% Bonus) × ${hoursPerDay}h) × ${formatDisplayNumber(pp)} G/PP`,
   };
 }
 
 export function transferCostGold(
-  concretePrice: number,
+  concretePrice: MoneyInput,
   opts: { retask: boolean; relocate: boolean },
-): { concreteUnits: number; gold: number; formula: string } {
+): { concreteUnits: number; gold: Decimal; formula: string } {
+  const price = parseMoney(concretePrice)!;
   const concreteUnits = (opts.retask ? 5 : 0) + (opts.relocate ? 5 : 0);
   const parts: string[] = [];
   if (opts.retask) parts.push("5 Concrete retask");
   if (opts.relocate) parts.push("5 Concrete relocate");
-  const gold = concreteUnits * concretePrice;
+  const gold = price.times(concreteUnits);
   return {
     concreteUnits,
     gold,
     formula:
       parts.length === 0
         ? "0 Concrete"
-        : `(${parts.join(" + ")}) × ${formatDisplayNumber(concretePrice)} G Concrete`,
+        : `(${parts.join(" + ")}) × ${formatDisplayNumber(price)} G Concrete`,
   };
 }
 
-export function paybackDays(transferGold: number, dailyDelta: number): number | null {
-  if (!(dailyDelta > 0) || !(transferGold >= 0)) return null;
-  if (transferGold === 0) return 0;
-  return transferGold / dailyDelta;
+export function paybackDays(transferGold: MoneyInput, dailyDelta: MoneyInput): number | null {
+  const transfer = parseMoney(transferGold)!;
+  const delta = parseMoney(dailyDelta)!;
+  if (!delta.gt(0) || !transfer.gte(0)) return null;
+  if (transfer.isZero()) return 0;
+  return transfer.div(delta).toNumber();
 }

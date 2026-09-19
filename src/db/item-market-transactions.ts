@@ -1,4 +1,5 @@
 import { inArray } from "drizzle-orm";
+import { parseMoney } from "../money/decimal";
 import type { ItemMarketTransaction } from "../warera/transactions";
 import type { Db } from "./client";
 import { itemMarketTransactions } from "./schema";
@@ -33,7 +34,7 @@ export async function insertItemMarketTransactionsIgnoreConflicts(
       .values(
         fresh.map((t) => ({
           id: t.id,
-          money: t.money,
+          money: parseMoney(t.money)!,
           itemCode: t.itemCode,
           quantity: t.quantity,
           sellerId: t.sellerId,

@@ -1,29 +1,30 @@
 import type { GearTierId } from "@/calculator";
 import type { SkillBand, SkillNumbers } from "@/equipment/skills";
 
+/** Wire money fields are JSON strings (Decimal.toJSON / serializeMoney). */
 export type OverviewItem = {
   itemCode: string;
   tier: GearTierId | null;
-  marketMedian: number | null;
-  scrapFloor: number | null;
-  spread: number | null;
+  marketMedian: string | null;
+  scrapFloor: string | null;
+  spread: string | null;
   trades: number;
 };
 
 export type OverviewResponse = {
   windowMs: number;
-  scrapPrice: number | null;
+  scrapPrice: string | null;
   scrapedAt: string | null;
   items: OverviewItem[];
 };
 
 export type CraftStatBlock = {
-  minExcl: number | null;
-  medianExcl: number | null;
-  maxExcl: number | null;
-  minAdvantage: number | null;
-  medianAdvantage: number | null;
-  maxAdvantage: number | null;
+  minExcl: string | null;
+  medianExcl: string | null;
+  maxExcl: string | null;
+  minAdvantage: string | null;
+  medianAdvantage: string | null;
+  maxAdvantage: string | null;
   trades: number;
 };
 
@@ -37,11 +38,11 @@ export type CraftCompareResponse = {
   scrapQty: number;
   steelRandom: number;
   steelSpecific: number;
-  scrapPrice: number | null;
-  steelPrice: number | null;
-  scrapValue: number | null;
-  steelCostRandom: number | null;
-  steelCostSpecific: number | null;
+  scrapPrice: string | null;
+  steelPrice: string | null;
+  scrapValue: string | null;
+  steelCostRandom: string | null;
+  steelCostSpecific: string | null;
   taxRate: number;
   itemCount: number;
   pricedItemCount: number;
@@ -50,27 +51,27 @@ export type CraftCompareResponse = {
 };
 
 export type RecommendListingDto = {
-  scrapFloor: number;
-  breakEvenIncl: number;
-  attractiveIncl: number;
+  scrapFloor: string;
+  breakEvenIncl: string;
+  attractiveIncl: string;
 };
 
 export type DetailResponse = {
   itemCode: string;
   tier: GearTierId | null;
-  scrapPrice: number | null;
+  scrapPrice: string | null;
   taxRate: number | null;
   countryId: string | null;
   lowestObserved: SkillNumbers | null;
   skillKeys: string[];
   activeBands: SkillBand[];
-  marketMedian: number | null;
-  sellerNet: number | null;
-  scrapFloor: number | null;
+  marketMedian: string | null;
+  sellerNet: string | null;
+  scrapFloor: string | null;
   recommend: RecommendListingDto | null;
   trades: number;
-  dailyMedians: { day: string; median: number; trades: number }[];
-  ladder: { bucketLabel: string; median: number; trades: number }[];
+  dailyMedians: { day: string; median: string; trades: number }[];
+  ladder: { bucketLabel: string; median: string; trades: number }[];
 };
 
 export type { Country, CountriesResponse } from "../calculator/types";

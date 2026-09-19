@@ -1,17 +1,21 @@
 # WarEra data inventory (as-is)
 
-**Last reviewed:** 2026-09-14
+**Last reviewed:** 2026-09-19
 **Status:** Living — update when cadence, ownership, or major consumers change  
 **Tier rules:** [Data tier caching strategy](../superpowers/specs/2026-08-02-data-tier-caching-strategy-design.md)
 
 High-level catalog of how we fetch, store, and use WarEra-related data today. Not a schema reference.
+
+## Storage backend
+
+All persisted toolkit data (Global / Geo tables, job history, packs, append-only history, generic `cache` KV) lives in **PostgreSQL** via `pg` Pool + Drizzle ORM. Production is typically **Pigsty-managed Postgres** on the operator host (`DATABASE_URL`). Turso/libSQL is no longer the system of record; legacy SQLite Drizzle migrations are archived under `drizzle-bak/`. Operator cutover steps: [Turso → Postgres migration design](../superpowers/specs/2026-09-18-turso-to-postgres-migration-design.md).
 
 ## Architecture snapshot
 
 ```
 Browser (SPA)
   → Hono /api/*  (TanStack Query in memory for user packs / some shared reads)
-  → Turso (SoT for Global / Geo / packs / history)
+  → Postgres (Pigsty) via pg Pool + Drizzle — SoT for Global / Geo / packs / history
   → Croner jobs (bulk Global / Geo refresh)
   → createWareraClient (governor, batch, dedup)
   → api2.warera.io/trpc
