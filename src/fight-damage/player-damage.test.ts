@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vite-plus/test";
 import type { FightKnobs, FightPlayerInput, PillStatus } from "./types";
-import { playerDamageIfPill, playerDamageNow } from "./player-damage";
+import {
+  playerDamageFullPill,
+  playerDamageIfPill,
+  playerDamageNow,
+  withFullResources,
+} from "./player-damage";
 
 const knobs: FightKnobs = {
   foodId: "steak",
@@ -43,5 +48,44 @@ describe("playerDamageIfPill", () => {
   it.each(["active", "debuff"] as const)("does not uplift a %s player", (pillStatus) => {
     const input = player(pillStatus);
     expect(playerDamageIfPill(input, knobs)).toBe(playerDamageNow(input, knobs));
+  });
+});
+
+describe("withFullResources", () => {
+  it("sets hp and hunger to their maxima", () => {
+    expect(withFullResources(player("debuff"))).toMatchObject({
+      hp: 100,
+      hunger: 100,
+      maxHp: 100,
+      maxHunger: 100,
+    });
+  });
+});
+
+describe("playerDamageFullPill", () => {
+  it("applies pill ATK bonus even when status is debuff", () => {
+    const debuff = player("debuff");
+    const expected = playerDamageNow(
+      withFullResources({ ...debuff, atk: debuff.atk * (1 + 0.6) }),
+      knobs,
+    );
+    expect(playerDamageFullPill(debuff, knobs)).toBeCloseTo(expected);
+  });
+
+  it("applies pill ATK bonus when already active", () => {
+    const active = player("active");
+    const expected = playerDamageNow(
+      withFullResources({ ...active, atk: active.atk * (1 + 0.6) }),
+      knobs,
+    );
+    expect(playerDamageFullPill(active, knobs)).toBeCloseTo(expected);
+  });
+
+  it("uses full resources, not the snapshot mid-fight bars", () => {
+    const midFight = { ...player("ready"), hp: 10, hunger: 0 };
+    const full = { ...player("ready"), hp: 100, hunger: 100 };
+    expect(playerDamageFullPill(midFight, knobs)).toBeCloseTo(
+      playerDamageFullPill(full, knobs),
+    );
   });
 });

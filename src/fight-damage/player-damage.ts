@@ -12,6 +12,24 @@ export function playerDamageNow(input: FightPlayerInput, knobs: FightKnobs): num
   return dmgPerHit(input) * maxHits * (1 + knobs.battleBonus);
 }
 
+export function withFullResources(input: FightPlayerInput): FightPlayerInput {
+  return {
+    ...input,
+    hp: input.maxHp,
+    hunger: input.maxHunger,
+  };
+}
+
+export function playerDamageFullPill(input: FightPlayerInput, knobs: FightKnobs): number {
+  return playerDamageNow(
+    withFullResources({
+      ...input,
+      atk: input.atk * (1 + PILL_ATK_BONUS),
+    }),
+    knobs,
+  );
+}
+
 export function playerDamageIfPill(input: FightPlayerInput, knobs: FightKnobs): number {
   if (input.pillStatus !== "ready") {
     return playerDamageNow(input, knobs);
