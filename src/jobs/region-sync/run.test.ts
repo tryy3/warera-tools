@@ -1,34 +1,18 @@
-import { createClient } from "@libsql/client";
-import { drizzle } from "drizzle-orm/libsql";
-import { mkdtempSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { beforeEach, describe, expect, it, vi } from "vite-plus/test";
+import { beforeAll, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 import type { Db } from "../../db/client";
+import { createTestDb, truncateAllTables } from "../../db/test/postgres";
 import { enqueueRegion, getRegion } from "../../db/regions";
-import * as schema from "../../db/schema";
 import { runRegionSync } from "./run";
-
-async function createDb(): Promise<Db> {
-  const dir = mkdtempSync(join(tmpdir(), "region-sync-"));
-  const client = createClient({ url: `file:${join(dir, "test.db")}` });
-  await client.execute(`
-    CREATE TABLE regions (
-      id TEXT PRIMARY KEY NOT NULL,
-      name TEXT,
-      country_code TEXT,
-      payload TEXT,
-      fetched_at INTEGER,
-      enqueued_at INTEGER NOT NULL
-    );
-  `);
-  return drizzle(client, { schema });
-}
 
 describe("runRegionSync", () => {
   let db: Db;
+
+  beforeAll(async () => {
+    ({ db } = await createTestDb());
+  });
+
   beforeEach(async () => {
-    db = await createDb();
+    await truncateAllTables(db);
   });
 
   it("no-ops successfully on empty watchlist", async () => {

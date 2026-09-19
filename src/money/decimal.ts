@@ -19,3 +19,11 @@ export function moneyEquals(a: Decimal | null | undefined, b: Decimal | null | u
   if (a == null || b == null) return false;
   return a.equals(b);
 }
+
+/** Coerce money to a finite number (bridge until Task 7 wires Decimal end-to-end). */
+export function moneyToNumber(value: Decimal | number | string | null | undefined): number | null {
+  const parsed = parseMoney(value ?? null);
+  if (parsed == null) return null;
+  const n = parsed.toNumber();
+  return Number.isFinite(n) ? n : null;
+}

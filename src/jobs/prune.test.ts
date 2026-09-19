@@ -1,46 +1,19 @@
-import { createClient } from "@libsql/client";
 import { desc, eq } from "drizzle-orm";
-import { drizzle } from "drizzle-orm/libsql";
-import { beforeEach, describe, expect, it } from "vite-plus/test";
+import { beforeAll, beforeEach, describe, expect, it } from "vite-plus/test";
 import type { Db } from "../db/client";
+import { createTestDb, truncateAllTables } from "../db/test/postgres";
 import * as schema from "../db/schema";
 import { pruneJobRuns } from "./prune";
 
-async function createDb(): Promise<Db> {
-  const client = createClient({ url: ":memory:" });
-  await client.execute(`
-    CREATE TABLE jobs (
-      id TEXT PRIMARY KEY NOT NULL,
-      name TEXT NOT NULL,
-      description TEXT DEFAULT '' NOT NULL,
-      enabled INTEGER DEFAULT 1 NOT NULL,
-      cron TEXT NOT NULL,
-      max_runs INTEGER,
-      last_started_at INTEGER,
-      last_finished_at INTEGER,
-      last_status TEXT,
-      last_error TEXT,
-      state TEXT
-    )
-  `);
-  await client.execute(`
-    CREATE TABLE job_runs (
-      id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-      job_id TEXT NOT NULL REFERENCES jobs(id),
-      started_at INTEGER NOT NULL,
-      finished_at INTEGER,
-      status TEXT NOT NULL,
-      message TEXT,
-      duration_ms INTEGER
-    )
-  `);
-  return drizzle(client, { schema });
-}
-
 describe("pruneJobRuns", () => {
   let db: Db;
+
+  beforeAll(async () => {
+    ({ db } = await createTestDb());
+  });
+
   beforeEach(async () => {
-    db = await createDb();
+    await truncateAllTables(db);
     await db.insert(schema.jobs).values({
       id: "j1",
       name: "J1",

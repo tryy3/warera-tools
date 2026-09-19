@@ -1,30 +1,12 @@
-import { createClient } from "@libsql/client";
-import { drizzle } from "drizzle-orm/libsql";
 import { Hono } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
-import { beforeEach, describe, expect, it } from "vite-plus/test";
+import { beforeAll, beforeEach, describe, expect, it } from "vite-plus/test";
 import type { Db } from "../../db/client";
+import { createTestDb, truncateAllTables } from "../../db/test/postgres";
 import * as schema from "../../db/schema";
 import { errorPayload, HttpError } from "../errors";
 import { parseTaxRate } from "../slug";
 import { assertNoCountryConflict, countriesRoutes } from "./countries";
-
-async function createMemoryDb(): Promise<Db> {
-  const client = createClient({ url: ":memory:" });
-  await client.execute(`
-    CREATE TABLE countries (
-      id TEXT PRIMARY KEY NOT NULL,
-      name TEXT NOT NULL UNIQUE,
-      tax_rate REAL NOT NULL,
-      iso_code TEXT,
-      source TEXT NOT NULL DEFAULT 'manual',
-      synced_at INTEGER,
-      created_at INTEGER NOT NULL,
-      updated_at INTEGER NOT NULL
-    )
-  `);
-  return drizzle(client, { schema });
-}
 
 function mountCountries(db: Db): Hono {
   const app = new Hono();
@@ -77,8 +59,12 @@ describe("parseTaxRate (countries)", () => {
 describe("assertNoCountryConflict", () => {
   let db: Db;
 
+  beforeAll(async () => {
+    ({ db } = await createTestDb());
+  });
+
   beforeEach(async () => {
-    db = await createMemoryDb();
+    await truncateAllTables(db);
     await seedCountry(db, { id: "sweden", name: "Sweden", taxRate: 0.01 });
   });
 
@@ -105,8 +91,12 @@ describe("countriesRoutes", () => {
   let db: Db;
   let app: Hono;
 
+  beforeAll(async () => {
+    ({ db } = await createTestDb());
+  });
+
   beforeEach(async () => {
-    db = await createMemoryDb();
+    await truncateAllTables(db);
     app = mountCountries(db);
     await seedCountry(db, { id: "sweden", name: "Sweden", taxRate: 0.01 });
   });

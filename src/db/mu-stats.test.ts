@@ -1,78 +1,19 @@
-import { createClient } from "@libsql/client";
 import { eq } from "drizzle-orm";
-import { drizzle } from "drizzle-orm/libsql";
-import { mkdtempSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { beforeEach, describe, expect, it } from "vite-plus/test";
+import { beforeAll, beforeEach, describe, expect, it } from "vite-plus/test";
 import type { Db } from "./client";
+import { createTestDb, truncateAllTables } from "./test/postgres";
 import * as schema from "./schema";
 import { insertMuMemberStatSnapshots, insertMuPoll, insertMuStatSnapshots } from "./mu-stats";
 
-async function createDb(): Promise<Db> {
-  const dir = mkdtempSync(join(tmpdir(), "mu-stats-"));
-  const client = createClient({ url: `file:${join(dir, "test.db")}` });
-  await client.execute(`
-    CREATE TABLE mu_polls (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      recorded_at INTEGER NOT NULL,
-      status TEXT NOT NULL,
-      error TEXT,
-      mu_count INTEGER NOT NULL DEFAULT 0,
-      member_count INTEGER NOT NULL DEFAULT 0
-    )
-  `);
-  await client.execute(`
-    CREATE TABLE mu_stat_snapshots (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      poll_id INTEGER NOT NULL REFERENCES mu_polls(id),
-      mu_id TEXT NOT NULL,
-      weekly_damages REAL,
-      weekly_damages_rank INTEGER,
-      weekly_damages_tier TEXT,
-      bounty REAL,
-      bounty_rank INTEGER,
-      bounty_tier TEXT,
-      reputation REAL,
-      reputation_rank INTEGER,
-      reputation_tier TEXT,
-      damages REAL,
-      damages_rank INTEGER,
-      damages_tier TEXT,
-      terrain REAL,
-      terrain_rank INTEGER,
-      terrain_tier TEXT,
-      wealth REAL,
-      wealth_rank INTEGER,
-      wealth_tier TEXT,
-      leveling_level INTEGER,
-      leveling_monthly_damages REAL,
-      payload TEXT
-    )
-  `);
-  await client.execute(`
-    CREATE TABLE mu_member_stat_snapshots (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      poll_id INTEGER NOT NULL REFERENCES mu_polls(id),
-      mu_id TEXT NOT NULL,
-      user_id TEXT NOT NULL,
-      member_row_id TEXT,
-      total_damages_count INTEGER,
-      monthly_damages_count INTEGER,
-      weekly_damages_count INTEGER,
-      total_help_count INTEGER,
-      monthly_help_count INTEGER,
-      weekly_help_count INTEGER,
-      payload TEXT
-    )
-  `);
-  return drizzle(client, { schema });
-}
-
 describe("mu-stats db", () => {
   let db: Db;
+
+  beforeAll(async () => {
+    ({ db } = await createTestDb());
+  });
+
   beforeEach(async () => {
-    db = await createDb();
+    await truncateAllTables(db);
   });
 
   it("inserts poll and snapshots", async () => {

@@ -1,37 +1,21 @@
-import { createClient } from "@libsql/client";
-import { drizzle } from "drizzle-orm/libsql";
-import { mkdtempSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { beforeEach, describe, expect, it } from "vite-plus/test";
+import { beforeAll, beforeEach, describe, expect, it } from "vite-plus/test";
 import type { Db } from "./client";
-import * as schema from "./schema";
+import { createTestDb, truncateAllTables } from "./test/postgres";
 import {
   getRecommendedRegion,
   getRecommendedRegionsByItemCodes,
   upsertRecommendedRegion,
 } from "./recommended-regions";
 
-async function createDb(): Promise<Db> {
-  const dir = mkdtempSync(join(tmpdir(), "rec-regions-"));
-  const client = createClient({ url: `file:${join(dir, "test.db")}` });
-  await client.execute(`
-    CREATE TABLE recommended_regions (
-      item_code TEXT PRIMARY KEY NOT NULL,
-      region_id TEXT NOT NULL,
-      region_name TEXT,
-      bonus REAL,
-      payload TEXT,
-      fetched_at INTEGER NOT NULL
-    )
-  `);
-  return drizzle(client, { schema });
-}
-
 describe("recommended_regions db", () => {
   let db: Db;
+
+  beforeAll(async () => {
+    ({ db } = await createTestDb());
+  });
+
   beforeEach(async () => {
-    db = await createDb();
+    await truncateAllTables(db);
   });
 
   it("upserts and reads by item code", async () => {

@@ -1,9 +1,7 @@
-import { createClient } from "@libsql/client";
-import { drizzle } from "drizzle-orm/libsql";
-import { beforeEach, describe, expect, it } from "vite-plus/test";
+import { beforeAll, beforeEach, describe, expect, it } from "vite-plus/test";
 import { insertPricePoll, insertPriceSnapshots } from "../../db/prices";
 import type { Db } from "../../db/client";
-import * as schema from "../../db/schema";
+import { createTestDb, truncateAllTables } from "../../db/test/postgres";
 import type { Logger } from "../../logging/logger";
 import { HttpError } from "../errors";
 import { resolveScrapPrice } from "./scraps";
@@ -18,35 +16,6 @@ const silentLogger = {
   fatal: () => {},
   child: () => silentLogger,
 } as unknown as Logger;
-
-async function createMemoryDb(): Promise<Db> {
-  const client = createClient({ url: ":memory:" });
-  await client.execute(`
-    CREATE TABLE price_polls (
-      id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-      recorded_at INTEGER NOT NULL,
-      status TEXT NOT NULL,
-      error TEXT,
-      item_count INTEGER DEFAULT 0 NOT NULL
-    )
-  `);
-  await client.execute(`
-    CREATE TABLE price_snapshots (
-      id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-      poll_id INTEGER NOT NULL,
-      item_code TEXT NOT NULL,
-      market_price REAL,
-      buy_min REAL,
-      buy_max REAL,
-      buy_avg REAL,
-      sell_min REAL,
-      sell_max REAL,
-      sell_avg REAL,
-      FOREIGN KEY (poll_id) REFERENCES price_polls(id)
-    )
-  `);
-  return drizzle(client, { schema });
-}
 
 function mockWarera(scraps: number) {
   return {
@@ -72,8 +41,12 @@ function mockWarera(scraps: number) {
 describe("resolveScrapPrice (history)", () => {
   let db: Db;
 
+  beforeAll(async () => {
+    ({ db } = await createTestDb());
+  });
+
   beforeEach(async () => {
-    db = await createMemoryDb();
+    await truncateAllTables(db);
   });
 
   it("returns latest history without calling WarEra", async () => {

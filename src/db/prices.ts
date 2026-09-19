@@ -1,4 +1,5 @@
 import { desc, eq, sql } from "drizzle-orm";
+import { moneyToNumber } from "../money/decimal";
 import type { Db } from "./client";
 import { pricePolls, priceSnapshots } from "./schema";
 
@@ -120,13 +121,13 @@ export async function getLatestPrices(db: Db): Promise<LatestPrices | null> {
     status: first.status,
     items: rows.map((r) => ({
       itemCode: r.itemCode,
-      marketPrice: r.marketPrice,
-      buyMin: r.buyMin,
-      buyMax: r.buyMax,
-      buyAvg: r.buyAvg,
-      sellMin: r.sellMin,
-      sellMax: r.sellMax,
-      sellAvg: r.sellAvg,
+      marketPrice: moneyToNumber(r.marketPrice),
+      buyMin: moneyToNumber(r.buyMin),
+      buyMax: moneyToNumber(r.buyMax),
+      buyAvg: moneyToNumber(r.buyAvg),
+      sellMin: moneyToNumber(r.sellMin),
+      sellMax: moneyToNumber(r.sellMax),
+      sellAvg: moneyToNumber(r.sellAvg),
     })),
   };
 }

@@ -1,15 +1,10 @@
-import { createClient } from "@libsql/client";
-import { drizzle } from "drizzle-orm/libsql";
 import { Hono } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
-import { mkdtempSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { beforeEach, describe, expect, it } from "vite-plus/test";
+import { beforeAll, beforeEach, describe, expect, it } from "vite-plus/test";
 import { emptyLoadout } from "../../battle-build/slots";
 import type { Db } from "../../db/client";
+import { createTestDb, truncateAllTables } from "../../db/test/postgres";
 import { insertItemMarketTransactionsIgnoreConflicts } from "../../db/item-market-transactions";
-import * as schema from "../../db/schema";
 import type { Logger } from "../../logging/logger";
 import type { WareraRequester } from "../../warera/prices";
 import type { ItemMarketTransaction } from "../../warera/transactions";
@@ -26,39 +21,6 @@ const silentLogger = {
   fatal: () => {},
   child: () => silentLogger,
 } as unknown as Logger;
-
-async function createMemoryDb(): Promise<Db> {
-  const dir = mkdtempSync(join(tmpdir(), "battle-build-api-"));
-  const client = createClient({ url: `file:${join(dir, "test.db")}` });
-  await client.execute(`
-    CREATE TABLE item_market_transactions (
-      id text PRIMARY KEY NOT NULL,
-      money real NOT NULL,
-      item_code text NOT NULL,
-      quantity integer NOT NULL,
-      seller_id text NOT NULL,
-      buyer_id text NOT NULL,
-      transaction_type text NOT NULL,
-      item_id text NOT NULL,
-      item_type text,
-      item_state integer,
-      item_max_state integer,
-      item_quantity integer,
-      item_last_acquisition_at integer,
-      skills text,
-      offer_created_at integer,
-      created_at integer NOT NULL,
-      updated_at integer,
-      payload text,
-      ingested_at integer NOT NULL
-    )
-  `);
-  await client.execute(`
-    CREATE INDEX item_market_tx_item_code_created_at_idx
-    ON item_market_transactions (item_code, created_at)
-  `);
-  return drizzle(client, { schema });
-}
 
 function makeTx(overrides: Partial<ItemMarketTransaction> = {}): ItemMarketTransaction {
   return {
@@ -106,8 +68,12 @@ function appFor(db: Db, warera?: WareraRequester) {
 describe("POST /quote", () => {
   let db: Db;
 
+  beforeAll(async () => {
+    ({ db } = await createTestDb());
+  });
+
   beforeEach(async () => {
-    db = await createMemoryDb();
+    await truncateAllTables(db);
   });
 
   it("returns a 24h median from stored item-market transactions", async () => {
@@ -168,8 +134,17 @@ describe("POST /quote", () => {
 });
 
 describe("GET /import", () => {
+  let db: Db;
+
+  beforeAll(async () => {
+    ({ db } = await createTestDb());
+  });
+
+  beforeEach(async () => {
+    await truncateAllTables(db);
+  });
+
   it("soft-fails with an empty loadout when WarEra rejects", async () => {
-    const db = await createMemoryDb();
     const res = await appFor(db, {
       request: async () => {
         throw new Error("inventory unavailable");

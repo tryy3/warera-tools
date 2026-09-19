@@ -1,19 +1,15 @@
 /**
- * Shared Postgres Testcontainers helper for Drizzle integration tests.
+ * Shared Postgres helper for Drizzle integration tests.
  *
- * Starts one `postgres:16-alpine` container per Vitest worker process (module
- * singleton), runs migrations once, and reuses the pool across suites.
+ * Prefers the URL from Vitest globalSetup (`src/db/test/global-setup.ts`) so
+ * one container serves the whole run even when Vitest isolates modules per file.
+ * Falls back to starting a container when run outside `vp test` (ad-hoc).
  *
  * Container runtime (local / this agent environment):
  *   export DOCKER_HOST=unix:///run/user/1000/podman/podman.sock
  *   export TESTCONTAINERS_RYUK_DISABLED=true
- *
- * Prefer Podman (or Docker) with a Docker-compatible API. Ryuk is often
- * problematic with rootless Podman — disable it as above. CI on
- * `ubuntu-latest` has Docker available; no workflow change required.
- *
- * Do not hardcode a host :5432 URL; each run gets a random mapped port.
  */
+import { readFileSync, existsSync } from "node:fs";
 import { PostgreSqlContainer, type StartedPostgreSqlContainer } from "@testcontainers/postgresql";
 import { sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
@@ -21,6 +17,7 @@ import pg from "pg";
 import type { Db } from "../client";
 import { migrateDb } from "../migrate";
 import * as schema from "../schema";
+import { TEST_PG_URL_FILE } from "./global-setup";
 
 const TRUNCATE_SQL = `
 TRUNCATE TABLE
@@ -57,7 +54,7 @@ RESTART IDENTITY CASCADE
 `;
 
 type SharedDb = {
-  container: StartedPostgreSqlContainer;
+  container?: StartedPostgreSqlContainer;
   pool: pg.Pool;
   db: Db;
 };
@@ -65,11 +62,26 @@ type SharedDb = {
 let shared: SharedDb | null = null;
 let sharedInit: Promise<SharedDb> | null = null;
 
+async function resolveConnectionUri(): Promise<{
+  uri: string;
+  container?: StartedPostgreSqlContainer;
+}> {
+  if (process.env.TEST_DATABASE_URL) {
+    return { uri: process.env.TEST_DATABASE_URL };
+  }
+  if (existsSync(TEST_PG_URL_FILE)) {
+    const uri = readFileSync(TEST_PG_URL_FILE, "utf8").trim();
+    if (uri) return { uri };
+  }
+  const container = await new PostgreSqlContainer("postgres:16-alpine").start();
+  return { uri: container.getConnectionUri(), container };
+}
+
 async function ensureShared(): Promise<SharedDb> {
   if (shared) return shared;
   sharedInit ??= (async () => {
-    const container = await new PostgreSqlContainer("postgres:16-alpine").start();
-    const pool = new pg.Pool({ connectionString: container.getConnectionUri() });
+    const { uri, container } = await resolveConnectionUri();
+    const pool = new pg.Pool({ connectionString: uri });
     const db = drizzle(pool, { schema });
     await migrateDb(db);
     shared = { container, pool, db };
@@ -88,7 +100,7 @@ export async function createTestDb(): Promise<{
     db: s.db,
     pool: s.pool,
     stop: async () => {
-      /* keep shared container for the Vitest worker process */
+      /* process-lifetime pool; container stopped in global teardown */
     },
   };
 }

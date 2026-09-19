@@ -1,75 +1,13 @@
-import { createClient } from "@libsql/client";
-import { drizzle } from "drizzle-orm/libsql";
-import { mkdtempSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { beforeEach, describe, expect, it, vi } from "vite-plus/test";
+import { beforeAll, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 import type { Db } from "../db/client";
+import { createTestDb, truncateAllTables } from "../db/test/postgres";
 import { upsertCompanyPack } from "../db/company-packs";
 import { insertPricePoll, insertPriceSnapshots } from "../db/prices";
 import { getRecommendedRegion, upsertRecommendedRegion } from "../db/recommended-regions";
 import { upsertRegionFetched } from "../db/regions";
-import * as schema from "../db/schema";
 import { listProducibleRecipes } from "./recipes";
 import { explainAeDaily } from "./profit";
 import { buildAdvisor } from "./advisor";
-
-async function createDb(): Promise<Db> {
-  const dir = mkdtempSync(join(tmpdir(), "advisor-"));
-  const client = createClient({ url: `file:${join(dir, "test.db")}` });
-  await client.execute(`
-    CREATE TABLE price_polls (
-      id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-      recorded_at INTEGER NOT NULL,
-      status TEXT NOT NULL,
-      error TEXT,
-      item_count INTEGER DEFAULT 0 NOT NULL
-    )
-  `);
-  await client.execute(`
-    CREATE TABLE price_snapshots (
-      id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-      poll_id INTEGER NOT NULL,
-      item_code TEXT NOT NULL,
-      market_price REAL,
-      buy_min REAL,
-      buy_max REAL,
-      buy_avg REAL,
-      sell_min REAL,
-      sell_max REAL,
-      sell_avg REAL
-    )
-  `);
-  await client.execute(`
-    CREATE TABLE recommended_regions (
-      item_code TEXT PRIMARY KEY NOT NULL,
-      region_id TEXT NOT NULL,
-      region_name TEXT,
-      bonus REAL,
-      payload TEXT,
-      fetched_at INTEGER NOT NULL
-    )
-  `);
-  await client.execute(`
-    CREATE TABLE regions (
-      id TEXT PRIMARY KEY NOT NULL,
-      name TEXT,
-      country_code TEXT,
-      payload TEXT,
-      fetched_at INTEGER,
-      enqueued_at INTEGER NOT NULL
-    )
-  `);
-  await client.execute(`
-    CREATE TABLE company_packs (
-      user_id TEXT PRIMARY KEY NOT NULL,
-      payload TEXT NOT NULL,
-      fetched_at INTEGER NOT NULL,
-      ttl_seconds INTEGER NOT NULL DEFAULT 600
-    )
-  `);
-  return drizzle(client, { schema });
-}
 
 async function seedPrices(db: Db): Promise<void> {
   const pollId = await insertPricePoll(db, {
@@ -224,8 +162,12 @@ async function seedWarmAdvisorCaches(db: Db): Promise<Date> {
 describe("buildAdvisor caching", () => {
   let db: Db;
 
+  beforeAll(async () => {
+    ({ db } = await createTestDb());
+  });
+
   beforeEach(async () => {
-    db = await createDb();
+    await truncateAllTables(db);
     await seedPrices(db);
     logger.debug.mockClear();
   });

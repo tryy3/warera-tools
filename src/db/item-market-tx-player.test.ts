@@ -1,51 +1,9 @@
-import { createClient } from "@libsql/client";
-import { drizzle } from "drizzle-orm/libsql";
-import { mkdtempSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { beforeEach, describe, expect, it } from "vite-plus/test";
+import { beforeAll, beforeEach, describe, expect, it } from "vite-plus/test";
 import type { ItemMarketTransaction } from "../warera/transactions";
 import type { Db } from "./client";
+import { createTestDb, truncateAllTables } from "./test/postgres";
 import { insertItemMarketTransactionsIgnoreConflicts } from "./item-market-transactions";
 import { listPlayerItemFills } from "./item-market-tx-player";
-import * as schema from "./schema";
-
-async function createDb(): Promise<Db> {
-  const dir = mkdtempSync(join(tmpdir(), "item-market-tx-player-"));
-  const client = createClient({ url: `file:${join(dir, "test.db")}` });
-  await client.execute(`
-    CREATE TABLE item_market_transactions (
-      id text PRIMARY KEY NOT NULL,
-      money real NOT NULL,
-      item_code text NOT NULL,
-      quantity integer NOT NULL,
-      seller_id text NOT NULL,
-      buyer_id text NOT NULL,
-      transaction_type text NOT NULL,
-      item_id text NOT NULL,
-      item_type text,
-      item_state integer,
-      item_max_state integer,
-      item_quantity integer,
-      item_last_acquisition_at integer,
-      skills text,
-      offer_created_at integer,
-      created_at integer NOT NULL,
-      updated_at integer,
-      payload text,
-      ingested_at integer NOT NULL
-    )
-  `);
-  await client.execute(`
-    CREATE INDEX item_market_tx_item_code_created_at_idx
-    ON item_market_transactions (item_code, created_at)
-  `);
-  await client.execute(`
-    CREATE INDEX item_market_tx_created_at_idx
-    ON item_market_transactions (created_at)
-  `);
-  return drizzle(client, { schema });
-}
 
 function makeTx(overrides: Partial<ItemMarketTransaction> = {}): ItemMarketTransaction {
   return {
@@ -81,8 +39,12 @@ function sideForPlayer(
 describe("listPlayerItemFills", () => {
   let db: Db;
 
+  beforeAll(async () => {
+    ({ db } = await createTestDb());
+  });
+
   beforeEach(async () => {
-    db = await createDb();
+    await truncateAllTables(db);
   });
 
   it("returns buy and sell fills for player+item ordered by createdAt", async () => {

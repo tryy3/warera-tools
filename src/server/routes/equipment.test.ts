@@ -1,14 +1,10 @@
-import { createClient } from "@libsql/client";
-import { drizzle } from "drizzle-orm/libsql";
 import { Hono } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
-import { mkdtempSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { beforeEach, describe, expect, it } from "vite-plus/test";
+import { beforeAll, beforeEach, describe, expect, it } from "vite-plus/test";
 import { insertItemMarketTransactionsIgnoreConflicts } from "../../db/item-market-transactions";
 import { insertPricePoll, insertPriceSnapshots } from "../../db/prices";
 import type { Db } from "../../db/client";
+import { createTestDb, truncateAllTables } from "../../db/test/postgres";
 import * as schema from "../../db/schema";
 import { MARKET_WINDOW_MS } from "../../equipment/windows";
 import type { Logger } from "../../logging/logger";
@@ -26,79 +22,6 @@ const silentLogger = {
   fatal: () => {},
   child: () => silentLogger,
 } as unknown as Logger;
-
-async function createMemoryDb(): Promise<Db> {
-  const dir = mkdtempSync(join(tmpdir(), "equipment-api-"));
-  const client = createClient({ url: `file:${join(dir, "test.db")}` });
-  await client.execute(`
-    CREATE TABLE price_polls (
-      id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-      recorded_at INTEGER NOT NULL,
-      status TEXT NOT NULL,
-      error TEXT,
-      item_count INTEGER DEFAULT 0 NOT NULL
-    )
-  `);
-  await client.execute(`
-    CREATE TABLE price_snapshots (
-      id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-      poll_id INTEGER NOT NULL,
-      item_code TEXT NOT NULL,
-      market_price REAL,
-      buy_min REAL,
-      buy_max REAL,
-      buy_avg REAL,
-      sell_min REAL,
-      sell_max REAL,
-      sell_avg REAL,
-      FOREIGN KEY (poll_id) REFERENCES price_polls(id)
-    )
-  `);
-  await client.execute(`
-    CREATE TABLE item_market_transactions (
-      id text PRIMARY KEY NOT NULL,
-      money real NOT NULL,
-      item_code text NOT NULL,
-      quantity integer NOT NULL,
-      seller_id text NOT NULL,
-      buyer_id text NOT NULL,
-      transaction_type text NOT NULL,
-      item_id text NOT NULL,
-      item_type text,
-      item_state integer,
-      item_max_state integer,
-      item_quantity integer,
-      item_last_acquisition_at integer,
-      skills text,
-      offer_created_at integer,
-      created_at integer NOT NULL,
-      updated_at integer,
-      payload text,
-      ingested_at integer NOT NULL
-    )
-  `);
-  await client.execute(`
-    CREATE INDEX item_market_tx_item_code_created_at_idx
-    ON item_market_transactions (item_code, created_at)
-  `);
-  await client.execute(`
-    CREATE INDEX item_market_tx_created_at_idx
-    ON item_market_transactions (created_at)
-  `);
-  await client.execute(`
-    CREATE TABLE countries (
-      id TEXT PRIMARY KEY NOT NULL,
-      name TEXT NOT NULL UNIQUE,
-      tax_rate REAL NOT NULL,
-      iso_code TEXT,
-      source TEXT NOT NULL DEFAULT 'manual',
-      synced_at INTEGER,
-      created_at INTEGER NOT NULL,
-      updated_at INTEGER NOT NULL
-    )
-  `);
-  return drizzle(client, { schema });
-}
 
 async function seedCountry(
   db: Db,
@@ -205,8 +128,12 @@ function appFor(db: Db) {
 describe("GET /overview", () => {
   let db: Db;
 
+  beforeAll(async () => {
+    ({ db } = await createTestDb());
+  });
+
   beforeEach(async () => {
-    db = await createMemoryDb();
+    await truncateAllTables(db);
   });
 
   it("returns aggregated equipment overview with scrap meta", async () => {
@@ -277,8 +204,12 @@ describe("GET /overview", () => {
 describe("GET /:itemCode", () => {
   let db: Db;
 
+  beforeAll(async () => {
+    ({ db } = await createTestDb());
+  });
+
   beforeEach(async () => {
-    db = await createMemoryDb();
+    await truncateAllTables(db);
   });
 
   it("returns detail with skill bands, country tax, and triad", async () => {
@@ -437,8 +368,12 @@ describe("GET /craft-compare", () => {
 
   let db: Db;
 
+  beforeAll(async () => {
+    ({ db } = await createTestDb());
+  });
+
   beforeEach(async () => {
-    db = await createMemoryDb();
+    await truncateAllTables(db);
   });
 
   it("returns craft compare for a tier", async () => {

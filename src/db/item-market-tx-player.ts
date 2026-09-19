@@ -1,4 +1,5 @@
 import { and, asc, eq, or } from "drizzle-orm";
+import { moneyToNumber } from "../money/decimal";
 import type { Db } from "./client";
 import { itemMarketTransactions } from "./schema";
 
@@ -16,7 +17,7 @@ export async function listPlayerItemFills(
   opts: { playerId: string; itemCode: string },
 ): Promise<PlayerItemFillRow[]> {
   const { playerId, itemCode } = opts;
-  return db
+  const rows = await db
     .select({
       id: itemMarketTransactions.id,
       money: itemMarketTransactions.money,
@@ -36,4 +37,9 @@ export async function listPlayerItemFills(
       ),
     )
     .orderBy(asc(itemMarketTransactions.createdAt));
+  return rows.map((r) => {
+    const money = moneyToNumber(r.money);
+    if (money == null) throw new Error(`item_market_transactions.money missing for ${r.id}`);
+    return { ...r, money };
+  });
 }

@@ -1,39 +1,8 @@
-import { createClient } from "@libsql/client";
-import { drizzle } from "drizzle-orm/libsql";
-import { beforeEach, describe, expect, it } from "vite-plus/test";
+import { beforeAll, beforeEach, describe, expect, it } from "vite-plus/test";
 import { insertPricePoll, insertPriceSnapshots } from "./prices";
 import type { Db } from "./client";
-import * as schema from "./schema";
+import { createTestDb, truncateAllTables } from "./test/postgres";
 import { getItemPriceHistory } from "./price-history";
-
-async function createMemoryDb(): Promise<Db> {
-  const client = createClient({ url: ":memory:" });
-  await client.execute(`
-    CREATE TABLE price_polls (
-      id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-      recorded_at INTEGER NOT NULL,
-      status TEXT NOT NULL,
-      error TEXT,
-      item_count INTEGER DEFAULT 0 NOT NULL
-    )
-  `);
-  await client.execute(`
-    CREATE TABLE price_snapshots (
-      id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-      poll_id INTEGER NOT NULL,
-      item_code TEXT NOT NULL,
-      market_price REAL,
-      buy_min REAL,
-      buy_max REAL,
-      buy_avg REAL,
-      sell_min REAL,
-      sell_max REAL,
-      sell_avg REAL,
-      FOREIGN KEY (poll_id) REFERENCES price_polls(id)
-    )
-  `);
-  return drizzle(client, { schema });
-}
 
 async function seedSnapshot(
   db: Db,
@@ -64,10 +33,15 @@ async function seedSnapshot(
 
 describe("getItemPriceHistory", () => {
   let db: Db;
+
+  beforeAll(async () => {
+    ({ db } = await createTestDb());
+  });
+
   const now = new Date("2026-08-01T12:00:00.000Z");
 
   beforeEach(async () => {
-    db = await createMemoryDb();
+    await truncateAllTables(db);
   });
 
   it("returns null for unknown item", async () => {

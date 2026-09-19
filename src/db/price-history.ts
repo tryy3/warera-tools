@@ -1,6 +1,7 @@
 import { and, asc, desc, eq, gte, inArray, lte } from "drizzle-orm";
 import { calculatePriceChange, type PriceChange } from "../market/change";
 import { rangeToMs, type PriceHistoryRange } from "../market/ranges";
+import { moneyToNumber } from "../money/decimal";
 import type { Db } from "./client";
 import { pricePolls, priceSnapshots } from "./schema";
 
@@ -24,15 +25,15 @@ const OK_STATUSES = ["success", "partial"] as const;
 
 function mapRow(row: {
   recordedAt: Date;
-  marketPrice: number | null;
-  buyMax: number | null;
-  sellMin: number | null;
+  marketPrice: Parameters<typeof moneyToNumber>[0];
+  buyMax: Parameters<typeof moneyToNumber>[0];
+  sellMin: Parameters<typeof moneyToNumber>[0];
 }): PriceHistoryPoint {
   return {
     recordedAt: row.recordedAt,
-    marketPrice: row.marketPrice,
-    topBuy: row.buyMax,
-    topSell: row.sellMin,
+    marketPrice: moneyToNumber(row.marketPrice),
+    topBuy: moneyToNumber(row.buyMax),
+    topSell: moneyToNumber(row.sellMin),
   };
 }
 
@@ -54,8 +55,7 @@ async function latestBaselineAtOrBefore(
     )
     .orderBy(desc(pricePolls.recordedAt), desc(pricePolls.id))
     .limit(1);
-  const price = rows[0]?.marketPrice;
-  return price != null && Number.isFinite(price) ? price : null;
+  return moneyToNumber(rows[0]?.marketPrice);
 }
 
 export async function getItemPriceHistory(

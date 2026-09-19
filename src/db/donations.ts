@@ -6,7 +6,7 @@ export function donationFingerprintKey(scopeType: string, scopeId: string, userI
   return `${scopeType}:${scopeId}:${userId}`;
 }
 
-export function donationAmountFingerprint(amount: number | null): string {
+export function donationAmountFingerprint(amount: number | { toString(): string } | null): string {
   return amount == null ? "null" : String(amount);
 }
 

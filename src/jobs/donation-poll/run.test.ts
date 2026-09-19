@@ -1,10 +1,6 @@
-import { createClient } from "@libsql/client";
-import { drizzle } from "drizzle-orm/libsql";
-import { mkdtempSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { beforeEach, describe, expect, it, vi } from "vite-plus/test";
+import { beforeAll, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 import type { Db } from "../../db/client";
+import { createTestDb, truncateAllTables } from "../../db/test/postgres";
 import * as schema from "../../db/schema";
 import {
   MANUAL_SOURCE_ID,
@@ -12,57 +8,8 @@ import {
   WATCH_REASON_MANUAL,
   insertMuWatchReason,
 } from "../../db/watch-reasons";
+import { Decimal, moneyEquals } from "../../money/decimal";
 import { donationFingerprintCache, runDonationPoll } from "./run";
-
-async function createDb(): Promise<Db> {
-  const dir = mkdtempSync(join(tmpdir(), "donation-poll-"));
-  const client = createClient({ url: `file:${join(dir, "test.db")}` });
-  await client.execute(`
-    CREATE TABLE mu_watch_reasons (
-      mu_id TEXT NOT NULL,
-      reason TEXT NOT NULL,
-      source_id TEXT NOT NULL,
-      last_touched_at INTEGER NOT NULL,
-      created_at INTEGER NOT NULL,
-      PRIMARY KEY (mu_id, reason, source_id)
-    )
-  `);
-  await client.execute(`
-    CREATE TABLE country_watch_reasons (
-      country_id TEXT NOT NULL,
-      reason TEXT NOT NULL,
-      source_id TEXT NOT NULL,
-      last_touched_at INTEGER NOT NULL,
-      created_at INTEGER NOT NULL,
-      PRIMARY KEY (country_id, reason, source_id)
-    )
-  `);
-  await client.execute(`
-    CREATE TABLE donation_polls (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      recorded_at INTEGER NOT NULL,
-      status TEXT NOT NULL,
-      error TEXT,
-      scope_count INTEGER NOT NULL DEFAULT 0,
-      row_count INTEGER NOT NULL DEFAULT 0
-    )
-  `);
-  await client.execute(`
-    CREATE TABLE donation_snapshots (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      poll_id INTEGER NOT NULL REFERENCES donation_polls(id),
-      scope_type TEXT NOT NULL,
-      scope_id TEXT NOT NULL,
-      user_id TEXT NOT NULL,
-      donation_row_id TEXT,
-      amount REAL,
-      donation_created_at INTEGER,
-      donation_updated_at INTEGER,
-      payload TEXT
-    )
-  `);
-  return drizzle(client, { schema });
-}
 
 const MU_ID = "mu-1";
 const REASON_AT = new Date("2026-09-03T12:00:00.000Z");
@@ -115,8 +62,12 @@ function makeScopeDonationWarera(overrides?: { muAmount?: number; countryAmount?
 describe("runDonationPoll", () => {
   let db: Db;
 
+  beforeAll(async () => {
+    ({ db } = await createTestDb());
+  });
+
   beforeEach(async () => {
-    db = await createDb();
+    await truncateAllTables(db);
     donationFingerprintCache.clear();
   });
 
@@ -229,7 +180,8 @@ describe("runDonationPoll", () => {
     const muSnapshots = snapshots.filter(
       (s) => s.scopeType === "mu" && s.scopeId === MU_ID && s.userId === "mu-user",
     );
-    expect(muSnapshots.map((s) => s.amount)).toEqual([100, 150]);
+    expect(moneyEquals(muSnapshots[0]?.amount, new Decimal("100"))).toBe(true);
+    expect(moneyEquals(muSnapshots[1]?.amount, new Decimal("150"))).toBe(true);
   });
 
   it("warms from DB and skips rewrite after cache clear", async () => {

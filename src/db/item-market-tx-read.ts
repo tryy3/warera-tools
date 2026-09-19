@@ -1,4 +1,5 @@
 import { and, eq, gte, inArray } from "drizzle-orm";
+import { moneyToNumber } from "../money/decimal";
 import type { Db } from "./client";
 import { itemMarketTransactions } from "./schema";
 
@@ -9,6 +10,24 @@ export type ItemMarketTxRow = {
   skills: Record<string, unknown> | null;
   createdAt: Date;
 };
+
+function mapTxRow(r: {
+  id: string;
+  money: Parameters<typeof moneyToNumber>[0];
+  itemCode: string;
+  skills: Record<string, unknown> | null;
+  createdAt: Date;
+}): ItemMarketTxRow {
+  const money = moneyToNumber(r.money);
+  if (money == null) throw new Error(`item_market_transactions.money missing for ${r.id}`);
+  return {
+    id: r.id,
+    money,
+    itemCode: r.itemCode,
+    skills: r.skills ?? null,
+    createdAt: r.createdAt,
+  };
+}
 
 export async function listItemMarketTxSince(
   db: Db,
@@ -31,10 +50,7 @@ export async function listItemMarketTxSince(
     })
     .from(itemMarketTransactions)
     .where(cond);
-  return rows.map((r) => ({
-    ...r,
-    skills: r.skills ?? null,
-  }));
+  return rows.map(mapTxRow);
 }
 
 export async function listItemMarketTxForItemCodes(
@@ -53,8 +69,5 @@ export async function listItemMarketTxForItemCodes(
     })
     .from(itemMarketTransactions)
     .where(inArray(itemMarketTransactions.itemCode, unique));
-  return rows.map((r) => ({
-    ...r,
-    skills: r.skills ?? null,
-  }));
+  return rows.map(mapTxRow);
 }

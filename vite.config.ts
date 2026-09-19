@@ -41,6 +41,12 @@ export default defineConfig({
   },
   test: {
     passWithNoTests: true,
+    globalSetup: ["./src/db/test/global-setup.ts"],
+    // One worker avoids parallel cold-start storms against Podman.
+    maxWorkers: 1,
+    hookTimeout: 120_000,
+    testTimeout: 60_000,
+    exclude: ["**/node_modules/**", "**/dist/**", "**/.worktrees/**", "**/drizzle-bak/**"],
   },
   appType: "spa",
   plugins: lazyPlugins(() => [

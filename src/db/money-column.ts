@@ -6,8 +6,12 @@ export const moneyNumeric = customType<{ data: Decimal; driverData: string }>({
   dataType() {
     return "numeric(20, 6)";
   },
-  toDriver(value: Decimal): string {
-    return value.toFixed();
+  toDriver(value: Decimal | number | string): string {
+    // Coerce number/string so callers not yet on Decimal (Task 7) don't hit
+    // Number#toFixed() default (0 fraction digits) and round money away.
+    const parsed = parseMoney(value);
+    if (!parsed) throw new Error(`Invalid money value for driver: ${String(value)}`);
+    return parsed.toFixed();
   },
   fromDriver(value: unknown): Decimal {
     const parsed = parseMoney(value as string | number);

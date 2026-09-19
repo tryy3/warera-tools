@@ -1,57 +1,10 @@
-import { createClient } from "@libsql/client";
-import { drizzle } from "drizzle-orm/libsql";
-import { mkdtempSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { beforeEach, describe, expect, it } from "vite-plus/test";
+import { beforeAll, beforeEach, describe, expect, it } from "vite-plus/test";
 import type { Db } from "./client";
+import { createTestDb, truncateAllTables } from "./test/postgres";
 import * as schema from "./schema";
 import { listMuMembers, listMusForSync, replaceMuMembers, upsertMuCurrent } from "./mus";
 import { SEED_MU_ID, type ParsedMu } from "../warera/mu";
 import { MANUAL_SOURCE_ID, WATCH_REASON_MANUAL, insertMuWatchReason } from "./watch-reasons";
-
-async function createDb(): Promise<Db> {
-  const dir = mkdtempSync(join(tmpdir(), "mus-"));
-  const client = createClient({ url: `file:${join(dir, "test.db")}` });
-  await client.execute(`
-    CREATE TABLE mus (
-      id TEXT PRIMARY KEY NOT NULL,
-      name TEXT,
-      avatar_url TEXT,
-      country_id TEXT,
-      region_id TEXT,
-      owner_user_id TEXT,
-      mercenary_reputation REAL,
-      level INTEGER,
-      created_at_game INTEGER,
-      roles TEXT,
-      active_upgrade_levels TEXT,
-      payload TEXT,
-      enqueued_at INTEGER NOT NULL,
-      fetched_at INTEGER
-    )
-  `);
-  await client.execute(`
-    CREATE TABLE mu_members (
-      mu_id TEXT NOT NULL REFERENCES mus(id),
-      user_id TEXT NOT NULL,
-      role TEXT,
-      updated_at INTEGER NOT NULL,
-      PRIMARY KEY (mu_id, user_id)
-    )
-  `);
-  await client.execute(`
-    CREATE TABLE mu_watch_reasons (
-      mu_id TEXT NOT NULL,
-      reason TEXT NOT NULL,
-      source_id TEXT NOT NULL,
-      last_touched_at INTEGER NOT NULL,
-      created_at INTEGER NOT NULL,
-      PRIMARY KEY (mu_id, reason, source_id)
-    )
-  `);
-  return drizzle(client, { schema });
-}
 
 function sampleMu(overrides: Partial<ParsedMu> = {}): ParsedMu {
   return {
@@ -96,8 +49,13 @@ function sampleMu(overrides: Partial<ParsedMu> = {}): ParsedMu {
 
 describe("mus db", () => {
   let db: Db;
+
+  beforeAll(async () => {
+    ({ db } = await createTestDb());
+  });
+
   beforeEach(async () => {
-    db = await createDb();
+    await truncateAllTables(db);
   });
 
   it("lists ids from mu_watch_reasons, not mus rows", async () => {
