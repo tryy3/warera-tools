@@ -161,8 +161,6 @@ describe("playerDamageFullPill", () => {
   it("uses full resources, not the snapshot mid-fight bars", () => {
     const midFight = { ...player("ready"), hp: 10, hunger: 0 };
     const full = { ...player("ready"), hp: 100, hunger: 100 };
-    expect(playerDamageFullPill(midFight, knobs)).toBeCloseTo(
-      playerDamageFullPill(full, knobs),
-    );
+    expect(playerDamageFullPill(midFight, knobs)).toBeCloseTo(playerDamageFullPill(full, knobs));
   });
 });

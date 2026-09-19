@@ -1,6 +1,6 @@
-import { ChevronDown, Factory, Swords } from "lucide-react";
+import { ChevronDown, Factory, Pill, Swords } from "lucide-react";
 import { classifyBuildFromSkillLevels } from "../../../build-class/classify";
-import { skillsResetStatus } from "../../../build-class/skills-reset";
+import type { FightPlayerInput } from "../../../fight-damage/types";
 import { formatDisplayNumber } from "@/lib/formatDisplayNumber";
 import type { FightDeskMemberRowData } from "./fightDeskMemberRows";
 
@@ -24,6 +24,36 @@ function formatRemaining(endsAt: string | Date | null, nowMs: number): string | 
   if (days > 0) return `${days}d ${hours}h`;
   if (hours > 0) return `${hours}h ${minutes}m`;
   return `${minutes}m`;
+}
+
+function PillStatusLine({
+  fight,
+  pillEndsAt,
+  nowMs,
+}: {
+  fight: FightPlayerInput | null;
+  pillEndsAt: string | null;
+  nowMs: number;
+}) {
+  if (!fight) return <span className="text-xs text-muted-foreground">Unavailable</span>;
+  const timer = formatRemaining(pillEndsAt, nowMs);
+  if (fight.pillStatus === "ready") {
+    return <span className="text-xs text-muted-foreground">Ready</span>;
+  }
+  if (fight.pillStatus === "active") {
+    return (
+      <span className="inline-flex items-center gap-1.5 text-xs text-emerald-400">
+        <Pill className="size-3.5" aria-hidden="true" />
+        {timer ?? "Active"}
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex items-center gap-1.5 text-xs text-red-400">
+      <Pill className="size-3.5" aria-hidden="true" />
+      {timer ?? "Debuff"}
+    </span>
+  );
 }
 
 function ResourceBar({
@@ -109,31 +139,16 @@ export function FightDeskMemberRow({
     Object.entries(member.display.skillLevels).map(([id, level]) => [id, { level }]),
   );
   const buildClass = classifyBuildFromSkillLevels(skillEntries);
-  const reset = skillsResetStatus(null, new Date(nowMs));
-  const resetText =
-    reset.kind === "available"
-      ? "Reset available"
-      : `Reset ${formatRemaining(reset.endsAt, nowMs) ?? "—"}`;
   const pillTimer = formatRemaining(member.display.pillEndsAt, nowMs);
   const pillText = !fight
     ? "Unavailable"
     : fight.pillStatus === "ready"
       ? "Ready"
-      : `${member.display.pillLabel ?? (fight.pillStatus === "active" ? "Active" : "Debuff")}${
-          pillTimer ? ` · ${pillTimer}` : ""
-        }`;
-  const pillDotClass =
-    fight?.pillStatus === "active"
-      ? "bg-violet-400 shadow-[0_0_8px_rgba(167,139,250,0.75)]"
-      : fight?.pillStatus === "debuff"
-        ? "bg-red-400 shadow-[0_0_8px_rgba(248,113,113,0.65)]"
-        : fight?.pillStatus === "ready"
-          ? "bg-emerald-400"
-          : "bg-muted-foreground/40";
+      : (pillTimer ?? (fight.pillStatus === "active" ? "Active" : "Debuff"));
 
   return (
     <article className="border-b border-border/55 last:border-b-0">
-      <div className="grid grid-cols-[auto_2rem_minmax(0,1fr)_auto] items-center gap-x-3 gap-y-3 px-3 py-3 xl:grid-cols-[auto_2rem_minmax(10rem,1fr)_7rem_7rem_minmax(11rem,1fr)_minmax(8rem,auto)_auto]">
+      <div className="grid grid-cols-[auto_2rem_minmax(0,1fr)_auto] items-center gap-x-3 gap-y-3 px-3 py-3 xl:grid-cols-[auto_2rem_minmax(10rem,1fr)_minmax(11rem,1fr)_minmax(8rem,auto)_auto]">
         <input
           type="checkbox"
           className="size-4 rounded border-input accent-primary disabled:cursor-not-allowed disabled:opacity-40"
@@ -152,7 +167,6 @@ export function FightDeskMemberRow({
             <span className="font-mono text-[0.7rem] text-muted-foreground">
               L{member.level == null ? "—" : formatDisplayNumber(member.level, 0)}
             </span>
-            <span className={`size-1.5 shrink-0 rounded-full ${pillDotClass}`} aria-hidden="true" />
             <span className="truncate text-sm font-semibold">
               {member.username ?? member.userId}
             </span>
@@ -179,34 +193,24 @@ export function FightDeskMemberRow({
           </div>
         </div>
 
-        <div className="hidden text-xs xl:block">
-          <div className="font-medium">{pillText}</div>
-        </div>
-
-        <div className="hidden font-mono text-xs text-muted-foreground tabular-nums xl:block">
-          {complete ? resetText : "—"}
-        </div>
-
-        <div className="col-span-4 grid grid-cols-2 gap-3 xl:col-span-1">
+        <div className="col-span-4 flex flex-col gap-2 xl:col-span-1">
           {fight && projected ? (
             <>
               <ResourceBar
                 label="HP"
                 value={projected.hp}
                 max={fight.maxHp}
-                colorClass="bg-emerald-500"
+                colorClass="bg-red-500"
               />
               <ResourceBar
                 label="Hunger"
                 value={projected.hunger}
                 max={fight.maxHunger}
-                colorClass="bg-amber-500"
+                colorClass="bg-emerald-500"
               />
             </>
           ) : (
-            <span className="col-span-2 text-xs text-muted-foreground">
-              Fight snapshot unavailable
-            </span>
+            <span className="text-xs text-muted-foreground">Fight snapshot unavailable</span>
           )}
         </div>
 
@@ -217,13 +221,13 @@ export function FightDeskMemberRow({
           <div className="font-mono text-sm font-semibold text-amber-100 tabular-nums">
             {formatNumber(row.nowDamage)}
           </div>
-          {fight?.pillStatus !== "active" && complete ? (
+          {row.peakDamage != null ? (
             <div className="font-mono text-[0.65rem] text-violet-300 tabular-nums">
-              If pill {formatNumber(row.peakDamage)}
+              Peak {formatNumber(row.peakDamage)}
             </div>
           ) : null}
-          <div className="mt-1 text-[0.65rem] text-muted-foreground xl:hidden">
-            {complete ? `${pillText} · ${resetText}` : pillText}
+          <div className="mt-1">
+            <PillStatusLine fight={fight} pillEndsAt={member.display.pillEndsAt} nowMs={nowMs} />
           </div>
         </div>
 
