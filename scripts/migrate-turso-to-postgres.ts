@@ -569,6 +569,8 @@ function parseArgs(argv: string[]): { truncate: boolean; sqlitePath: string | un
   let sqlitePath: string | undefined;
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i]!;
+    // pnpm/npm often forward a bare "--" before script args
+    if (a === "--") continue;
     if (a === "--truncate") {
       truncate = true;
     } else if (a === "--sqlite") {
