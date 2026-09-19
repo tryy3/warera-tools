@@ -9,6 +9,7 @@ import {
   insertUserFightPoll,
   insertUserFightSnapshots,
   listLatestFightStatesForMu,
+  listPeakFightStatesForUsers,
   type UserFightSnapshotRow,
 } from "./user-fight-state";
 
@@ -162,5 +163,81 @@ describe("user fight state db", () => {
 
     expect(result).toHaveLength(2);
     expect(result).toEqual(expect.arrayContaining([parsed(user1Latest), parsed(user2)]));
+  });
+
+  it("picks the highest-atk snapshot inside the 7d window per user", async () => {
+    await db.insert(schema.mus).values({
+      id: "mu-1",
+      name: "MU",
+      enqueuedAt: new Date("2026-09-15T00:00:00.000Z"),
+      fetchedAt: new Date("2026-09-15T00:00:00.000Z"),
+    });
+    await db.insert(schema.muMembers).values({
+      muId: "mu-1",
+      userId: "user-1",
+      role: "member",
+      updatedAt: new Date("2026-09-15T00:00:00.000Z"),
+    });
+
+    const now = new Date("2026-09-19T12:00:00.000Z");
+    const pollId = await insertUserFightPoll(db, {
+      recordedAt: now,
+      status: "success",
+      userCount: 3,
+      muCount: 1,
+    });
+
+    expect(
+      await insertUserFightSnapshots(db, pollId, [
+        fightRow({
+          userId: "user-1",
+          muId: "mu-1",
+          atk: 100,
+          recordedAt: new Date("2026-09-18T10:00:00.000Z"),
+          pillStatus: "debuff",
+        }),
+        fightRow({
+          userId: "user-1",
+          muId: "mu-1",
+          atk: 500,
+          recordedAt: new Date("2026-09-17T10:00:00.000Z"),
+          username: "PeakFighter",
+          pillStatus: "active",
+          // force content change so fingerprint allows insert
+          armor: 481,
+        }),
+        fightRow({
+          userId: "user-1",
+          muId: "mu-1",
+          atk: 200,
+          recordedAt: new Date("2026-09-19T11:00:00.000Z"),
+          armor: 482,
+          pillStatus: "ready",
+        }),
+      ]),
+    ).toBe(3);
+
+    // Outside window — must not win even with huge atk
+    const oldPoll = await insertUserFightPoll(db, {
+      recordedAt: new Date("2026-09-01T00:00:00.000Z"),
+      status: "success",
+      userCount: 1,
+      muCount: 1,
+    });
+    expect(
+      await insertUserFightSnapshots(db, oldPoll, [
+        fightRow({
+          userId: "user-1",
+          muId: "mu-1",
+          atk: 9999,
+          recordedAt: new Date("2026-09-01T00:00:00.000Z"),
+          armor: 999,
+        }),
+      ]),
+    ).toBe(1);
+
+    const peaks = await listPeakFightStatesForUsers(db, ["user-1"], now);
+    expect(peaks.get("user-1")?.atk).toBe(500);
+    expect(peaks.get("user-1")?.username).toBe("PeakFighter");
   });
 });

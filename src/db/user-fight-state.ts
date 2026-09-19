@@ -1,8 +1,11 @@
-import { and, desc, eq, gt, notExists, or } from "drizzle-orm";
+import { and, desc, eq, gt, gte, inArray, notExists, or } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
+import { pickHighestAtkSnapshot } from "../fight-damage/peak-pick";
 import type { ParsedFightState } from "../warera/fight-state";
 import type { Db } from "./client";
 import { muMembers, userFightPolls, userFightSnapshots, type PricePollStatus } from "./schema";
+
+export const FIGHT_PEAK_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 
 export type UserFightSnapshotRow = ParsedFightState & {
   muId: string;
@@ -184,6 +187,37 @@ export async function getLatestFightState(
 ): Promise<ParsedFightState | null> {
   const row = await getLatestSnapshotRow(db, userId);
   return row ? toParsedFightState(row) : null;
+}
+
+export async function listPeakFightStatesForUsers(
+  db: Db,
+  userIds: string[],
+  now: Date = new Date(),
+): Promise<Map<string, ParsedFightState>> {
+  const out = new Map<string, ParsedFightState>();
+  const unique = [...new Set(userIds.filter((id) => id.length > 0))];
+  if (unique.length === 0) return out;
+
+  const since = new Date(now.getTime() - FIGHT_PEAK_WINDOW_MS);
+  const rows = await db
+    .select()
+    .from(userFightSnapshots)
+    .where(
+      and(inArray(userFightSnapshots.userId, unique), gte(userFightSnapshots.recordedAt, since)),
+    );
+
+  const byUser = new Map<string, (typeof rows)[number][]>();
+  for (const row of rows) {
+    const list = byUser.get(row.userId) ?? [];
+    list.push(row);
+    byUser.set(row.userId, list);
+  }
+
+  for (const [userId, list] of byUser) {
+    const peak = pickHighestAtkSnapshot(list);
+    if (peak) out.set(userId, toParsedFightState(peak));
+  }
+  return out;
 }
 
 export async function listLatestFightStatesForMu(
