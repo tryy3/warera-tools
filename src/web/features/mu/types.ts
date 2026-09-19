@@ -82,6 +82,8 @@ export type MuFightDeskMember = {
   incomplete: boolean;
   refreshFailed?: boolean;
   fight: FightPlayerInput | null;
+  /** Highest-ATK loadout in 7d (or latest on cold start). Null only when incomplete. */
+  peakFight: FightPlayerInput | null;
   display: {
     avatarUrl: string | null;
     militaryRankBonus: number | null;
@@ -89,7 +91,6 @@ export type MuFightDeskMember = {
     pillLabel: string | null;
     pillEndsAt: string | null;
     skillLevels: Record<string, number>;
-    lastSkillsResetAt: string | null;
   };
 };
 

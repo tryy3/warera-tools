@@ -174,6 +174,7 @@ describe("muFightDeskRoutes", () => {
         role: "owner",
         incomplete: true,
         fight: null,
+        peakFight: null,
         display: {
           avatarUrl: null,
           militaryRankBonus: null,
@@ -181,7 +182,6 @@ describe("muFightDeskRoutes", () => {
           pillLabel: null,
           pillEndsAt: null,
           skillLevels: {},
-          lastSkillsResetAt: null,
         },
       },
     ]);
@@ -232,6 +232,12 @@ describe("muFightDeskRoutes", () => {
         precision: 0.82,
         pillStatus: "active",
       },
+      peakFight: {
+        userId: "u1",
+        atk: 1_234,
+        precision: 0.82,
+        pillStatus: "active",
+      },
       display: {
         avatarUrl: "https://example.test/u1.png",
         militaryRankBonus: 0.35,
@@ -239,10 +245,53 @@ describe("muFightDeskRoutes", () => {
         pillLabel: "cocain",
         pillEndsAt: "2026-09-15T13:00:00.000Z",
         skillLevels: { attack: 11, health: 9 },
-        lastSkillsResetAt: "2026-09-01T00:00:00.000Z",
       },
     });
+    expect(body.members[0]?.display).not.toHaveProperty("lastSkillsResetAt");
     expect(requestBatch).not.toHaveBeenCalled();
+  });
+
+  it("returns 7d highest-ATK as peakFight and omits skills-reset from display", async () => {
+    await seedMu(db, ["u1", "u2"]);
+    const peakAt = new Date("2026-09-14T12:00:00.000Z");
+    const pollId = await insertUserFightPoll(db, {
+      recordedAt: peakAt,
+      status: "success",
+      userCount: 1,
+      muCount: 1,
+    });
+    await insertUserFightSnapshots(db, pollId, [
+      { ...parsedFight("u1", "alice"), atk: 2_500, muId: "mu-1", recordedAt: peakAt },
+      { ...parsedFight("u1", "alice"), atk: 1_234, muId: "mu-1", recordedAt: NOW },
+    ]);
+    const { app } = appFor(db);
+
+    const res = await app.request("http://localhost/mu-1/fight-desk");
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      members: Array<{
+        userId: string;
+        incomplete: boolean;
+        fight: { atk: number } | null;
+        peakFight: { atk: number } | null;
+        display: Record<string, unknown>;
+      }>;
+    };
+    expect(body.members[0]).toMatchObject({
+      userId: "u1",
+      incomplete: false,
+      fight: { atk: 1_234 },
+      peakFight: { atk: 2_500 },
+    });
+    expect(body.members[0]?.display).not.toHaveProperty("lastSkillsResetAt");
+    expect(body.members[1]).toMatchObject({
+      userId: "u2",
+      incomplete: true,
+      fight: null,
+      peakFight: null,
+    });
+    expect(body.members[1]?.display).not.toHaveProperty("lastSkillsResetAt");
   });
 
   it("live-fills a watched MU when no fight snapshots exist", async () => {

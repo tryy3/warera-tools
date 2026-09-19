@@ -6,6 +6,7 @@ import {
   insertUserFightPoll,
   insertUserFightSnapshots,
   listLatestFightStatesForMu,
+  listPeakFightStatesForUsers,
   loadLatestFightStateFingerprints,
   type UserFightSnapshotRow,
 } from "../../db/user-fight-state";
@@ -95,6 +96,7 @@ function incompleteMember(userId: string, role: string | null, refreshFailed = f
     incomplete: true,
     ...(refreshFailed ? { refreshFailed: true } : {}),
     fight: null,
+    peakFight: null,
     display: {
       avatarUrl: null,
       militaryRankBonus: null,
@@ -102,12 +104,16 @@ function incompleteMember(userId: string, role: string | null, refreshFailed = f
       pillLabel: null,
       pillEndsAt: null,
       skillLevels: {},
-      lastSkillsResetAt: null,
     },
   };
 }
 
-function completeMember(snapshot: ParsedFightState, role: string | null, refreshFailed = false) {
+function completeMember(
+  snapshot: ParsedFightState,
+  peakSnapshot: ParsedFightState | null,
+  role: string | null,
+  refreshFailed = false,
+) {
   return {
     userId: snapshot.userId,
     username: snapshot.username,
@@ -116,6 +122,7 @@ function completeMember(snapshot: ParsedFightState, role: string | null, refresh
     incomplete: false,
     ...(refreshFailed ? { refreshFailed: true } : {}),
     fight: toFightPlayerInput(snapshot),
+    peakFight: toFightPlayerInput(peakSnapshot ?? snapshot),
     display: {
       avatarUrl: snapshot.avatarUrl,
       militaryRankBonus: snapshot.militaryRankBonus,
@@ -123,7 +130,6 @@ function completeMember(snapshot: ParsedFightState, role: string | null, refresh
       pillLabel: snapshot.pillLabel,
       pillEndsAt: snapshot.pillEndsAt?.toISOString() ?? null,
       skillLevels: snapshot.skillLevels,
-      lastSkillsResetAt: snapshot.lastSkillsResetAt?.toISOString() ?? null,
     },
   };
 }
@@ -175,6 +181,7 @@ export function muFightDeskRoutes(deps: MuFightDeskRouteDeps) {
               .limit(1)
           )[0];
     const snapshotByUserId = new Map(snapshots.map((snapshot) => [snapshot.userId, snapshot]));
+    const peakByUserId = await listPeakFightStatesForUsers(db, userIds);
 
     return {
       mu,
@@ -183,7 +190,12 @@ export function muFightDeskRoutes(deps: MuFightDeskRouteDeps) {
         const snapshot = snapshotByUserId.get(member.userId);
         const refreshFailed = refreshFailedUserIdSet.has(member.userId);
         return snapshot
-          ? completeMember(snapshot, member.role, refreshFailed)
+          ? completeMember(
+              snapshot,
+              peakByUserId.get(member.userId) ?? null,
+              member.role,
+              refreshFailed,
+            )
           : incompleteMember(member.userId, member.role, refreshFailed);
       }),
       meta: { watched, liveFilled: shouldLiveFill, refreshFailedUserIds },
