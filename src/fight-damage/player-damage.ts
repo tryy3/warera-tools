@@ -26,10 +26,12 @@ export function withFullResources(input: FightPlayerInput): FightPlayerInput {
 }
 
 export function playerDamageFullPill(input: FightPlayerInput, knobs: FightKnobs): number {
+  const atk =
+    input.pillStatus === "active" ? input.atk : input.atk * (1 + PILL_ATK_BONUS);
   return playerDamageNow(
     withFullResources({
       ...input,
-      atk: input.atk * (1 + PILL_ATK_BONUS),
+      atk,
     }),
     knobs,
   );

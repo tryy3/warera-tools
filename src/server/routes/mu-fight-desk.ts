@@ -139,6 +139,7 @@ export function muFightDeskRoutes(deps: MuFightDeskRouteDeps) {
   const app = new Hono();
 
   async function respond(muId: string, forceRefresh: boolean) {
+    const now = new Date();
     const [muRows, roster, watchRows] = await Promise.all([
       db.select({ id: mus.id, name: mus.name }).from(mus).where(eq(mus.id, muId)).limit(1),
       listMuMembers(db, muId),
@@ -162,7 +163,7 @@ export function muFightDeskRoutes(deps: MuFightDeskRouteDeps) {
         deps,
         muId,
         roster.map((member) => member.userId),
-        new Date(),
+        now,
       );
       snapshots = await listLatestFightStatesForMu(db, muId);
     }
@@ -181,7 +182,7 @@ export function muFightDeskRoutes(deps: MuFightDeskRouteDeps) {
               .limit(1)
           )[0];
     const snapshotByUserId = new Map(snapshots.map((snapshot) => [snapshot.userId, snapshot]));
-    const peakByUserId = await listPeakFightStatesForUsers(db, userIds);
+    const peakByUserId = await listPeakFightStatesForUsers(db, userIds, now);
 
     return {
       mu,

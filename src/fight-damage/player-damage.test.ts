@@ -149,13 +149,51 @@ describe("playerDamageFullPill", () => {
     expect(playerDamageFullPill(debuff, knobs)).toBeCloseTo(expected);
   });
 
-  it("applies pill ATK bonus when already active", () => {
+  it("does not re-apply pill ATK bonus when already active", () => {
     const active = player("active");
+    const expected = playerDamageNow(withFullResources(active), knobs);
+    expect(playerDamageFullPill(active, knobs)).toBeCloseTo(expected);
+  });
+
+  it("does not double-apply pill ATK on a production-like active snapshot", () => {
+    const pilledPeak: FightPlayerInput = {
+      userId: "fjelle",
+      atk: 865,
+      precision: 1,
+      critChance: 0.59,
+      critDamage: 2.62,
+      armor: 77,
+      dodge: 42,
+      hp: 131,
+      maxHp: 160,
+      hunger: 4,
+      maxHunger: 6,
+      hpRegenPerHour: 0,
+      hungerRegenPerHour: 0,
+      pillStatus: "active",
+    };
+    const steak: FightKnobs = {
+      foodId: "steak",
+      foodBonus: 0.15,
+      battleBonus: 0,
+      ticks: 0,
+    };
+    const expected = playerDamageNow(withFullResources(pilledPeak), steak);
+    const doubleBoosted = playerDamageNow(
+      withFullResources({ ...pilledPeak, atk: pilledPeak.atk * (1 + 0.6) }),
+      steak,
+    );
+    expect(playerDamageFullPill(pilledPeak, steak)).toBeCloseTo(expected);
+    expect(playerDamageFullPill(pilledPeak, steak)).toBeLessThan(doubleBoosted);
+  });
+
+  it("applies pill ATK bonus when status is ready", () => {
+    const ready = player("ready");
     const expected = playerDamageNow(
-      withFullResources({ ...active, atk: active.atk * (1 + 0.6) }),
+      withFullResources({ ...ready, atk: ready.atk * (1 + 0.6) }),
       knobs,
     );
-    expect(playerDamageFullPill(active, knobs)).toBeCloseTo(expected);
+    expect(playerDamageFullPill(ready, knobs)).toBeCloseTo(expected);
   });
 
   it("uses full resources, not the snapshot mid-fight bars", () => {

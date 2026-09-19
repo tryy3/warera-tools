@@ -3,7 +3,11 @@ import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 import type { Db } from "../../db/client";
 import { createTestDb, truncateAllTables } from "../../db/test/postgres";
-import { insertUserFightPoll, insertUserFightSnapshots } from "../../db/user-fight-state";
+import {
+  FIGHT_PEAK_WINDOW_MS,
+  insertUserFightPoll,
+  insertUserFightSnapshots,
+} from "../../db/user-fight-state";
 import * as schema from "../../db/schema";
 import type { TrpcBatchSlotResult, WareraBatchItem } from "../../warera/trpc";
 import { errorPayload } from "../errors";
@@ -253,7 +257,7 @@ describe("muFightDeskRoutes", () => {
 
   it("returns 7d highest-ATK as peakFight and omits skills-reset from display", async () => {
     await seedMu(db, ["u1", "u2"]);
-    const peakAt = new Date("2026-09-14T12:00:00.000Z");
+    const peakAt = new Date(NOW.getTime() - 24 * 60 * 60 * 1000);
     const pollId = await insertUserFightPoll(db, {
       recordedAt: peakAt,
       status: "success",
@@ -292,6 +296,59 @@ describe("muFightDeskRoutes", () => {
       peakFight: null,
     });
     expect(body.members[1]?.display).not.toHaveProperty("lastSkillsResetAt");
+  });
+
+  it("does not let an out-of-window high-ATK snapshot win Peak", async () => {
+    await seedMu(db, ["u1"]);
+    const staleAt = new Date(NOW.getTime() - FIGHT_PEAK_WINDOW_MS - 24 * 60 * 60 * 1000);
+    const pollId = await insertUserFightPoll(db, {
+      recordedAt: staleAt,
+      status: "success",
+      userCount: 1,
+      muCount: 1,
+    });
+    await insertUserFightSnapshots(db, pollId, [
+      { ...parsedFight("u1", "alice"), atk: 9_999, muId: "mu-1", recordedAt: staleAt },
+      { ...parsedFight("u1", "alice"), atk: 1_234, muId: "mu-1", recordedAt: NOW },
+    ]);
+    const { app } = appFor(db);
+
+    const res = await app.request("http://localhost/mu-1/fight-desk");
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      members: Array<{ fight: { atk: number } | null; peakFight: { atk: number } | null }>;
+    };
+    expect(body.members[0]).toMatchObject({
+      fight: { atk: 1_234 },
+      peakFight: { atk: 1_234 },
+    });
+  });
+
+  it("falls peakFight back to latest when the only snapshot is outside the 7d window", async () => {
+    await seedMu(db, ["u1"]);
+    const staleAt = new Date(NOW.getTime() - FIGHT_PEAK_WINDOW_MS - 24 * 60 * 60 * 1000);
+    const pollId = await insertUserFightPoll(db, {
+      recordedAt: staleAt,
+      status: "success",
+      userCount: 1,
+      muCount: 1,
+    });
+    await insertUserFightSnapshots(db, pollId, [
+      { ...parsedFight("u1", "alice"), atk: 9_999, muId: "mu-1", recordedAt: staleAt },
+    ]);
+    const { app } = appFor(db);
+
+    const res = await app.request("http://localhost/mu-1/fight-desk");
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      members: Array<{ fight: { atk: number } | null; peakFight: { atk: number } | null }>;
+    };
+    expect(body.members[0]).toMatchObject({
+      fight: { atk: 9_999 },
+      peakFight: { atk: 9_999 },
+    });
   });
 
   it("live-fills a watched MU when no fight snapshots exist", async () => {
