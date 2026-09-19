@@ -5,6 +5,7 @@ import { upsertCompanyPack } from "../db/company-packs";
 import { insertPricePoll, insertPriceSnapshots } from "../db/prices";
 import { getRecommendedRegion, upsertRecommendedRegion } from "../db/recommended-regions";
 import { upsertRegionFetched } from "../db/regions";
+import { moneyEquals } from "../money/decimal";
 import { listProducibleRecipes } from "./recipes";
 import { explainAeDaily } from "./profit";
 import { buildAdvisor } from "./advisor";
@@ -201,15 +202,23 @@ describe("buildAdvisor caching", () => {
       referenceAeLevel: 6,
       bestBonus: 0.5,
     });
-    expect(ironOpp?.roughDailyValue).toBe(explainAeDaily(6, 0.5, ironOpp!.profitPerPp!).dailyValue);
+    expect(
+      moneyEquals(
+        ironOpp?.roughDailyValue,
+        explainAeDaily(6, 0.5, ironOpp!.profitPerPp!).dailyValue,
+      ),
+    ).toBe(true);
     const steelOpp = result.opportunities.find((o) => o.itemCode === "steel");
     expect(steelOpp).toMatchObject({
       referenceAeLevel: 6,
       bestBonus: 0.5,
     });
-    expect(steelOpp?.roughDailyValue).toBe(
-      explainAeDaily(6, 0.5, steelOpp!.profitPerPp!).dailyValue,
-    );
+    expect(
+      moneyEquals(
+        steelOpp?.roughDailyValue,
+        explainAeDaily(6, 0.5, steelOpp!.profitPerPp!).dailyValue,
+      ),
+    ).toBe(true);
     for (let i = 1; i < result.opportunities.length; i++) {
       expect(result.opportunities[i - 1]!.profitPerPp!.toNumber()).toBeGreaterThanOrEqual(
         result.opportunities[i]!.profitPerPp!.toNumber(),

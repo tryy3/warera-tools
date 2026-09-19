@@ -119,7 +119,7 @@ describe("GET /bootstrap", () => {
       concrete: number;
       opportunitiesLite: unknown[];
       bestItem: Record<string, unknown>;
-      prices: { steel: number; concrete: number };
+      prices: { steel: string; concrete: string };
     };
     expect(body.startBalance).toBe(0);
     expect(body.steel).toBe(0);
@@ -130,8 +130,8 @@ describe("GET /bootstrap", () => {
     expect(body.opportunitiesLite.length).toBeGreaterThan(0);
     expect(body.bestItem).toHaveProperty("itemCode");
     expect(body.bestItem.suggestedBonus).toBe(0);
-    expect(body.prices.steel).toBe(20);
-    expect(body.prices.concrete).toBe(5);
+    expect(body.prices.steel).toBe("20");
+    expect(body.prices.concrete).toBe("5");
     expect(body).not.toHaveProperty("opportunities");
   });
 

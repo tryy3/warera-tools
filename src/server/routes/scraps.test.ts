@@ -77,7 +77,7 @@ describe("resolveScrapPrice (history)", () => {
     };
 
     const result = await resolveScrapPrice(db, warera, silentLogger, { force: false });
-    expect(result.price).toBe(0.215);
+    expect(result.price).toBe("0.215");
     expect(result.fetchedAt).toBe("2026-07-31T12:00:00.000Z");
     expect(calls).toBe(0);
   });
@@ -86,13 +86,13 @@ describe("resolveScrapPrice (history)", () => {
     const result = await resolveScrapPrice(db, mockWarera(0.42), silentLogger, {
       force: false,
     });
-    expect(result.price).toBe(0.42);
+    expect(result.price).toBe("0.42");
     expect(result.stale).toBeUndefined();
 
     const cached = await resolveScrapPrice(db, mockWarera(0.99), silentLogger, {
       force: false,
     });
-    expect(cached.price).toBe(0.42);
+    expect(cached.price).toBe("0.42");
   });
 
   it("force runs a new poll", async () => {
@@ -100,7 +100,7 @@ describe("resolveScrapPrice (history)", () => {
     const result = await resolveScrapPrice(db, mockWarera(0.99), silentLogger, {
       force: true,
     });
-    expect(result.price).toBe(0.99);
+    expect(result.price).toBe("0.99");
   });
 
   it("returns stale when poll fails but history exists", async () => {
@@ -130,7 +130,7 @@ describe("resolveScrapPrice (history)", () => {
 
     const result = await resolveScrapPrice(db, warera, silentLogger, { force: true });
     expect(result).toEqual({
-      price: 0.33,
+      price: "0.33",
       fetchedAt: "2026-07-30T12:00:00.000Z",
       stale: true,
     });

@@ -48,14 +48,14 @@ type MyTradesBody = {
   range: string;
   chunks: Array<{
     side: "buy" | "sell";
-    unitPrice: number;
+    unitPrice: string;
     totalQty: number;
-    totalMoney: number;
+    totalMoney: string;
     startAt: string;
     endAt: string;
     fillCount: number;
   }>;
-  realized: { pnl: number | null; sellQty: number; buyQty: number };
+  realized: { pnl: string | null; sellQty: number; buyQty: number };
   historyIncomplete: boolean;
   fillCount: number;
 };
@@ -92,7 +92,7 @@ describe("GET /:itemCode/my-trades", () => {
       playerId: "player1",
       range: "7d",
       chunks: [],
-      realized: { pnl: 0, sellQty: 0, buyQty: 0 },
+      realized: { pnl: "0", sellQty: 0, buyQty: 0 },
       historyIncomplete: false,
       fillCount: 0,
     });
@@ -136,23 +136,23 @@ describe("GET /:itemCode/my-trades", () => {
     expect(body.range).toBe("7d");
     expect(body.fillCount).toBe(2);
     expect(body.historyIncomplete).toBe(false);
-    expect(body.realized).toEqual({ pnl: 50, sellQty: 10, buyQty: 10 });
+    expect(body.realized).toEqual({ pnl: "50", sellQty: 10, buyQty: 10 });
 
     expect(body.chunks).toHaveLength(2);
     expect(body.chunks[0]).toMatchObject({
       side: "buy",
-      unitPrice: 10,
+      unitPrice: "10",
       totalQty: 10,
-      totalMoney: 100,
+      totalMoney: "100",
       fillCount: 1,
       startAt: buyAt.toISOString(),
       endAt: buyAt.toISOString(),
     });
     expect(body.chunks[1]).toMatchObject({
       side: "sell",
-      unitPrice: 15,
+      unitPrice: "15",
       totalQty: 10,
-      totalMoney: 150,
+      totalMoney: "150",
       fillCount: 1,
       startAt: sellAt.toISOString(),
       endAt: sellAt.toISOString(),

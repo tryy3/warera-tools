@@ -1,4 +1,5 @@
 import { beforeAll, beforeEach, describe, expect, it } from "vite-plus/test";
+import { Decimal, moneyEquals } from "../money/decimal";
 import type { ItemMarketTransaction } from "../warera/transactions";
 import type { Db } from "./client";
 import { createTestDb, truncateAllTables } from "./test/postgres";
@@ -100,15 +101,15 @@ describe("listPlayerItemFills", () => {
     expect(rows.map((r) => r.id)).toEqual(["buy1", "sell1"]);
     expect(sideForPlayer(rows[0]!, playerId)).toBe("buy");
     expect(sideForPlayer(rows[1]!, playerId)).toBe("sell");
+    expect(moneyEquals(rows[0]!.money, new Decimal(100))).toBe(true);
     expect(rows[0]).toMatchObject({
-      money: 100,
       quantity: 2,
       buyerId: playerId,
       sellerId: "other-seller",
       createdAt: t0,
     });
+    expect(moneyEquals(rows[1]!.money, new Decimal(60))).toBe(true);
     expect(rows[1]).toMatchObject({
-      money: 60,
       quantity: 1,
       buyerId: "other-buyer",
       sellerId: playerId,
