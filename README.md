@@ -36,7 +36,7 @@ cp .env.example .env
 
 Edit `.env` — at minimum set `DATABASE_URL` (Postgres connection string). Full list of variables is in [`.env.example`](.env.example).
 
-**Turso → Postgres cutover (operators):** step-by-step checklist in the [migration design](./docs/superpowers/specs/2026-09-18-turso-to-postgres-migration-design.md) (§ Cutover checklist). One-time data copy: `pnpm run migrate:turso-to-postgres` (needs legacy `TURSO_*` env only for that script). Archived SQLite migrations live under `drizzle-bak/`.
+**Turso → Postgres cutover (operators):** step-by-step checklist in the [migration design](./docs/superpowers/specs/2026-09-18-turso-to-postgres-migration-design.md) (§ Cutover checklist). Download a Turso SQLite dump once, then copy locally: `pnpm run migrate:turso-to-postgres -- --sqlite ./turso-backup.db --truncate` (no live Turso reads). Archived SQLite migrations live under `drizzle-bak/`.
 
 ## Dev
 

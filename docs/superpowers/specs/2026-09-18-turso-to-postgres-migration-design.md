@@ -69,7 +69,8 @@ Damages, reputation, wealth, terrain, recommended-region `bonus`, countries `tax
   stop WarEra (jobs stop with process)
   → Pigsty Postgres empty DB
   → drizzle migrate (fresh 0000+)
-  → scripts/migrate-turso-to-postgres (read Turso → write PG + transforms)
+  → download Turso SQLite dump (once)
+  → scripts/migrate-turso-to-postgres --sqlite dump.db (local read → write PG + transforms)
   → .env: DATABASE_URL only
   → start WarEra
   → verify health + smoke tools + one job run
@@ -117,9 +118,9 @@ Damages, reputation, wealth, terrain, recommended-region `bonus`, countries `tax
 
 ### 4. Data copy script
 
-One-shot script (e.g. `scripts/migrate-turso-to-postgres.ts`):
+One-shot script (`scripts/migrate-turso-to-postgres.ts`):
 
-- Inputs: Turso URL/token (read) + `DATABASE_URL` (write)
+- Inputs: **local SQLite dump** (`--sqlite <path>` or `SQLITE_SOURCE_PATH`) + `DATABASE_URL` (write). Do **not** read live Turso during cutover (avoids remote read limits); download a dump from Turso first.
 - Insert in FK-safe order; preserve integer PKs; **reset sequences** after load
 - Transforms: epoch-ms → `timestamptz`, JSON text → `jsonb`, int bool → bool, money real → `numeric`
 - Prefer copy **all** tables (including TTL cache / company packs) for behavior parity; cold-miss refill remains fine if some cache rows are skipped later as an option
@@ -137,13 +138,14 @@ One-shot script (e.g. `scripts/migrate-turso-to-postgres.ts`):
 ### 6. Cutover checklist
 
 1. Stop WarEra server (Croner jobs stop)
-2. Confirm Pigsty DB reachable from the app host
-3. Run app migrations on Postgres
-4. Run Turso → Postgres copy script; review count/checksum report
-5. Switch `.env` to `DATABASE_URL`; remove Turso vars
-6. Start server; check `/api/health`, shell player load, prices / equipment / MU or battle smoke, jobs UI
-7. Confirm at least one job run succeeds
-8. Keep Turso as offline rollback until confidence is high
+2. Download a Turso SQLite dump to the app host (dashboard/CLI) — one download, not live API reads during copy
+3. Confirm Pigsty DB reachable from the app host
+4. Run app migrations on Postgres
+5. Run dump → Postgres copy: `pnpm run migrate:turso-to-postgres -- --sqlite ./turso-backup.db --truncate`; review count/checksum report
+6. Switch `.env` to `DATABASE_URL`; remove any leftover Turso vars
+7. Start server; check `/api/health`, shell player load, prices / equipment / MU or battle smoke, jobs UI
+8. Confirm at least one job run succeeds
+9. Keep the SQLite dump (+ Turso) as offline rollback until confidence is high
 
 ## Error handling
 

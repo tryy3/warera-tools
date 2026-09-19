@@ -1,12 +1,15 @@
 /**
- * One-shot Turso (libSQL) → Postgres data copy.
+ * One-shot SQLite dump → Postgres data copy (Turso backup file, not live Turso).
+ *
+ * Download a SQLite dump from the Turso dashboard / CLI first, then point this
+ * script at the local file so cutover does not burn remote read quota.
  *
  * Env:
- *   TURSO_DATABASE_URL   (required) — legacy Turso / libSQL URL
- *   TURSO_AUTH_TOKEN     (optional) — Turso auth token
  *   DATABASE_URL         (required) — target Postgres connection string
+ *   SQLITE_SOURCE_PATH   (optional) — local .db / .sqlite path if not passed as --sqlite
  *
  * Flags:
+ *   --sqlite <path>      Local SQLite dump file (required unless SQLITE_SOURCE_PATH is set)
  *   --truncate           TRUNCATE all app tables (RESTART IDENTITY CASCADE) before copy
  *
  * Dry-run example (disposable PG must already have migrations applied):
@@ -14,14 +17,17 @@
  *   set -a && source .env && set +a
  *   export DATABASE_URL=postgres://…   # staging / Testcontainers URL
  *   pnpm run db:migrate
- *   pnpm run migrate:turso-to-postgres -- --truncate
+ *   pnpm run migrate:turso-to-postgres -- --sqlite ./turso-backup.db --truncate
  *
  * Expectation: per-table source/dest counts match; money SUM spot-checks align
- * after Decimal coercion (Turso real → PG numeric).
+ * after Decimal coercion (SQLite real → PG numeric).
  */
 import "dotenv/config";
 import { createClient, type Client } from "@libsql/client";
 import { Decimal } from "decimal.js";
+import fs from "node:fs";
+import path from "node:path";
+import { pathToFileURL } from "node:url";
 import pg from "pg";
 
 const PAGE_SIZE = 1000;
@@ -558,14 +564,30 @@ const TABLES: TableSpec[] = [
   },
 ];
 
-function parseArgs(argv: string[]): { truncate: boolean } {
+function parseArgs(argv: string[]): { truncate: boolean; sqlitePath: string | undefined } {
   let truncate = false;
-  for (const a of argv) {
-    if (a === "--truncate") truncate = true;
-    else if (a === "--help" || a === "-h") {
-      console.log(`Usage: tsx scripts/migrate-turso-to-postgres.ts [--truncate]
+  let sqlitePath: string | undefined;
+  for (let i = 0; i < argv.length; i++) {
+    const a = argv[i]!;
+    if (a === "--truncate") {
+      truncate = true;
+    } else if (a === "--sqlite") {
+      const next = argv[++i];
+      if (!next || next.startsWith("-")) {
+        console.error("--sqlite requires a file path");
+        process.exit(2);
+      }
+      sqlitePath = next;
+    } else if (a.startsWith("--sqlite=")) {
+      sqlitePath = a.slice("--sqlite=".length);
+      if (!sqlitePath) {
+        console.error("--sqlite= requires a file path");
+        process.exit(2);
+      }
+    } else if (a === "--help" || a === "-h") {
+      console.log(`Usage: tsx scripts/migrate-turso-to-postgres.ts --sqlite <path> [--truncate]
 
-Env: TURSO_DATABASE_URL, optional TURSO_AUTH_TOKEN, DATABASE_URL
+Env: DATABASE_URL (required); SQLITE_SOURCE_PATH (optional alternative to --sqlite)
 `);
       process.exit(0);
     } else {
@@ -573,7 +595,22 @@ Env: TURSO_DATABASE_URL, optional TURSO_AUTH_TOKEN, DATABASE_URL
       process.exit(2);
     }
   }
-  return { truncate };
+  return { truncate, sqlitePath };
+}
+
+function resolveSqliteFileUrl(sqlitePath: string): string {
+  const resolved = path.resolve(sqlitePath);
+  if (!fs.existsSync(resolved)) {
+    console.error(`SQLite dump not found: ${resolved}`);
+    process.exit(2);
+  }
+  const st = fs.statSync(resolved);
+  if (!st.isFile()) {
+    console.error(`SQLite path is not a file: ${resolved}`);
+    process.exit(2);
+  }
+  // libSQL file: URLs need an absolute path; pathToFileURL → file:///…
+  return pathToFileURL(resolved).href;
 }
 
 function requireEnv(name: string): string {
@@ -855,15 +892,17 @@ async function resetSequences(pool: pg.Pool): Promise<void> {
 }
 
 async function main(): Promise<void> {
-  const { truncate } = parseArgs(process.argv.slice(2));
-  const tursoUrl = requireEnv("TURSO_DATABASE_URL");
+  const { truncate, sqlitePath: sqliteArg } = parseArgs(process.argv.slice(2));
+  const sqlitePath = sqliteArg ?? process.env.SQLITE_SOURCE_PATH;
+  if (!sqlitePath) {
+    console.error("Missing SQLite dump path: pass --sqlite <path> or set SQLITE_SOURCE_PATH");
+    process.exit(2);
+  }
+  const sqliteUrl = resolveSqliteFileUrl(sqlitePath);
   const databaseUrl = requireEnv("DATABASE_URL");
-  const authToken = process.env.TURSO_AUTH_TOKEN;
 
-  const turso = createClient({
-    url: tursoUrl,
-    authToken: authToken || undefined,
-  });
+  console.log(`Source SQLite: ${sqliteUrl}`);
+  const source = createClient({ url: sqliteUrl });
   const pool = new pg.Pool({ connectionString: databaseUrl });
 
   try {
@@ -871,7 +910,7 @@ async function main(): Promise<void> {
       await truncateAll(pool);
     }
 
-    await preflightJobStatuses(turso);
+    await preflightJobStatuses(source);
 
     console.log("");
     console.log(
@@ -880,15 +919,15 @@ async function main(): Promise<void> {
     console.log("-".repeat(90));
 
     for (const spec of TABLES) {
-      const src = await sourceCount(turso, spec.name);
-      const { inserted } = await copyTable(turso, pool, spec);
+      const src = await sourceCount(source, spec.name);
+      const { inserted } = await copyTable(source, pool, spec);
       const dst = await destCount(pool, spec.name);
 
       let moneyNote = "";
       if (spec.moneySumColumns?.length) {
         const parts: string[] = [];
         for (const col of spec.moneySumColumns) {
-          const sSum = await sourceMoneySum(turso, spec.name, col);
+          const sSum = await sourceMoneySum(source, spec.name, col);
           const dSum = await destMoneySum(pool, spec.name, col);
           const ok = sSum === dSum ? "ok" : "MISMATCH";
           parts.push(`${col}: src=${sSum ?? "null"} dst=${dSum ?? "null"} (${ok})`);
@@ -916,7 +955,7 @@ async function main(): Promise<void> {
     console.log("Migration copy complete.");
   } finally {
     await pool.end();
-    turso.close();
+    source.close();
   }
 }
 
