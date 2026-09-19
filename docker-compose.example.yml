@@ -2,7 +2,7 @@
 #   docker compose -f docker-compose.example.yml --env-file .env up -d --build
 #
 # Tailscale: open http://<tailscale-hostname>:8787
-# Turso: point .env at the primary DB in production; use a branch URL for dry-runs.
+# Set DATABASE_URL in .env (Postgres / Pigsty). Migrations run on container boot.
 
 services:
   warera:

@@ -641,13 +641,8 @@ function transformValue(
   }
 }
 
-function transformRow(
-  row: Record<string, unknown>,
-  spec: TableSpec,
-): unknown[] {
-  return spec.columns.map((col) =>
-    transformValue(row[col], spec.transforms[col], spec.name, col),
-  );
+function transformRow(row: Record<string, unknown>, spec: TableSpec): unknown[] {
+  return spec.columns.map((col) => transformValue(row[col], spec.transforms[col], spec.name, col));
 }
 
 async function sourceCount(turso: Client, table: string): Promise<number> {
@@ -674,11 +669,7 @@ async function sourceMoneySum(
   return new Decimal(String(s)).toDecimalPlaces(6).toFixed();
 }
 
-async function destMoneySum(
-  pool: pg.Pool,
-  table: string,
-  column: string,
-): Promise<string | null> {
+async function destMoneySum(pool: pg.Pool, table: string, column: string): Promise<string | null> {
   const rs = await pool.query<{ s: string | null }>(
     `SELECT SUM("${column}"::numeric)::text AS s FROM "${table}"`,
   );
@@ -736,9 +727,7 @@ async function copyTable(
       try {
         cells = transformRow(row, spec);
       } catch (err) {
-        throw new Error(
-          `Transform failed for ${spec.name} batch ${batchIndex}: ${String(err)}`,
-        );
+        throw new Error(`Transform failed for ${spec.name} batch ${batchIndex}: ${String(err)}`);
       }
       const rowPlaceholders = spec.columns.map((col) => {
         const n = param++;
@@ -820,10 +809,7 @@ async function main(): Promise<void> {
 
     console.log("");
     console.log(
-      "table".padEnd(32) +
-        "source".padStart(10) +
-        "dest".padStart(10) +
-        "  money checksums",
+      "table".padEnd(32) + "source".padStart(10) + "dest".padStart(10) + "  money checksums",
     );
     console.log("-".repeat(90));
 
