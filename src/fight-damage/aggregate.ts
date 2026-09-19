@@ -1,20 +1,21 @@
-import { playerDamageIfPill, playerDamageNow } from "./player-damage";
+import { playerDamageFullPill, playerDamageNow } from "./player-damage";
 import type { FightKnobs, FightPlayerInput } from "./types";
 
 export function aggregateFightDesk(
   players: FightPlayerInput[],
   selectedIds: ReadonlySet<string>,
   knobs: FightKnobs,
+  peaksByUserId: ReadonlyMap<string, FightPlayerInput> = new Map(),
 ): {
   now: number;
-  fullPillPotential: number;
+  peakPotential: number;
   selectedCount: number;
   avgPerMember: number;
   topDamage: number;
   pillCounts: { active: number; debuff: number; ready: number };
 } {
   let now = 0;
-  let fullPillPotential = 0;
+  let peakPotential = 0;
   let selectedCount = 0;
   let topDamage = 0;
   const pillCounts = { active: 0, debuff: 0, ready: 0 };
@@ -27,15 +28,16 @@ export function aggregateFightDesk(
     }
 
     const playerNow = playerDamageNow(player, knobs);
+    const peakInput = peaksByUserId.get(player.userId) ?? player;
     now += playerNow;
-    fullPillPotential += playerDamageIfPill(player, knobs);
+    peakPotential += playerDamageFullPill(peakInput, knobs);
     selectedCount += 1;
     topDamage = Math.max(topDamage, playerNow);
   }
 
   return {
     now,
-    fullPillPotential,
+    peakPotential,
     selectedCount,
     avgPerMember: selectedCount === 0 ? 0 : now / selectedCount,
     topDamage,

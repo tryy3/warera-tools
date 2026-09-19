@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { classifyBuildFromSkillLevels } from "../../../build-class/classify";
 import { aggregateFightDesk } from "../../../fight-damage/aggregate";
 import { FIGHT_FOOD_OPTIONS, foodBonusForId } from "../../../fight-damage/food";
+import type { FightPlayerInput } from "../../../fight-damage/types";
 import { Button } from "@/components/ui/button";
 import { formatDisplayNumber } from "@/lib/formatDisplayNumber";
 import {
@@ -123,12 +124,24 @@ export function FightDeskTab({ muId }: { muId: string }) {
     [prefs.battleBonus, prefs.foodId, prefs.ticks],
   );
 
-  const summary = useMemo(() => {
-    const players = (query.data?.members ?? []).flatMap((member) =>
-      member.fight ? [member.fight] : [],
-    );
-    return aggregateFightDesk(players, new Set(prefs.selectedUserIds), fightKnobs);
-  }, [fightKnobs, prefs.selectedUserIds, query.data?.members]);
+  const peaksByUserId = useMemo(() => {
+    const map = new Map<string, FightPlayerInput>();
+    for (const member of query.data?.members ?? []) {
+      if (member.peakFight) map.set(member.userId, member.peakFight);
+    }
+    return map;
+  }, [query.data?.members]);
+
+  const summary = useMemo(
+    () =>
+      aggregateFightDesk(
+        (query.data?.members ?? []).flatMap((m) => (m.fight ? [m.fight] : [])),
+        new Set(prefs.selectedUserIds),
+        fightKnobs,
+        peaksByUserId,
+      ),
+    [fightKnobs, peaksByUserId, prefs.selectedUserIds, query.data?.members],
+  );
 
   const memberRows = useMemo(
     () => buildFightDeskMemberRows(query.data?.members ?? [], fightKnobs),
@@ -306,10 +319,7 @@ export function FightDeskTab({ muId }: { muId: string }) {
 
       <section className="grid grid-cols-2 gap-3 lg:grid-cols-5">
         <SummaryCard label="Now" value={formatDisplayNumber(summary.now, 0)} />
-        <SummaryCard
-          label="Full pill-potential"
-          value={formatDisplayNumber(summary.fullPillPotential, 0)}
-        />
+        <SummaryCard label="Peak" value={formatDisplayNumber(summary.peakPotential, 0)} />
         <SummaryCard label="Members" value={formatDisplayNumber(summary.selectedCount, 0)} />
         <SummaryCard label="Avg / member" value={formatDisplayNumber(summary.avgPerMember, 0)} />
         <SummaryCard label="Top" value={formatDisplayNumber(summary.topDamage, 0)} />
@@ -331,7 +341,7 @@ export function FightDeskTab({ muId }: { muId: string }) {
               onChange={(event) => setSort(event.target.value as FightDeskSort)}
             >
               <option value="now">Total now</option>
-              <option value="potential">Potential</option>
+              <option value="potential">Peak</option>
               <option value="hp">HP</option>
               <option value="name">Name</option>
             </select>

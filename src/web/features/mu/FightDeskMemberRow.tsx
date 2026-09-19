@@ -109,10 +109,7 @@ export function FightDeskMemberRow({
     Object.entries(member.display.skillLevels).map(([id, level]) => [id, { level }]),
   );
   const buildClass = classifyBuildFromSkillLevels(skillEntries);
-  const reset = skillsResetStatus(
-    member.display.lastSkillsResetAt ? new Date(member.display.lastSkillsResetAt) : null,
-    new Date(nowMs),
-  );
+  const reset = skillsResetStatus(null, new Date(nowMs));
   const resetText =
     reset.kind === "available"
       ? "Reset available"
@@ -222,7 +219,7 @@ export function FightDeskMemberRow({
           </div>
           {fight?.pillStatus !== "active" && complete ? (
             <div className="font-mono text-[0.65rem] text-violet-300 tabular-nums">
-              If pill {formatNumber(row.potentialDamage)}
+              If pill {formatNumber(row.peakDamage)}
             </div>
           ) : null}
           <div className="mt-1 text-[0.65rem] text-muted-foreground xl:hidden">

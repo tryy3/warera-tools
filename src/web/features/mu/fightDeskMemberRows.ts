@@ -1,5 +1,5 @@
 import { dmgPerHit } from "../../../fight-damage/dmg-hit";
-import { playerDamageIfPill, playerDamageNow } from "../../../fight-damage/player-damage";
+import { playerDamageFullPill, playerDamageNow } from "../../../fight-damage/player-damage";
 import { projectResources } from "../../../fight-damage/project";
 import type { FightKnobs } from "../../../fight-damage/types";
 import type { MuFightDeskMember } from "./types";
@@ -9,7 +9,7 @@ export type FightDeskSort = "now" | "potential" | "hp" | "name";
 export type FightDeskMemberRowData = {
   member: MuFightDeskMember;
   nowDamage: number | null;
-  potentialDamage: number | null;
+  peakDamage: number | null;
   damagePerHit: number | null;
   projected: { hp: number; hunger: number } | null;
 };
@@ -23,7 +23,7 @@ export function buildFightDeskMemberRows(
       return {
         member,
         nowDamage: null,
-        potentialDamage: null,
+        peakDamage: null,
         damagePerHit: null,
         projected: null,
       };
@@ -32,7 +32,7 @@ export function buildFightDeskMemberRows(
     return {
       member,
       nowDamage: playerDamageNow(member.fight, knobs),
-      potentialDamage: playerDamageIfPill(member.fight, knobs),
+      peakDamage: member.peakFight ? playerDamageFullPill(member.peakFight, knobs) : null,
       damagePerHit: dmgPerHit(member.fight),
       projected: projectResources(member.fight, knobs.ticks),
     };
@@ -50,7 +50,7 @@ export function sortFightDeskMemberRows(
 
     switch (sort) {
       case "potential":
-        return (b.potentialDamage ?? -1) - (a.potentialDamage ?? -1);
+        return (b.peakDamage ?? -1) - (a.peakDamage ?? -1);
       case "hp":
         return (b.projected?.hp ?? -1) - (a.projected?.hp ?? -1);
       case "name":

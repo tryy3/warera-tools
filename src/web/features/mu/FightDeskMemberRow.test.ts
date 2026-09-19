@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vite-plus/test";
+import { playerDamageFullPill, playerDamageNow } from "../../../fight-damage/player-damage";
 import type { FightKnobs, FightPlayerInput, PillStatus } from "../../../fight-damage/types";
 import {
   buildFightDeskMemberRows,
@@ -14,10 +15,10 @@ const knobs: FightKnobs = {
   ticks: 2,
 };
 
-function fight(userId: string, pillStatus: PillStatus, hp: number): FightPlayerInput {
+function fight(userId: string, pillStatus: PillStatus, hp: number, atk = 100): FightPlayerInput {
   return {
     userId,
-    atk: 100,
+    atk,
     precision: 1,
     critChance: 0,
     critDamage: 2.66,
@@ -38,14 +39,17 @@ function member(
   username: string,
   pillStatus: PillStatus,
   hp: number,
+  peakFight?: FightPlayerInput,
 ): MuFightDeskMember {
+  const current = fight(userId, pillStatus, hp);
   return {
     userId,
     username,
     level: 10,
     role: null,
     incomplete: false,
-    fight: fight(userId, pillStatus, hp),
+    fight: current,
+    peakFight: peakFight ?? current,
     display: {
       avatarUrl: null,
       militaryRankBonus: 0.25,
@@ -53,7 +57,6 @@ function member(
       pillLabel: "Battle pill",
       pillEndsAt: null,
       skillLevels: { attack: 5 },
-      lastSkillsResetAt: null,
     },
   };
 }
@@ -67,12 +70,22 @@ function sortedIds(sort: FightDeskSort): string[] {
 }
 
 describe("buildFightDeskMemberRows", () => {
-  it("derives projected resources and pill potential from complete fight data", () => {
+  it("derives projected resources and Peak from complete fight data", () => {
     const [row] = buildFightDeskMemberRows([member("ready", "Ready", "ready", 20)], knobs);
 
     expect(row?.projected).toEqual({ hp: 40, hunger: 20 });
-    expect(row?.potentialDamage).toBeGreaterThan(row?.nowDamage ?? 0);
+    expect(row?.peakDamage).toBeGreaterThan(row?.nowDamage ?? 0);
     expect(row?.damagePerHit).toBe(100);
+  });
+
+  it("projects peakDamage from peakFight Full-pill, not current mid-fight resources", () => {
+    const current = fight("ready", "ready", 20);
+    const peak = fight("ready", "debuff", 10, 250);
+    const [row] = buildFightDeskMemberRows([member("ready", "Ready", "ready", 20, peak)], knobs);
+
+    expect(row?.nowDamage).toBe(playerDamageNow(current, knobs));
+    expect(row?.peakDamage).toBe(playerDamageFullPill(peak, knobs));
+    expect(row?.peakDamage).toBeGreaterThan(row?.nowDamage ?? 0);
   });
 });
 
@@ -87,11 +100,23 @@ describe("sortFightDeskMemberRows", () => {
     expect(sortedIds("name")).toEqual(["active", "ready"]);
   });
 
+  it("sorts potential by peakDamage from peakFight", () => {
+    const lowPeak = member("low", "Low", "ready", 80, fight("low", "ready", 80, 100));
+    const highPeak = member("high", "High", "ready", 20, fight("high", "ready", 20, 400));
+    const rows = buildFightDeskMemberRows([lowPeak, highPeak], knobs);
+
+    expect(sortFightDeskMemberRows(rows, "potential").map((row) => row.member.userId)).toEqual([
+      "high",
+      "low",
+    ]);
+  });
+
   it("keeps incomplete members at the bottom", () => {
     const incomplete: MuFightDeskMember = {
       ...member("incomplete", "Aardvark", "ready", 100),
       incomplete: true,
       fight: null,
+      peakFight: null,
     };
     const rows = buildFightDeskMemberRows(
       [incomplete, member("complete", "Zulu", "ready", 20)],
