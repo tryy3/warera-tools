@@ -23,6 +23,7 @@ function sampleBattle(overrides: Partial<ParsedBattle> = {}): ParsedBattle {
       regionId: "r-att",
       wonRoundsCount: 1,
       muOrders: ["mu-a"],
+      countryOrders: [],
       hitCount: 10,
     },
     defender: {
@@ -30,6 +31,7 @@ function sampleBattle(overrides: Partial<ParsedBattle> = {}): ParsedBattle {
       regionId: "r-def",
       wonRoundsCount: 0,
       muOrders: ["mu-b"],
+      countryOrders: [],
       hitCount: 8,
     },
     roundsToWin: 8,
@@ -103,6 +105,7 @@ describe("battles db", () => {
           regionId: "r-att",
           wonRoundsCount: 2,
           muOrders: [],
+          countryOrders: [],
           hitCount: 11,
         },
         defender: {
@@ -110,6 +113,7 @@ describe("battles db", () => {
           regionId: "r-def",
           wonRoundsCount: 1,
           muOrders: ["mu-c"],
+          countryOrders: [],
           hitCount: 9,
         },
       }),

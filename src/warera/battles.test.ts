@@ -114,6 +114,15 @@ describe("parseBattleListItem", () => {
     expect(parsed!.attacker.countryOrders).toEqual([]);
     expect(parsed!.defender.countryOrders).toEqual([]);
   });
+
+  it("falls back to countryOrderIds when countryOrders is omitted", () => {
+    const parsed = parseBattleListItem({
+      _id: "b3",
+      attacker: { country: "cA", countryOrderIds: ["egypt"] },
+      defender: { country: "cD" },
+    });
+    expect(parsed!.attacker.countryOrders).toEqual(["egypt"]);
+  });
 });
 
 describe("scoreboardFromBattle", () => {
