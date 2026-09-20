@@ -21,6 +21,9 @@ import { TEST_PG_URL_FILE } from "./global-setup";
 
 const TRUNCATE_SQL = `
 TRUNCATE TABLE
+  battle_orders,
+  battle_bonus_facts,
+  country_diplomacy,
   battle_loot_snapshots,
   battle_scoreboard_snapshots,
   battle_polls,

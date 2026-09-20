@@ -490,6 +490,18 @@ export const itemMarketTransactions = pgTable(
 export const battlePollStatuses = ["success", "partial", "error"] as const;
 export type BattlePollStatus = (typeof battlePollStatuses)[number];
 
+export const battleOrderOwnerTypes = ["mu", "country"] as const;
+export type BattleOrderOwnerType = (typeof battleOrderOwnerTypes)[number];
+export const battleOrderOwnerTypeEnum = pgEnum("battle_order_owner_type", battleOrderOwnerTypes);
+
+export const battleOrderSides = ["attacker", "defender"] as const;
+export type BattleOrderSide = (typeof battleOrderSides)[number];
+export const battleOrderSideEnum = pgEnum("battle_order_side", battleOrderSides);
+
+export const battleOrderPriorities = ["low", "medium", "high"] as const;
+export type BattleOrderPriority = (typeof battleOrderPriorities)[number];
+export const battleOrderPriorityEnum = pgEnum("battle_order_priority", battleOrderPriorities);
+
 export const battles = pgTable(
   "battles",
   {
@@ -508,6 +520,8 @@ export const battles = pgTable(
     defenderWonRounds: integer("defender_won_rounds"),
     attackerMuOrders: jsonb("attacker_mu_orders").$type<string[] | null>(),
     defenderMuOrders: jsonb("defender_mu_orders").$type<string[] | null>(),
+    attackerCountryOrders: jsonb("attacker_country_orders").$type<string[] | null>(),
+    defenderCountryOrders: jsonb("defender_country_orders").$type<string[] | null>(),
     stickyMuIds: jsonb("sticky_mu_ids").$type<string[] | null>(),
     roundsHistory: jsonb("rounds_history").$type<unknown[] | null>(),
     startedAtGame: timestamp("started_at_game", { withTimezone: true, mode: "date" }),
@@ -517,6 +531,57 @@ export const battles = pgTable(
     payload: jsonb("payload").$type<Record<string, unknown> | null>(),
   },
   (t) => [index("battles_is_active_idx").on(t.isActive)],
+);
+
+export const battleOrders = pgTable(
+  "battle_orders",
+  {
+    battleId: text("battle_id")
+      .notNull()
+      .references(() => battles.id),
+    ownerType: battleOrderOwnerTypeEnum("owner_type").notNull(),
+    ownerId: text("owner_id").notNull(),
+    side: battleOrderSideEnum("side").notNull(),
+    priority: battleOrderPriorityEnum("priority").notNull(),
+    fetchedAt: timestamp("fetched_at", { withTimezone: true, mode: "date" }).notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.battleId, t.ownerType, t.ownerId] }),
+    index("battle_orders_owner_idx").on(t.ownerType, t.ownerId),
+  ],
+);
+
+export const battleBonusFacts = pgTable("battle_bonus_facts", {
+  battleId: text("battle_id")
+    .primaryKey()
+    .references(() => battles.id),
+  isRevolt: boolean("is_revolt").notNull(),
+  bunkerLevel: integer("bunker_level"),
+  bunkerActive: boolean("bunker_active"),
+  militaryBaseLevel: integer("military_base_level"),
+  militaryBaseActive: boolean("military_base_active"),
+  resistance: doublePrecision("resistance"),
+  defenderSupplyLinked: boolean("defender_supply_linked"),
+  attackerRegionId: text("attacker_region_id"),
+  defenderRegionId: text("defender_region_id"),
+  fetchedAt: timestamp("fetched_at", { withTimezone: true, mode: "date" }).notNull(),
+});
+
+export const countryDiplomacy = pgTable(
+  "country_diplomacy",
+  {
+    countryId: text("country_id").primaryKey(),
+    allianceId: text("alliance_id"),
+    allianceWorldShare: doublePrecision("alliance_world_share"),
+    swornEnemyId: text("sworn_enemy_id"),
+    swornEnemySince: timestamp("sworn_enemy_since", { withTimezone: true, mode: "date" }),
+    defensivePacts: jsonb("defensive_pacts").$type<Array<{
+      countryId: string;
+      since: string;
+    }> | null>(),
+    fetchedAt: timestamp("fetched_at", { withTimezone: true, mode: "date" }).notNull(),
+  },
+  (t) => [index("country_diplomacy_alliance_idx").on(t.allianceId)],
 );
 
 export const battlePolls = pgTable(
