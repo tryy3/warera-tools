@@ -1,6 +1,6 @@
 import { eq, inArray } from "drizzle-orm";
 import { computeBattleBonus } from "../battle-bonus/compute";
-import type { BattleBonusFacts, BattleBonusResult, BattleSide, OrderPriority } from "../battle-bonus/types";
+import type { BattleBonusFacts, BattleSide, OrderPriority } from "../battle-bonus/types";
 import { listBattleOrders } from "../db/battle-orders";
 import { listFightDeskBattles, listLatestMuDamageByBattle, type BattleStripRow } from "../db/battle-strip";
 import type { Db } from "../db/client";

@@ -594,6 +594,7 @@ describe("muFightDeskRoutes", () => {
     const body = (await res.json()) as {
       battles: Array<{
         kind: string;
+        regionName: string | null;
         muDamageToDate: number | null;
         bonus: { total: number; parts: Array<{ id: string; amount: number | null }> };
       }>;
