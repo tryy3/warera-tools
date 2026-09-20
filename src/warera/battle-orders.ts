@@ -33,9 +33,16 @@ function resolveOwner(obj: Record<string, unknown>): { ownerType: "mu" | "countr
 }
 
 function parsePriority(raw: unknown): OrderPriority | null {
+  if (raw === 0 || raw === "0") return null;
   if (raw === "low" || raw === 1) return "low";
   if (raw === "medium" || raw === 2) return "medium";
   if (raw === "high" || raw === 3) return "high";
+  return null;
+}
+
+function resolvePriority(obj: Record<string, unknown>): OrderPriority | null {
+  if (obj.priority !== undefined) return parsePriority(obj.priority);
+  if (obj.rank !== undefined) return parsePriority(obj.rank);
   return null;
 }
 
@@ -54,12 +61,20 @@ function extractOrderList(raw: unknown): unknown[] {
   return [];
 }
 
-function parseOne(raw: unknown): ParsedBattleOrder | null {
+function resolveSide(rawSide: unknown, defaultSide?: BattleSide): BattleSide | null {
+  const parsed = parseSide(rawSide);
+  if (parsed) return parsed;
+  if (rawSide === undefined && defaultSide) return defaultSide;
+  if (defaultSide && rawSide != null && parseSide(rawSide) === null) return defaultSide;
+  return null;
+}
+
+function parseOne(raw: unknown, defaultSide?: BattleSide): ParsedBattleOrder | null {
   const obj = asRecord(raw);
   if (!obj) return null;
   const owner = resolveOwner(obj);
-  const side = parseSide(obj.side);
-  const priority = parsePriority(obj.priority);
+  const side = resolveSide(obj.side, defaultSide);
+  const priority = resolvePriority(obj);
   if (!owner || !side || !priority) return null;
   return {
     ...owner,
@@ -69,9 +84,13 @@ function parseOne(raw: unknown): ParsedBattleOrder | null {
   };
 }
 
-export function parseBattleOrders(raw: unknown): ParsedBattleOrder[] {
+export function parseBattleOrders(
+  raw: unknown,
+  opts?: { defaultSide?: BattleSide },
+): ParsedBattleOrder[] {
+  const defaultSide = opts?.defaultSide;
   return extractOrderList(raw).flatMap((row) => {
-    const parsed = parseOne(row);
+    const parsed = parseOne(row, defaultSide);
     return parsed ? [parsed] : [];
   });
 }
@@ -80,8 +99,13 @@ export async function fetchBattleOrders(
   warera: WareraRequester,
   battleId: string,
 ): Promise<ParsedBattleOrder[]> {
-  const json = await warera.request<unknown>(
-    wareraProcedurePath("battleOrder.getByBattle", { battleId }),
+  const sides = ["attacker", "defender"] as const;
+  const jsons = await Promise.all(
+    sides.map((side) =>
+      warera.request<unknown>(wareraProcedurePath("battleOrder.getByBattle", { battleId, side })),
+    ),
   );
-  return parseBattleOrders(unwrapTrpcData(json));
+  return sides.flatMap((side, i) =>
+    parseBattleOrders(unwrapTrpcData(jsons[i]), { defaultSide: side }),
+  );
 }
