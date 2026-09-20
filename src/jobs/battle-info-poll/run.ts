@@ -1,10 +1,13 @@
+import { inArray } from "drizzle-orm";
 import type { Db } from "../../db/client";
+import { upsertBattleBonusFacts } from "../../db/battle-bonus-facts";
 import {
   listActiveTrackedBattles,
   markBattleEnded,
   markBattleFinalized,
   upsertBattleFromParsed,
 } from "../../db/battles";
+import { upsertCountryDiplomacy } from "../../db/country-diplomacy";
 import {
   insertBattleLootSnapshots,
   insertBattlePoll,
@@ -14,6 +17,7 @@ import {
 } from "../../db/battle-stats";
 import { replaceBattleOrders } from "../../db/battle-orders";
 import { listMuMembers, listMusForSync, listWatchedMusWithCountry } from "../../db/mus";
+import { mus } from "../../db/schema";
 import { relevantStickyMuIds } from "./relevance";
 import { fetchBattleOrders } from "../../warera/battle-orders";
 import type { Logger } from "../../logging/logger";
@@ -26,7 +30,21 @@ import {
   type ParsedBattle,
   type ParsedBattleLootSummary,
 } from "../../warera/battles";
+import {
+  computeAllianceWorldShare,
+  fetchCountryCapitalRegionId,
+  fetchCountryDiplomacy,
+  fetchWorldDevelopment,
+  type ParsedWorldDevelopment,
+} from "../../warera/diplomacy";
 import type { WareraRequester } from "../../warera/prices";
+import {
+  computeDefenderSupplyLinked,
+  fetchRegionCombat,
+  isBattleRevoltType,
+  toGraphNode,
+  type ParsedRegionCombat,
+} from "../../warera/region-combat";
 
 export type BattleInfoPollResult = {
   pollId: number;
@@ -87,6 +105,24 @@ export async function runBattleInfoPoll(options: {
     );
   }
 
+  const stickyMuIdsAll = new Set<string>();
+  for (const row of dbActive) {
+    for (const muId of row.stickyMuIds ?? []) stickyMuIdsAll.add(muId);
+  }
+  const muCountryByMuId = await loadMuCountries(db, [...stickyMuIdsAll]);
+  const distinctMuCountries = new Set(
+    [...stickyMuIdsAll]
+      .map((muId) => muCountryByMuId.get(muId))
+      .filter((c): c is string => typeof c === "string" && c.length > 0),
+  );
+
+  const bonusWarm: BattleBonusWarmState = {
+    diplomacyFetched: new Set(),
+    regions: new Map(),
+    capitalByCountry: new Map(),
+    worldDev: null,
+  };
+
   const scoreboardRows: BattleScoreboardSnapshotRow[] = [];
   const lootRows: BattleLootSnapshotRow[] = [];
   // Battles that completed getById + final loot cleanly and are ready to be
@@ -128,6 +164,24 @@ export async function runBattleInfoPoll(options: {
         });
       }
       await syncBattleOrders(db, warera, row.id, now, errors, logger);
+      await warmDistinctMuDiplomacy(
+        db,
+        warera,
+        distinctMuCountries,
+        bonusWarm,
+        now,
+        errors,
+        logger,
+      );
+      await syncBattleBonusFacts(
+        db,
+        warera,
+        parsed,
+        bonusWarm,
+        now,
+        errors,
+        logger,
+      );
       await collectLoot(warera, row.id, stickyMuIds, rosterByMu, lootRows, now, errors, logger);
       continue;
     }
@@ -265,6 +319,167 @@ export async function runBattleInfoPoll(options: {
     finalizedCount,
     status,
   };
+}
+
+type BattleBonusWarmState = {
+  diplomacyFetched: Set<string>;
+  regions: Map<string, ParsedRegionCombat>;
+  capitalByCountry: Map<string, string | null>;
+  worldDev: ParsedWorldDevelopment | null;
+};
+
+async function loadMuCountries(db: Db, muIds: string[]): Promise<Map<string, string | null>> {
+  const out = new Map<string, string | null>();
+  if (muIds.length === 0) return out;
+  const rows = await db
+    .select({ id: mus.id, countryId: mus.countryId })
+    .from(mus)
+    .where(inArray(mus.id, muIds));
+  for (const row of rows) out.set(row.id, row.countryId ?? null);
+  for (const muId of muIds) {
+    if (!out.has(muId)) out.set(muId, null);
+  }
+  return out;
+}
+
+async function ensureWorldDevelopment(
+  warera: WareraRequester,
+  warm: BattleBonusWarmState,
+  errors: string[],
+  logger: Logger,
+): Promise<void> {
+  if (warm.worldDev) return;
+  try {
+    warm.worldDev = await fetchWorldDevelopment(warera);
+  } catch (err) {
+    warm.worldDev = { totalDevelopment: null, allianceDevelopmentById: new Map() };
+    errors.push(`worldDev: ${err instanceof Error ? err.message : String(err)}`);
+    logger.warn(
+      { err: err instanceof Error ? err.message : String(err) },
+      "world development fetch failed",
+    );
+  }
+}
+
+async function warmDistinctMuDiplomacy(
+  db: Db,
+  warera: WareraRequester,
+  countryIds: Set<string>,
+  warm: BattleBonusWarmState,
+  fetchedAt: Date,
+  errors: string[],
+  logger: Logger,
+): Promise<void> {
+  await ensureWorldDevelopment(warera, warm, errors, logger);
+  for (const countryId of countryIds) {
+    if (warm.diplomacyFetched.has(countryId)) continue;
+    warm.diplomacyFetched.add(countryId);
+    try {
+      const parsed = await fetchCountryDiplomacy(warera, countryId);
+      const allianceWorldShare = computeAllianceWorldShare(warm.worldDev!, parsed.allianceId);
+      await upsertCountryDiplomacy(db, {
+        countryId,
+        allianceId: parsed.allianceId,
+        allianceWorldShare,
+        swornEnemyId: parsed.swornEnemyId,
+        swornEnemySince: parsed.swornEnemySince,
+        defensivePacts: parsed.pacts,
+        fetchedAt,
+      });
+    } catch (err) {
+      errors.push(`diplomacy ${countryId}: ${err instanceof Error ? err.message : String(err)}`);
+      logger.warn(
+        { country_id: countryId, err: err instanceof Error ? err.message : String(err) },
+        "country diplomacy fetch failed",
+      );
+    }
+  }
+}
+
+async function loadRegionCombatCached(
+  warera: WareraRequester,
+  regionId: string | null,
+  warm: BattleBonusWarmState,
+): Promise<ParsedRegionCombat | null> {
+  if (!regionId) return null;
+  const cached = warm.regions.get(regionId);
+  if (cached) return cached;
+  const parsed = await fetchRegionCombat(warera, regionId);
+  warm.regions.set(regionId, parsed);
+  return parsed;
+}
+
+async function resolveCapitalRegionId(
+  warera: WareraRequester,
+  countryId: string | null,
+  warm: BattleBonusWarmState,
+): Promise<string | null> {
+  if (!countryId) return null;
+  if (warm.capitalByCountry.has(countryId)) {
+    return warm.capitalByCountry.get(countryId) ?? null;
+  }
+  const capital = await fetchCountryCapitalRegionId(warera, countryId);
+  warm.capitalByCountry.set(countryId, capital);
+  return capital;
+}
+
+async function syncBattleBonusFacts(
+  db: Db,
+  warera: WareraRequester,
+  parsed: ParsedBattle,
+  warm: BattleBonusWarmState,
+  fetchedAt: Date,
+  errors: string[],
+  logger: Logger,
+): Promise<void> {
+  const defenderRegionId = parsed.defender.regionId;
+  const attackerRegionId = parsed.attacker.regionId;
+  if (!defenderRegionId) return;
+
+  try {
+    const defenderCombat = await loadRegionCombatCached(warera, defenderRegionId, warm);
+    if (!defenderCombat) return;
+
+    let attackerCombat: ParsedRegionCombat | null = null;
+    if (attackerRegionId) {
+      attackerCombat = await loadRegionCombatCached(warera, attackerRegionId, warm);
+    }
+
+    const defenderCountryId = parsed.defender.countryId ?? defenderCombat.ownerCountryId;
+    const capitalRegionId = await resolveCapitalRegionId(warera, defenderCountryId, warm);
+
+    const graph = new Map([
+      [defenderRegionId, toGraphNode(defenderRegionId, defenderCombat)],
+    ]);
+    if (attackerRegionId && attackerCombat) {
+      graph.set(attackerRegionId, toGraphNode(attackerRegionId, attackerCombat));
+    }
+
+    const defenderSupplyLinked = computeDefenderSupplyLinked(
+      defenderRegionId,
+      capitalRegionId,
+      graph,
+    );
+
+    await upsertBattleBonusFacts(db, parsed.id, {
+      isRevolt: isBattleRevoltType(parsed.type),
+      bunkerLevel: defenderCombat.bunkerLevel,
+      bunkerActive: defenderCombat.bunkerActive,
+      militaryBaseLevel: attackerCombat?.militaryBaseLevel ?? null,
+      militaryBaseActive: attackerCombat?.militaryBaseActive ?? null,
+      resistance: defenderCombat.resistance,
+      defenderSupplyLinked,
+      attackerRegionId,
+      defenderRegionId,
+      fetchedAt,
+    });
+  } catch (err) {
+    errors.push(`bonusFacts ${parsed.id}: ${err instanceof Error ? err.message : String(err)}`);
+    logger.warn(
+      { battle_id: parsed.id, err: err instanceof Error ? err.message : String(err) },
+      "battle bonus facts fetch failed",
+    );
+  }
 }
 
 async function syncBattleOrders(

@@ -33,9 +33,9 @@ Custom vs OpenAPI: https://github.com/WarEraProjects/TRPC/tree/main/src/CustomEn
 | company.getProductionBonus | trpc-custom | unknown | yes |
 | company.getRecommendedRegionIdsByItemCode | trpc-custom | required | yes |
 | country.getAllCountries | openapi | optional | yes |
-| country.getCountryById | openapi | unknown | no |
+| country.getCountryById | openapi | unknown | yes |
 | country.getUnrestData | explorer | unknown | no |
-| countryDiplomacy.getByCountry | explorer | unknown | no |
+| countryDiplomacy.getByCountry | explorer | unknown | yes |
 | donation.getManyPaginated | trpc-custom | required | yes |
 | donation.getTotalDonations | trpc-custom | unknown | no |
 | election.getElection | explorer | unknown | no |
@@ -44,7 +44,7 @@ Custom vs OpenAPI: https://github.com/WarEraProjects/TRPC/tree/main/src/CustomEn
 | gameConfig.getDates | openapi | unknown | no |
 | gameConfig.getGameConfig | openapi | unknown | no |
 | gameStat.getEquipmentAvgByCode | trpc-custom | unknown | no |
-| gameStat.getWorldDevelopment | explorer | unknown | no |
+| gameStat.getWorldDevelopment | explorer | unknown | yes |
 | giveaway.getManyPaginated | explorer | unknown | no |
 | government.getByCountryId | openapi | unknown | no |
 | inventory.fetchCurrentEquipment | openapi | unknown | yes |

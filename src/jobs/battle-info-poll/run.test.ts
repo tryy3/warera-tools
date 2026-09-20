@@ -114,6 +114,10 @@ function makeWarera(handlers: {
   lootThrowFor?: Set<string>;
   battleOrders?: (battleId: string, side: "attacker" | "defender") => unknown;
   battleOrdersThrowFor?: Set<string>;
+  regionById?: (regionId: string) => unknown;
+  countryDiplomacy?: (countryId: string) => unknown;
+  countryById?: (countryId: string) => unknown;
+  worldDevelopment?: unknown;
 }) {
   const request = vi.fn(async (path: string) => {
     if (path.includes("battle.getBattles")) {
@@ -155,6 +159,49 @@ function makeWarera(handlers: {
       }
       const body = handlers.loot?.(battleId, userId);
       return { result: { data: body ?? lootFixture({}) } };
+    }
+    if (path.includes("region.getById")) {
+      const inputMatch = path.match(/input=([^&]+)/);
+      const inputJson = inputMatch?.[1] ? decodeURIComponent(inputMatch[1]) : "{}";
+      const input = JSON.parse(inputJson) as { regionId?: string };
+      const regionId = input.regionId ?? "";
+      const body = handlers.regionById?.(regionId);
+      return {
+        result: {
+          data: body ?? {
+            countryId: "c-def",
+            neighbors: [],
+            bunker: { level: 0, active: false },
+            militaryBase: { level: 0, active: false },
+          },
+        },
+      };
+    }
+    if (path.includes("countryDiplomacy.getByCountry")) {
+      const inputMatch = path.match(/input=([^&]+)/);
+      const inputJson = inputMatch?.[1] ? decodeURIComponent(inputMatch[1]) : "{}";
+      const input = JSON.parse(inputJson) as { countryId?: string };
+      const countryId = input.countryId ?? "";
+      const body = handlers.countryDiplomacy?.(countryId);
+      return { result: { data: body ?? { defensivePacts: [] } } };
+    }
+    if (path.includes("gameStat.getWorldDevelopment")) {
+      return {
+        result: {
+          data: handlers.worldDevelopment ?? {
+            totalDevelopment: 100,
+            alliances: [],
+          },
+        },
+      };
+    }
+    if (path.includes("country.getCountryById")) {
+      const inputMatch = path.match(/input=([^&]+)/);
+      const inputJson = inputMatch?.[1] ? decodeURIComponent(inputMatch[1]) : "{}";
+      const input = JSON.parse(inputJson) as { countryId?: string };
+      const countryId = input.countryId ?? "";
+      const body = handlers.countryById?.(countryId);
+      return { result: { data: body ?? { capitalRegionId: "r-cap" } } };
     }
     throw new Error(`unexpected path ${path}`);
   });
@@ -565,6 +612,53 @@ describe("runBattleInfoPoll", () => {
       .from(schema.battleLootSnapshots)
       .where(eq(schema.battleLootSnapshots.pollId, result.pollId));
     expect(pollRows.map((l) => l.userId).sort()).toEqual(["u2"]);
+  });
+
+  it("battle bonus facts: defender not supply-linked to capital -> defender_supply_linked false", async () => {
+    await seedMuWatch(db, "mu-a", { countryId: "c-mu" });
+    await seedMuMembers(db, "mu-a", ["u1"]);
+    const warera = makeWarera({
+      activeBattles: [
+        battleFixture({
+          id: "b-supply",
+          defenderMuOrders: ["mu-a"],
+        }),
+      ],
+      regionById: (regionId) => {
+        if (regionId === "r-def") {
+          return {
+            countryId: "c-def",
+            neighbors: [],
+            bunker: { level: 3, active: true },
+            militaryBase: { level: 0, active: false },
+          };
+        }
+        if (regionId === "r-att") {
+          return {
+            countryId: "c-att",
+            neighbors: [],
+            militaryBase: { level: 2, active: true },
+          };
+        }
+        return { countryId: "c-def", neighbors: [] };
+      },
+      countryById: (countryId) =>
+        countryId === "c-def" ? { capitalRegionId: "r-cap-far" } : { capitalRegionId: null },
+      loot: () => lootFixture({}),
+    });
+    await runBattleInfoPoll({
+      db,
+      warera: warera as never,
+      logger: makeLogger() as never,
+      now: new Date("2026-09-03T12:00:00.000Z"),
+    });
+    const [facts] = await db
+      .select()
+      .from(schema.battleBonusFacts)
+      .where(eq(schema.battleBonusFacts.battleId, "b-supply"));
+    expect(facts?.defenderSupplyLinked).toBe(false);
+    expect(facts?.bunkerLevel).toBe(3);
+    expect(facts?.militaryBaseLevel).toBe(2);
   });
 
   it("fix2: sticky unwatched MU still gets loot for its mu_members (roster loaded from stickyMuIds)", async () => {
