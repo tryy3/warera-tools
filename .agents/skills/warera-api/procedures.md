@@ -26,7 +26,7 @@ Custom vs OpenAPI: https://github.com/WarEraProjects/TRPC/tree/main/src/CustomEn
 | battle.getById | openapi | unknown | yes |
 | battle.getLiveBattleData | openapi | unknown | no |
 | battleLootSummary.getByBattleAndUser | openapi | unknown | yes |
-| battleOrder.getByBattle | openapi | unknown | no |
+| battleOrder.getByBattle | openapi | unknown | yes |
 | battleRanking.getRanking | openapi | unknown | no |
 | company.getById | openapi | unknown | yes |
 | company.getCompanies | openapi | unknown | yes |
