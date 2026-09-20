@@ -17,6 +17,7 @@ import {
   type FightDeskPresetId,
 } from "../../lib/fightDeskSelection";
 import { useMuFightDeskQuery, useRefreshMuFightDesk } from "../../query/useMuFightDeskQuery";
+import { FightDeskBattleStrip } from "./FightDeskBattleStrip";
 import { FightDeskMemberRow } from "./FightDeskMemberRow";
 import {
   buildFightDeskMemberRows,
@@ -114,14 +115,37 @@ export function FightDeskTab({ muId }: { muId: string }) {
     saveFightDeskPrefs(muId, prefs);
   }, [initialPresetDone, muId, prefs]);
 
+  const battles = query.data?.battles ?? [];
+
+  useEffect(() => {
+    if (!query.data || !initial.applyInitialPreset) return;
+    setPrefs((current) => {
+      if (current.selectedBattleId !== "custom") return current;
+      const pick = battles.find((battle) => battle.kind !== "country_order");
+      if (!pick) return current;
+      return { ...current, selectedBattleId: pick.id };
+    });
+  }, [battles, initial.applyInitialPreset, query.data]);
+
+  useEffect(() => {
+    if (prefs.selectedBattleId === "custom") return;
+    if (battles.some((battle) => battle.id === prefs.selectedBattleId)) return;
+    setPrefs((current) => ({ ...current, selectedBattleId: "custom" }));
+  }, [battles, prefs.selectedBattleId]);
+
+  const selectedLiveBattle = useMemo(() => {
+    if (prefs.selectedBattleId === "custom") return null;
+    return battles.find((battle) => battle.id === prefs.selectedBattleId) ?? null;
+  }, [battles, prefs.selectedBattleId]);
+
   const fightKnobs = useMemo(
     () => ({
       foodId: prefs.foodId,
       foodBonus: foodBonusForId(prefs.foodId),
-      battleBonus: prefs.battleBonus,
+      battleBonus: selectedLiveBattle ? selectedLiveBattle.bonus.total : prefs.battleBonus,
       ticks: prefs.ticks,
     }),
-    [prefs.battleBonus, prefs.foodId, prefs.ticks],
+    [prefs.battleBonus, prefs.foodId, prefs.ticks, selectedLiveBattle],
   );
 
   const peaksByUserId = useMemo(() => {
@@ -261,19 +285,6 @@ export function FightDeskTab({ muId }: { muId: string }) {
             </summary>
             <div className="mt-3 flex flex-wrap gap-3">
               <label className="text-xs text-muted-foreground">
-                Battle bonus %
-                <input
-                  type="number"
-                  min="0"
-                  step="1"
-                  className="mt-1 block h-8 w-28 rounded-lg border border-input bg-secondary px-2.5 font-mono text-sm text-foreground outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
-                  value={prefs.battleBonus * 100}
-                  onChange={(event) =>
-                    updatePrefs({ battleBonus: numericInputValue(event.target.value) / 100 })
-                  }
-                />
-              </label>
-              <label className="text-xs text-muted-foreground">
                 Ticks (hours)
                 <input
                   type="number"
@@ -288,6 +299,17 @@ export function FightDeskTab({ muId }: { muId: string }) {
               </label>
             </div>
           </details>
+        </div>
+        <div className="border-t border-border/60 p-4">
+          <FightDeskBattleStrip
+            battles={battles}
+            selectedBattleId={prefs.selectedBattleId}
+            customBonus={prefs.battleBonus}
+            onSelectBattle={(selectedBattleId) => updatePrefs({ selectedBattleId })}
+            onCustomBonusChange={(battleBonus) =>
+              updatePrefs({ battleBonus, selectedBattleId: "custom" })
+            }
+          />
         </div>
       </section>
 
