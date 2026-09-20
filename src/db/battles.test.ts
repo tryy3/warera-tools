@@ -156,6 +156,36 @@ describe("battles db", () => {
     expect(row?.finalizedAt).toBeNull();
   });
 
+  it("persists attacker and defender country order arrays", async () => {
+    const fetchedAt = new Date("2026-09-03T12:00:00.000Z");
+    await upsertBattleFromParsed(
+      db,
+      sampleBattle({
+        attacker: {
+          countryId: "c-att",
+          regionId: "r-att",
+          wonRoundsCount: 1,
+          muOrders: ["mu-a"],
+          countryOrders: ["sweden"],
+          hitCount: 10,
+        },
+        defender: {
+          countryId: "c-def",
+          regionId: "r-def",
+          wonRoundsCount: 0,
+          muOrders: ["mu-b"],
+          countryOrders: ["norway"],
+          hitCount: 8,
+        },
+      }),
+      { stickyMuIds: ["mu-a"], fetchedAt },
+    );
+
+    const [row] = await db.select().from(schema.battles).where(eq(schema.battles.id, "b1"));
+    expect(row?.attackerCountryOrders).toEqual(["sweden"]);
+    expect(row?.defenderCountryOrders).toEqual(["norway"]);
+  });
+
   it("markBattleFinalized clears is_active", async () => {
     const fetchedAt = new Date("2026-09-03T12:00:00.000Z");
     const finalizedAt = new Date("2026-09-03T12:16:00.000Z");
