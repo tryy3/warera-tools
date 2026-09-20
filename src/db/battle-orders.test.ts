@@ -100,6 +100,20 @@ describe("battle orders db", () => {
       stickyMuIds: [],
       fetchedAt,
     });
+    await replaceBattleOrders(
+      db,
+      "b-clear",
+      [
+        {
+          ownerType: "mu",
+          ownerId: "mu-1",
+          side: "attacker",
+          priority: "high",
+          payload: null,
+        },
+      ],
+      fetchedAt,
+    );
     await replaceBattleOrders(db, "b-clear", [], fetchedAt);
     expect(await listBattleOrders(db, "b-clear")).toEqual([]);
   });

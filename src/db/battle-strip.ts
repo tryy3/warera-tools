@@ -129,6 +129,7 @@ export async function listLatestMuDamageByBattle(
               and(
                 eq(newerLoot.battleId, battleLootSnapshots.battleId),
                 eq(newerLoot.userId, battleLootSnapshots.userId),
+                eq(newerLoot.muId, battleLootSnapshots.muId),
                 or(
                   gt(newerLoot.recordedAt, battleLootSnapshots.recordedAt),
                   and(

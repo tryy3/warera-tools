@@ -9,19 +9,20 @@ export async function replaceBattleOrders(
   orders: ParsedBattleOrder[],
   fetchedAt: Date,
 ): Promise<void> {
-  await db.delete(battleOrders).where(eq(battleOrders.battleId, battleId));
-  if (orders.length === 0) return;
-
-  await db.insert(battleOrders).values(
-    orders.map((order) => ({
-      battleId,
-      ownerType: order.ownerType,
-      ownerId: order.ownerId,
-      side: order.side,
-      priority: order.priority,
-      fetchedAt,
-    })),
-  );
+  await db.transaction(async (tx) => {
+    await tx.delete(battleOrders).where(eq(battleOrders.battleId, battleId));
+    if (orders.length === 0) return;
+    await tx.insert(battleOrders).values(
+      orders.map((order) => ({
+        battleId,
+        ownerType: order.ownerType,
+        ownerId: order.ownerId,
+        side: order.side,
+        priority: order.priority,
+        fetchedAt,
+      })),
+    );
+  });
 }
 
 export async function listBattleOrders(db: Db, battleId: string): Promise<ParsedBattleOrder[]> {

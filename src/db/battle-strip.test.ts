@@ -216,4 +216,75 @@ describe("battle strip db", () => {
     expect(row?.defenderCountryOrders).toEqual(["sweden"]);
     expect(row?.isActive).toBe(true);
   });
+
+  it("latest loot per user is scoped to this MU when another MU has newer snapshots", async () => {
+    const fetchedAt = new Date("2026-09-12T10:00:00.000Z");
+    const battleId = "b-mixed-mu";
+    await upsertBattleFromParsed(db, battleWithCountryOrder(battleId, ["sweden"]), {
+      stickyMuIds: [],
+      fetchedAt,
+    });
+
+    const pollId = await insertBattlePoll(db, {
+      recordedAt: fetchedAt,
+      status: "success",
+      battleCount: 1,
+      lootSnapshotCount: 3,
+      finalizedCount: 0,
+    });
+
+    const t1 = new Date("2026-09-12T11:00:00.000Z");
+    const t2 = new Date("2026-09-12T12:00:00.000Z");
+    const t3 = new Date("2026-09-12T13:00:00.000Z");
+    await db.insert(schema.battleLootSnapshots).values([
+      {
+        pollId,
+        battleId,
+        userId: "user-a",
+        muId: "mu-1",
+        totalDmg: 250,
+        hits: null,
+        totalMoneyFromBounty: null,
+        totalMoneyFromContract: null,
+        case1Count: null,
+        case2Count: null,
+        poolLoot: null,
+        payload: null,
+        recordedAt: t2,
+      },
+      {
+        pollId,
+        battleId,
+        userId: "user-a",
+        muId: "mu-other",
+        totalDmg: 999,
+        hits: null,
+        totalMoneyFromBounty: null,
+        totalMoneyFromContract: null,
+        case1Count: null,
+        case2Count: null,
+        poolLoot: null,
+        payload: null,
+        recordedAt: t3,
+      },
+      {
+        pollId,
+        battleId,
+        userId: "user-b",
+        muId: "mu-1",
+        totalDmg: 50,
+        hits: null,
+        totalMoneyFromBounty: null,
+        totalMoneyFromContract: null,
+        case1Count: null,
+        case2Count: null,
+        poolLoot: null,
+        payload: null,
+        recordedAt: t1,
+      },
+    ]);
+
+    const damage = await listLatestMuDamageByBattle(db, "mu-1", [battleId]);
+    expect(damage.get(battleId)).toBe(300);
+  });
 });
