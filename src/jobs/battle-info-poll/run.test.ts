@@ -614,6 +614,103 @@ describe("runBattleInfoPoll", () => {
     expect(pollRows.map((l) => l.userId).sort()).toEqual(["u2"]);
   });
 
+  it("battle bonus facts: BFS fetches mid-chain neighbor -> defender_supply_linked false", async () => {
+    await seedMuWatch(db, "mu-a", { countryId: "c-mu" });
+    await seedMuMembers(db, "mu-a", ["u1"]);
+    const warera = makeWarera({
+      activeBattles: [
+        battleFixture({
+          id: "b-supply-chain",
+          defenderMuOrders: ["mu-a"],
+        }),
+      ],
+      regionById: (regionId) => {
+        if (regionId === "r-def") {
+          return {
+            countryId: "c-def",
+            neighbors: ["r-mid"],
+            bunker: { level: 1, active: true },
+          };
+        }
+        if (regionId === "r-mid") {
+          return { countryId: "c-def", neighbors: [] };
+        }
+        if (regionId === "r-att") {
+          return { countryId: "c-att", neighbors: [], militaryBase: { level: 0, active: false } };
+        }
+        return { countryId: "c-def", neighbors: [] };
+      },
+      countryById: (countryId) =>
+        countryId === "c-def" ? { capitalRegionId: "r-cap" } : { capitalRegionId: null },
+      loot: () => lootFixture({}),
+    });
+    await runBattleInfoPoll({
+      db,
+      warera: warera as never,
+      logger: makeLogger() as never,
+      now: new Date("2026-09-03T12:00:00.000Z"),
+    });
+    const regionCalls = warera.request.mock.calls.filter((c) =>
+      String(c[0]).includes("region.getById"),
+    );
+    const fetchedRegionIds = regionCalls.map((c) => {
+      const inputMatch = String(c[0]).match(/input=([^&]+)/);
+      const inputJson = inputMatch?.[1] ? decodeURIComponent(inputMatch[1]) : "{}";
+      return (JSON.parse(inputJson) as { regionId?: string }).regionId;
+    });
+    expect(fetchedRegionIds).toContain("r-def");
+    expect(fetchedRegionIds).toContain("r-mid");
+    expect(fetchedRegionIds).toContain("r-att");
+    const [facts] = await db
+      .select()
+      .from(schema.battleBonusFacts)
+      .where(eq(schema.battleBonusFacts.battleId, "b-supply-chain"));
+    expect(facts?.defenderSupplyLinked).toBe(false);
+  });
+
+  it("battle bonus facts: defender neighbors capital -> defender_supply_linked true", async () => {
+    await seedMuWatch(db, "mu-a", { countryId: "c-mu" });
+    await seedMuMembers(db, "mu-a", ["u1"]);
+    const warera = makeWarera({
+      activeBattles: [
+        battleFixture({
+          id: "b-supply-cap",
+          defenderMuOrders: ["mu-a"],
+        }),
+      ],
+      regionById: (regionId) => {
+        if (regionId === "r-def") {
+          return {
+            countryId: "c-def",
+            neighbors: ["r-cap"],
+            bunker: { level: 1, active: true },
+          };
+        }
+        if (regionId === "r-cap") {
+          return { countryId: "c-def", neighbors: [] };
+        }
+        if (regionId === "r-att") {
+          return { countryId: "c-att", neighbors: [], militaryBase: { level: 0, active: false } };
+        }
+        return { countryId: "c-def", neighbors: [] };
+      },
+      countryById: (countryId) =>
+        countryId === "c-def" ? { capitalRegionId: "r-cap" } : { capitalRegionId: null },
+      loot: () => lootFixture({}),
+    });
+    await runBattleInfoPoll({
+      db,
+      warera: warera as never,
+      logger: makeLogger() as never,
+      now: new Date("2026-09-03T12:00:00.000Z"),
+    });
+    const [facts] = await db
+      .select()
+      .from(schema.battleBonusFacts)
+      .where(eq(schema.battleBonusFacts.battleId, "b-supply-cap"));
+    expect(facts?.defenderSupplyLinked).toBe(true);
+  });
+
   it("battle bonus facts: defender not supply-linked to capital -> defender_supply_linked false", async () => {
     await seedMuWatch(db, "mu-a", { countryId: "c-mu" });
     await seedMuMembers(db, "mu-a", ["u1"]);

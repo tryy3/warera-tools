@@ -39,7 +39,7 @@ import {
 } from "../../warera/diplomacy";
 import type { WareraRequester } from "../../warera/prices";
 import {
-  computeDefenderSupplyLinked,
+  computeDefenderSupplyLinkedWithFetch,
   fetchRegionCombat,
   isBattleRevoltType,
   toGraphNode,
@@ -455,10 +455,17 @@ async function syncBattleBonusFacts(
       graph.set(attackerRegionId, toGraphNode(attackerRegionId, attackerCombat));
     }
 
-    const defenderSupplyLinked = computeDefenderSupplyLinked(
+    const defenderSupplyLinked = await computeDefenderSupplyLinkedWithFetch(
       defenderRegionId,
       capitalRegionId,
       graph,
+      async (regionId) => {
+        try {
+          return await loadRegionCombatCached(warera, regionId, warm);
+        } catch {
+          return null;
+        }
+      },
     );
 
     await upsertBattleBonusFacts(db, parsed.id, {

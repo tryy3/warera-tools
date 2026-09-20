@@ -72,4 +72,40 @@ describe("computeDefenderSupplyLinked", () => {
   it("returns null when capital is missing", () => {
     expect(computeDefenderSupplyLinked("r1", null, graph([]))).toBeNull();
   });
+
+  it("returns null when a listed neighbor is missing from the graph map", () => {
+    expect(
+      computeDefenderSupplyLinked(
+        "r1",
+        "r-cap",
+        graph([{ id: "r1", owner: "c1", neighbors: ["r-missing"] }]),
+      ),
+    ).toBeNull();
+  });
+
+  it("returns false when same-owner component is exhausted without reaching capital", () => {
+    expect(
+      computeDefenderSupplyLinked(
+        "r-def",
+        "r-cap",
+        graph([
+          { id: "r-def", owner: "c1", neighbors: ["r-mid"] },
+          { id: "r-mid", owner: "c1", neighbors: [] },
+        ]),
+      ),
+    ).toBe(false);
+  });
+
+  it("returns true when defender directly neighbors the capital (same owner)", () => {
+    expect(
+      computeDefenderSupplyLinked(
+        "r-def",
+        "r-cap",
+        graph([
+          { id: "r-def", owner: "c1", neighbors: ["r-cap"] },
+          { id: "r-cap", owner: "c1", neighbors: [] },
+        ]),
+      ),
+    ).toBe(true);
+  });
 });
