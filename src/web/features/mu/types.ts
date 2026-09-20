@@ -1,3 +1,4 @@
+import type { BattleBonusResult } from "../../../battle-bonus/types";
 import type { MemberHistoryMetric, MuHistoryMetric } from "../../../mu/metrics";
 import type { MuHistoryRange } from "../../../mu/ranges";
 import type { FightPlayerInput } from "../../../fight-damage/types";
@@ -74,6 +75,21 @@ export type MuMemberHistoryResponse = {
   series: MuMemberHistorySeries[];
 };
 
+export type MuFightDeskBattle = {
+  id: string;
+  regionName: string | null;
+  attackerCountryId: string | null;
+  defenderCountryId: string | null;
+  attackerIsoCode: string | null;
+  defenderIsoCode: string | null;
+  kind: "mu_order" | "country_order" | "both";
+  muOrderSide: "attacker" | "defender" | null;
+  countryOrderSide: "attacker" | "defender" | null;
+  isRevolt: boolean;
+  muDamageToDate: number | null;
+  bonus: BattleBonusResult;
+};
+
 export type MuFightDeskMember = {
   userId: string;
   username: string | null;
@@ -98,6 +114,7 @@ export type MuFightDeskResponse = {
   mu: { id: string; name: string | null };
   asOf: string | null;
   members: MuFightDeskMember[];
+  battles: MuFightDeskBattle[];
   meta: {
     watched: boolean;
     liveFilled: boolean;

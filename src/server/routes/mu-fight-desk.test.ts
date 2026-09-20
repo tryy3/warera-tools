@@ -1,7 +1,11 @@
 import { Hono } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vite-plus/test";
+import { computeBattleBonus } from "../../battle-bonus/compute";
+import { insertBattlePoll } from "../../db/battle-stats";
+import { replaceBattleOrders } from "../../db/battle-orders";
 import type { Db } from "../../db/client";
+import { upsertBattleFromParsed } from "../../db/battles";
 import { createTestDb, truncateAllTables } from "../../db/test/postgres";
 import {
   FIGHT_PEAK_WINDOW_MS,
@@ -9,6 +13,7 @@ import {
   insertUserFightSnapshots,
 } from "../../db/user-fight-state";
 import * as schema from "../../db/schema";
+import type { ParsedBattle } from "../../warera/battles";
 import type { TrpcBatchSlotResult, WareraBatchItem } from "../../warera/trpc";
 import { errorPayload } from "../errors";
 import { muFightDeskRoutes } from "./mu-fight-desk";
@@ -46,12 +51,18 @@ function appFor(
   return { app, requestBatch: batch };
 }
 
-async function seedMu(db: Db, userIds: string[], watched = false): Promise<void> {
+async function seedMu(
+  db: Db,
+  userIds: string[],
+  watched = false,
+  muOverrides?: Partial<typeof schema.mus.$inferInsert>,
+): Promise<void> {
   await db.insert(schema.mus).values({
     id: "mu-1",
     name: "First Unit",
     enqueuedAt: NOW,
     fetchedAt: NOW,
+    ...muOverrides,
   });
   if (userIds.length > 0) {
     await db.insert(schema.muMembers).values(
@@ -158,6 +169,7 @@ describe("muFightDeskRoutes", () => {
       mu: { id: "mu-1", name: "First Unit" },
       asOf: null,
       members: [],
+      battles: [],
       meta: { watched: false, liveFilled: false, refreshFailedUserIds: [] },
     });
     expect(requestBatch).not.toHaveBeenCalled();
@@ -466,5 +478,188 @@ describe("muFightDeskRoutes", () => {
       },
     });
     expect(await db.select().from(schema.userFightSnapshots)).toHaveLength(1);
+  });
+
+  it("returns battle strip with bonus and summed MU loot", async () => {
+    const battleId = "b-crete";
+    const fetchedAt = NOW;
+    await seedMu(db, [], false, {
+      countryId: "sweden",
+      activeUpgradeLevels: { headquarters: 3 },
+    });
+
+    const creteBattle: ParsedBattle = {
+      id: battleId,
+      warId: "w-crete",
+      type: "war",
+      isActive: true,
+      attacker: {
+        countryId: "greece",
+        regionId: "r-att",
+        wonRoundsCount: 0,
+        muOrders: ["mu-1"],
+        countryOrders: ["sweden"],
+        hitCount: null,
+      },
+      defender: {
+        countryId: "turkey",
+        regionId: "r-def",
+        wonRoundsCount: 0,
+        muOrders: [],
+        countryOrders: [],
+        hitCount: null,
+      },
+      roundsToWin: 8,
+      rounds: [],
+      roundsHistory: [],
+      startedAtGame: null,
+      currentRound: null,
+      payload: null,
+    };
+    await upsertBattleFromParsed(db, creteBattle, { stickyMuIds: [], fetchedAt });
+    await replaceBattleOrders(
+      db,
+      battleId,
+      [
+        { ownerType: "mu", ownerId: "mu-1", side: "attacker", priority: "low", payload: null },
+        {
+          ownerType: "country",
+          ownerId: "sweden",
+          side: "attacker",
+          priority: "high",
+          payload: null,
+        },
+      ],
+      fetchedAt,
+    );
+    await db.insert(schema.regions).values({
+      id: "r-def",
+      name: "Crete",
+      countryCode: "TR",
+      enqueuedAt: fetchedAt,
+      fetchedAt,
+    });
+    await db.insert(schema.battleBonusFacts).values({
+      battleId,
+      isRevolt: false,
+      bunkerLevel: null,
+      bunkerActive: null,
+      militaryBaseLevel: null,
+      militaryBaseActive: null,
+      resistance: null,
+      defenderSupplyLinked: null,
+      attackerRegionId: "r-att",
+      defenderRegionId: "r-def",
+      fetchedAt,
+    });
+
+    const pollId = await insertBattlePoll(db, {
+      recordedAt: fetchedAt,
+      status: "success",
+      battleCount: 1,
+      lootSnapshotCount: 1,
+      finalizedCount: 0,
+    });
+    await db.insert(schema.battleLootSnapshots).values({
+      pollId,
+      battleId,
+      userId: "user-a",
+      muId: "mu-1",
+      totalDmg: 12_400_000,
+      hits: null,
+      totalMoneyFromBounty: null,
+      totalMoneyFromContract: null,
+      case1Count: null,
+      case2Count: null,
+      poolLoot: null,
+      payload: null,
+      recordedAt: fetchedAt,
+    });
+
+    const { app } = appFor(db);
+    const res = await app.request("http://localhost/mu-1/fight-desk");
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      battles: Array<{
+        kind: string;
+        muDamageToDate: number | null;
+        bonus: { total: number; parts: Array<{ id: string; amount: number | null }> };
+      }>;
+    };
+
+    expect(body.battles).toHaveLength(1);
+    expect(body.battles[0]?.kind).toBe("both");
+    expect(body.battles[0]?.muDamageToDate).toBe(12_400_000);
+
+    const expectedBonus = computeBattleBonus({
+      fightSide: "attacker",
+      muCountryId: "sweden",
+      attackerCountryId: "greece",
+      defenderCountryId: "turkey",
+      isRevolt: false,
+      countryOrderPriority: "high",
+      muOrderPriority: "low",
+      hqLevel: 3,
+      hqRunning: true,
+      allianceWorldShare: null,
+      defendingPactPartner: null,
+      swornEnemy: null,
+      bunkerLevel: null,
+      bunkerActive: null,
+      militaryBaseLevel: null,
+      militaryBaseActive: false,
+      resistance: null,
+      defenderSupplyLinked: null,
+      alliedFortHalf: true,
+    });
+    expect(body.battles[0]?.bonus.total).toBe(expectedBonus.total);
+    expect(body.battles[0]?.bonus.parts).toEqual(expectedBonus.parts);
+  });
+
+  it("returns null muDamageToDate when the MU has no loot rows for the battle", async () => {
+    const battleId = "b-no-loot";
+    const fetchedAt = NOW;
+    await seedMu(db, [], false, { countryId: "sweden" });
+    await upsertBattleFromParsed(
+      db,
+      {
+        id: battleId,
+        warId: "w-empty",
+        type: "war",
+        isActive: true,
+        attacker: {
+          countryId: "x",
+          regionId: "r-x",
+          wonRoundsCount: 0,
+          muOrders: [],
+          countryOrders: ["sweden"],
+          hitCount: null,
+        },
+        defender: {
+          countryId: "y",
+          regionId: "r-y",
+          wonRoundsCount: 0,
+          muOrders: [],
+          countryOrders: [],
+          hitCount: null,
+        },
+        roundsToWin: 8,
+        rounds: [],
+        roundsHistory: [],
+        startedAtGame: null,
+        currentRound: null,
+        payload: null,
+      },
+      { stickyMuIds: [], fetchedAt },
+    );
+
+    const { app } = appFor(db);
+    const res = await app.request("http://localhost/mu-1/fight-desk");
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      battles: Array<{ id: string; muDamageToDate: number | null }>;
+    };
+    expect(body.battles).toHaveLength(1);
+    expect(body.battles[0]?.muDamageToDate).toBeNull();
   });
 });

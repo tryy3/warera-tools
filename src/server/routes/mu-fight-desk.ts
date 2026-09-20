@@ -20,6 +20,7 @@ import {
 } from "../../warera/fight-state";
 import type { WareraRequester } from "../../warera/prices";
 import { fetchUserByIdRawBatch } from "../../warera/users";
+import { loadFightDeskBattles } from "../fight-desk-battles";
 import { HttpError } from "../errors";
 
 export type MuFightDeskRouteDeps = {
@@ -140,6 +141,7 @@ export function muFightDeskRoutes(deps: MuFightDeskRouteDeps) {
 
   async function respond(muId: string, forceRefresh: boolean) {
     const now = new Date();
+    const battlesPromise = loadFightDeskBattles(db, muId, now);
     const [muRows, roster, watchRows] = await Promise.all([
       db.select({ id: mus.id, name: mus.name }).from(mus).where(eq(mus.id, muId)).limit(1),
       listMuMembers(db, muId),
@@ -184,6 +186,8 @@ export function muFightDeskRoutes(deps: MuFightDeskRouteDeps) {
     const snapshotByUserId = new Map(snapshots.map((snapshot) => [snapshot.userId, snapshot]));
     const peakByUserId = await listPeakFightStatesForUsers(db, userIds, now);
 
+    const battles = await battlesPromise;
+
     return {
       mu,
       asOf: asOfRow?.recordedAt.toISOString() ?? null,
@@ -199,6 +203,7 @@ export function muFightDeskRoutes(deps: MuFightDeskRouteDeps) {
             )
           : incompleteMember(member.userId, member.role, refreshFailed);
       }),
+      battles,
       meta: { watched, liveFilled: shouldLiveFill, refreshFailedUserIds },
     };
   }
