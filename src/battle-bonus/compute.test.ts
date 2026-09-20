@@ -98,6 +98,15 @@ describe("computeBattleBonus", () => {
     expect(status(result, "alliance")).toBe("unknown");
     expect(result.total).toBe(0);
   });
+
+  it("treats unknown bunker active as unknown, not off", () => {
+    const result = computeBattleBonus(
+      facts({ fightSide: "defender", bunkerActive: null, bunkerLevel: 3 }),
+    );
+    expect(status(result, "bunker")).toBe("unknown");
+    expect(amount(result, "bunker")).toBeNull();
+    expect(result.total).toBe(0);
+  });
 });
 
 describe("customBattleBonus", () => {

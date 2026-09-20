@@ -78,6 +78,9 @@ function bunkerPart(facts: BattleBonusFacts): BonusPart {
   if (facts.fightSide !== "defender") {
     return { id: "bunker", label: "Bunker", amount: 0, status: "off" };
   }
+  if (facts.bunkerActive == null) {
+    return { id: "bunker", label: "Bunker", amount: null, status: "unknown" };
+  }
   if (!facts.bunkerActive) {
     return { id: "bunker", label: "Bunker", amount: 0, status: "off" };
   }
@@ -96,6 +99,14 @@ function bunkerPart(facts: BattleBonusFacts): BonusPart {
 function militaryBasePart(facts: BattleBonusFacts): BonusPart {
   if (facts.fightSide !== "attacker") {
     return { id: "military_base", label: "Military base", amount: 0, status: "off" };
+  }
+  if (facts.militaryBaseActive == null) {
+    return {
+      id: "military_base",
+      label: "Military base",
+      amount: null,
+      status: "unknown",
+    };
   }
   if (!facts.militaryBaseActive) {
     return { id: "military_base", label: "Military base", amount: 0, status: "off" };
