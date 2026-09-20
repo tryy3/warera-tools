@@ -25,6 +25,7 @@ const battleListFixture = {
     region: "regA",
     wonRoundsCount: 0,
     muOrders: ["mu1"],
+    countryOrders: ["sweden"],
     damages: 0,
     hitCount: 10,
   },
@@ -100,6 +101,18 @@ describe("parseBattleListItem", () => {
     expect(parsed!.currentRound!.live!.nextTickAt?.toISOString()).toBe("2026-09-03T10:02:00.000Z");
     expect(parsed!.currentRound!.createdAt?.toISOString()).toBe("2026-09-03T10:00:00.000Z");
     expect(parsed!.payload).toEqual({ extraKeep: "leftover" });
+    expect(parsed!.attacker.countryOrders).toEqual(["sweden"]);
+    expect(parsed!.defender.countryOrders).toEqual([]);
+  });
+
+  it("returns empty countryOrders when side omits the field", () => {
+    const parsed = parseBattleListItem({
+      _id: "b2",
+      attacker: { country: "cA" },
+      defender: { country: "cD" },
+    });
+    expect(parsed!.attacker.countryOrders).toEqual([]);
+    expect(parsed!.defender.countryOrders).toEqual([]);
   });
 });
 
