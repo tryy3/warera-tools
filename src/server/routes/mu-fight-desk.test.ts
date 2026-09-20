@@ -5,6 +5,7 @@ import { computeBattleBonus } from "../../battle-bonus/compute";
 import { insertBattlePoll } from "../../db/battle-stats";
 import { replaceBattleOrders } from "../../db/battle-orders";
 import type { Db } from "../../db/client";
+import { upsertCountryDiplomacy } from "../../db/country-diplomacy";
 import { upsertBattleFromParsed } from "../../db/battles";
 import { createTestDb, truncateAllTables } from "../../db/test/postgres";
 import {
@@ -616,6 +617,7 @@ describe("muFightDeskRoutes", () => {
       hqLevel: 3,
       hqRunning: true,
       allianceWorldShare: null,
+      supportingAllianceMember: null,
       defendingPactPartner: null,
       swornEnemy: null,
       bunkerLevel: null,
@@ -754,9 +756,91 @@ describe("muFightDeskRoutes", () => {
     const res = await app.request("http://localhost/mu-1/fight-desk");
     expect(res.status).toBe(200);
     const body = (await res.json()) as {
-      battles: Array<{ bonus: { parts: Array<{ id: string; amount: number | null; status: string }> } }>;
+      battles: Array<{
+        bonus: { parts: Array<{ id: string; amount: number | null; status: string }> };
+      }>;
     };
     const hqPart = body.battles[0]?.bonus.parts.find((p) => p.id === "hq");
     expect(hqPart).toEqual({ id: "hq", label: "HQ", amount: 0, status: "off" });
+  });
+
+  it("does not apply alliance curve when the ordered side is not an alliance member", async () => {
+    const battleId = "b-non-ally";
+    const fetchedAt = NOW;
+    await seedMu(db, [], false, {
+      countryId: "sweden",
+      activeUpgradeLevels: { headquarters: 3 },
+    });
+    await upsertBattleFromParsed(
+      db,
+      {
+        id: battleId,
+        warId: "w-ally",
+        type: "war",
+        isActive: true,
+        attacker: {
+          countryId: "greece",
+          regionId: "r-att",
+          wonRoundsCount: 0,
+          muOrders: ["mu-1"],
+          countryOrders: [],
+          hitCount: null,
+        },
+        defender: {
+          countryId: "turkey",
+          regionId: "r-def",
+          wonRoundsCount: 0,
+          muOrders: [],
+          countryOrders: [],
+          hitCount: null,
+        },
+        roundsToWin: 8,
+        rounds: [],
+        roundsHistory: [],
+        startedAtGame: null,
+        currentRound: null,
+        payload: null,
+      },
+      { stickyMuIds: [], fetchedAt },
+    );
+    await replaceBattleOrders(
+      db,
+      battleId,
+      [{ ownerType: "mu", ownerId: "mu-1", side: "attacker", priority: "low", payload: null }],
+      fetchedAt,
+    );
+    await upsertCountryDiplomacy(db, {
+      countryId: "sweden",
+      allianceId: "north",
+      allianceWorldShare: 0.1,
+      swornEnemyId: null,
+      swornEnemySince: null,
+      defensivePacts: [],
+      fetchedAt,
+    });
+    await upsertCountryDiplomacy(db, {
+      countryId: "greece",
+      allianceId: "south",
+      allianceWorldShare: 0.2,
+      swornEnemyId: null,
+      swornEnemySince: null,
+      defensivePacts: [],
+      fetchedAt,
+    });
+
+    const { app } = appFor(db);
+    const res = await app.request("http://localhost/mu-1/fight-desk");
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      battles: Array<{
+        bonus: {
+          total: number;
+          parts: Array<{ id: string; amount: number | null; status: string }>;
+        };
+      }>;
+    };
+    const alliancePart = body.battles[0]?.bonus.parts.find((p) => p.id === "alliance");
+    expect(alliancePart).toEqual({ id: "alliance", label: "Alliance", amount: 0, status: "off" });
+    expect(body.battles[0]?.bonus.total).toBe(0.2);
   });
 });

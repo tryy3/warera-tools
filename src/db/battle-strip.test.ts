@@ -3,7 +3,7 @@ import type { ParsedBattle } from "../warera/battles";
 import type { ParsedMu } from "../warera/mu";
 import { insertBattlePoll } from "./battle-stats";
 import { listFightDeskBattles, listLatestMuDamageByBattle } from "./battle-strip";
-import { upsertBattleFromParsed } from "./battles";
+import { markBattleEnded, upsertBattleFromParsed } from "./battles";
 import type { Db } from "./client";
 import { upsertMuCurrent } from "./mus";
 import * as schema from "./schema";
@@ -286,5 +286,27 @@ describe("battle strip db", () => {
 
     const damage = await listLatestMuDamageByBattle(db, "mu-1", [battleId]);
     expect(damage.get(battleId)).toBe(300);
+  });
+
+  it("omits still-active battles once endedAt is set", async () => {
+    const fetchedAt = new Date("2026-09-12T10:00:00.000Z");
+    await upsertMuCurrent(db, muSweden(), fetchedAt);
+
+    const liveId = "b-live";
+    const endedId = "b-ended";
+    await upsertBattleFromParsed(db, battleWithCountryOrder(liveId, ["sweden"]), {
+      stickyMuIds: [],
+      fetchedAt,
+    });
+    await upsertBattleFromParsed(db, battleWithCountryOrder(endedId, ["sweden"]), {
+      stickyMuIds: [],
+      fetchedAt,
+    });
+    await markBattleEnded(db, endedId, new Date("2026-09-12T10:05:00.000Z"));
+
+    const strip = await listFightDeskBattles(db, "mu-1");
+    const ids = strip.map((row) => row.id);
+    expect(ids).toContain(liveId);
+    expect(ids).not.toContain(endedId);
   });
 });

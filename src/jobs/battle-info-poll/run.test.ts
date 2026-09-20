@@ -758,6 +758,91 @@ describe("runBattleInfoPoll", () => {
     expect(facts?.militaryBaseLevel).toBe(2);
   });
 
+  it("persists battlefield region name from region.getById onto regions", async () => {
+    await seedMuWatch(db, "mu-a", { countryId: "c-mu" });
+    await seedMuMembers(db, "mu-a", ["u1"]);
+    const warera = makeWarera({
+      activeBattles: [
+        battleFixture({
+          id: "b-crete",
+          defenderMuOrders: ["mu-a"],
+        }),
+      ],
+      regionById: (regionId) => {
+        if (regionId === "r-def") {
+          return {
+            name: "Crete",
+            countryCode: "GR",
+            countryId: "c-def",
+            neighbors: [],
+            bunker: { level: 1, active: true },
+          };
+        }
+        if (regionId === "r-att") {
+          return {
+            name: "Athens",
+            countryCode: "GR",
+            countryId: "c-att",
+            neighbors: [],
+            militaryBase: { level: 2, active: true },
+          };
+        }
+        return { countryId: "c-def", neighbors: [] };
+      },
+      countryById: (countryId) =>
+        countryId === "c-def" ? { capitalRegionId: "r-cap" } : { capitalRegionId: null },
+      loot: () => lootFixture({}),
+    });
+    await runBattleInfoPoll({
+      db,
+      warera: warera as never,
+      logger: makeLogger() as never,
+      now: new Date("2026-09-03T12:00:00.000Z"),
+    });
+    const [defender] = await db.select().from(schema.regions).where(eq(schema.regions.id, "r-def"));
+    const [attacker] = await db.select().from(schema.regions).where(eq(schema.regions.id, "r-att"));
+    expect(defender?.name).toBe("Crete");
+    expect(defender?.countryCode).toBe("GR");
+    expect(attacker?.name).toBe("Athens");
+  });
+
+  it("warms attacker and defender country diplomacy, not only the MU country", async () => {
+    await seedMuWatch(db, "mu-a", { countryId: "c-mu" });
+    await seedMuMembers(db, "mu-a", ["u1"]);
+    const warera = makeWarera({
+      activeBattles: [
+        battleFixture({
+          id: "b-ally",
+          attackerMuOrders: ["mu-a"],
+        }),
+      ],
+      countryDiplomacy: (countryId) => {
+        if (countryId === "c-mu") return { allianceId: "north" };
+        if (countryId === "c-att") return { allianceId: "north" };
+        if (countryId === "c-def") return { allianceId: "south" };
+        return { defensivePacts: [] };
+      },
+      worldDevelopment: {
+        totalDevelopment: 100,
+        alliances: [
+          { _id: "north", development: 10 },
+          { _id: "south", development: 20 },
+        ],
+      },
+      loot: () => lootFixture({}),
+    });
+    await runBattleInfoPoll({
+      db,
+      warera: warera as never,
+      logger: makeLogger() as never,
+      now: new Date("2026-09-03T12:00:00.000Z"),
+    });
+    const rows = await db.select().from(schema.countryDiplomacy);
+    const ids = rows.map((row) => row.countryId).toSorted();
+    expect(ids).toEqual(["c-att", "c-def", "c-mu"]);
+    expect(rows.find((row) => row.countryId === "c-def")?.allianceId).toBe("south");
+  });
+
   it("fix2: sticky unwatched MU still gets loot for its mu_members (roster loaded from stickyMuIds)", async () => {
     // mu-sticky is watched initially so the battle becomes sticky for it.
     await seedMuWatch(db, "mu-sticky");

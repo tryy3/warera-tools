@@ -41,7 +41,10 @@ function patrioticPart(facts: BattleBonusFacts): BonusPart {
 }
 
 function alliancePart(facts: BattleBonusFacts): BonusPart {
-  if (facts.allianceWorldShare == null) {
+  if (facts.supportingAllianceMember === false) {
+    return { id: "alliance", label: "Alliance", amount: 0, status: "off" };
+  }
+  if (facts.supportingAllianceMember == null || facts.allianceWorldShare == null) {
     return { id: "alliance", label: "Alliance", amount: null, status: "unknown" };
   }
   return {

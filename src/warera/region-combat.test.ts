@@ -5,6 +5,8 @@ describe("parseRegionCombat", () => {
   it("parses bunker, military base, neighbors, owner, and core flag", () => {
     expect(
       parseRegionCombat({
+        name: "Crete",
+        countryCode: "GR",
         countryId: "c-def",
         isCore: true,
         resistance: 0.42,
@@ -21,6 +23,15 @@ describe("parseRegionCombat", () => {
       neighborRegionIds: ["r2"],
       ownerCountryId: "c-def",
       isCore: true,
+      name: "Crete",
+      countryCode: "GR",
+    });
+  });
+
+  it("keeps name from mainCity when name is absent", () => {
+    expect(parseRegionCombat({ mainCity: "Iraklion", countryCode: "GR" })).toMatchObject({
+      name: "Iraklion",
+      countryCode: "GR",
     });
   });
 });

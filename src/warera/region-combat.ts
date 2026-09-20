@@ -1,4 +1,5 @@
 import type { WareraRequester } from "./prices";
+import { parseRegionInfo } from "./companies";
 import { unwrapTrpcData, wareraProcedurePath } from "./trpc";
 
 export type ParsedRegionCombat = {
@@ -10,6 +11,8 @@ export type ParsedRegionCombat = {
   neighborRegionIds: string[];
   ownerCountryId: string | null;
   isCore: boolean;
+  name: string | null;
+  countryCode: string | null;
 };
 
 export type RegionGraphNode = {
@@ -91,6 +94,7 @@ export function parseRegionCombat(raw: unknown): ParsedRegionCombat {
   const militaryBase = parseFacility(obj.militaryBase ?? obj.military_base);
   const ownerCountryId = pickString(obj, ["countryId", "country", "ownerCountryId", "owner"]);
   const isCore = obj.isCore === true || obj.core === true;
+  const info = parseRegionInfo(raw);
   return {
     bunkerLevel: bunker.level,
     bunkerActive: bunker.active,
@@ -100,6 +104,8 @@ export function parseRegionCombat(raw: unknown): ParsedRegionCombat {
     neighborRegionIds: parseNeighbors(obj),
     ownerCountryId,
     isCore,
+    name: info.name,
+    countryCode: info.countryCode,
   };
 }
 
@@ -207,8 +213,6 @@ export async function fetchRegionCombat(
   warera: WareraRequester,
   regionId: string,
 ): Promise<ParsedRegionCombat> {
-  const json = await warera.request<unknown>(
-    wareraProcedurePath("region.getById", { regionId }),
-  );
+  const json = await warera.request<unknown>(wareraProcedurePath("region.getById", { regionId }));
   return parseRegionCombat(unwrapTrpcData(json));
 }

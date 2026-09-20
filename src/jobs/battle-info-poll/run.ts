@@ -8,6 +8,7 @@ import {
   upsertBattleFromParsed,
 } from "../../db/battles";
 import { upsertCountryDiplomacy } from "../../db/country-diplomacy";
+import { upsertRegionFetched } from "../../db/regions";
 import {
   insertBattleLootSnapshots,
   insertBattlePoll,
@@ -110,11 +111,15 @@ export async function runBattleInfoPoll(options: {
     for (const muId of row.stickyMuIds ?? []) stickyMuIdsAll.add(muId);
   }
   const muCountryByMuId = await loadMuCountries(db, [...stickyMuIdsAll]);
-  const distinctMuCountries = new Set(
+  const diplomacyCountryIds = new Set(
     [...stickyMuIdsAll]
       .map((muId) => muCountryByMuId.get(muId))
       .filter((c): c is string => typeof c === "string" && c.length > 0),
   );
+  for (const row of dbActive) {
+    if (row.attackerCountryId) diplomacyCountryIds.add(row.attackerCountryId);
+    if (row.defenderCountryId) diplomacyCountryIds.add(row.defenderCountryId);
+  }
 
   const bonusWarm: BattleBonusWarmState = {
     diplomacyFetched: new Set(),
@@ -164,24 +169,18 @@ export async function runBattleInfoPoll(options: {
         });
       }
       await syncBattleOrders(db, warera, row.id, now, errors, logger);
+      if (parsed.attacker.countryId) diplomacyCountryIds.add(parsed.attacker.countryId);
+      if (parsed.defender.countryId) diplomacyCountryIds.add(parsed.defender.countryId);
       await warmDistinctMuDiplomacy(
         db,
         warera,
-        distinctMuCountries,
+        diplomacyCountryIds,
         bonusWarm,
         now,
         errors,
         logger,
       );
-      await syncBattleBonusFacts(
-        db,
-        warera,
-        parsed,
-        bonusWarm,
-        now,
-        errors,
-        logger,
-      );
+      await syncBattleBonusFacts(db, warera, parsed, bonusWarm, now, errors, logger);
       await collectLoot(warera, row.id, stickyMuIds, rosterByMu, lootRows, now, errors, logger);
       continue;
     }
@@ -397,15 +396,23 @@ async function warmDistinctMuDiplomacy(
 }
 
 async function loadRegionCombatCached(
+  db: Db,
   warera: WareraRequester,
   regionId: string | null,
   warm: BattleBonusWarmState,
+  fetchedAt: Date,
 ): Promise<ParsedRegionCombat | null> {
   if (!regionId) return null;
   const cached = warm.regions.get(regionId);
   if (cached) return cached;
   const parsed = await fetchRegionCombat(warera, regionId);
   warm.regions.set(regionId, parsed);
+  await upsertRegionFetched(db, {
+    id: regionId,
+    name: parsed.name,
+    countryCode: parsed.countryCode,
+    fetchedAt,
+  });
   return parsed;
 }
 
@@ -437,20 +444,24 @@ async function syncBattleBonusFacts(
   if (!defenderRegionId) return;
 
   try {
-    const defenderCombat = await loadRegionCombatCached(warera, defenderRegionId, warm);
+    const defenderCombat = await loadRegionCombatCached(
+      db,
+      warera,
+      defenderRegionId,
+      warm,
+      fetchedAt,
+    );
     if (!defenderCombat) return;
 
     let attackerCombat: ParsedRegionCombat | null = null;
     if (attackerRegionId) {
-      attackerCombat = await loadRegionCombatCached(warera, attackerRegionId, warm);
+      attackerCombat = await loadRegionCombatCached(db, warera, attackerRegionId, warm, fetchedAt);
     }
 
     const defenderCountryId = parsed.defender.countryId ?? defenderCombat.ownerCountryId;
     const capitalRegionId = await resolveCapitalRegionId(warera, defenderCountryId, warm);
 
-    const graph = new Map([
-      [defenderRegionId, toGraphNode(defenderRegionId, defenderCombat)],
-    ]);
+    const graph = new Map([[defenderRegionId, toGraphNode(defenderRegionId, defenderCombat)]]);
     if (attackerRegionId && attackerCombat) {
       graph.set(attackerRegionId, toGraphNode(attackerRegionId, attackerCombat));
     }
@@ -461,7 +472,7 @@ async function syncBattleBonusFacts(
       graph,
       async (regionId) => {
         try {
-          return await loadRegionCombatCached(warera, regionId, warm);
+          return await loadRegionCombatCached(db, warera, regionId, warm, fetchedAt);
         } catch {
           return null;
         }

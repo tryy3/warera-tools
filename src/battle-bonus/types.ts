@@ -28,6 +28,7 @@ export type BattleBonusFacts = {
   hqLevel: number | null;
   hqRunning: boolean | null;
   allianceWorldShare: number | null;
+  supportingAllianceMember: boolean | null;
   defendingPactPartner: RampPartner | null;
   swornEnemy: RampPartner | null;
   bunkerLevel: number | null;

@@ -2,7 +2,11 @@ import { eq, inArray } from "drizzle-orm";
 import { computeBattleBonus } from "../battle-bonus/compute";
 import type { BattleBonusFacts, BattleSide, OrderPriority } from "../battle-bonus/types";
 import { listBattleOrders } from "../db/battle-orders";
-import { listFightDeskBattles, listLatestMuDamageByBattle, type BattleStripRow } from "../db/battle-strip";
+import {
+  listFightDeskBattles,
+  listLatestMuDamageByBattle,
+  type BattleStripRow,
+} from "../db/battle-strip";
 import type { Db } from "../db/client";
 import { getRegionsByIds } from "../db/regions";
 import { battleBonusFacts, countries, countryDiplomacy, mus } from "../db/schema";
@@ -55,8 +59,7 @@ function mergeOrderSides(
   countryOrderPriority: OrderPriority | null;
 } {
   let muOrderSide = sideFromMuOrders(row, muId);
-  let countryOrderSide =
-    muCountryId == null ? null : sideFromCountryOrders(row, muCountryId);
+  let countryOrderSide = muCountryId == null ? null : sideFromCountryOrders(row, muCountryId);
   let muOrderPriority: OrderPriority | null = null;
   let countryOrderPriority: OrderPriority | null = null;
 
@@ -100,7 +103,26 @@ function alliedFortHalf(
   return muCountryId !== orderedSideCountryId;
 }
 
-function opponentCountryId(fightSide: BattleSide, attackerCountryId: string, defenderCountryId: string): string {
+function supportingAllianceMember(
+  muCountryId: string,
+  orderedSideCountryId: string,
+  diplomacyByCountry: Map<string, typeof countryDiplomacy.$inferSelect>,
+): boolean | null {
+  const muDip = diplomacyByCountry.get(muCountryId);
+  const sideDip = diplomacyByCountry.get(orderedSideCountryId);
+  if (muDip == null || sideDip == null) return null;
+  const muAllianceId = muDip.allianceId;
+  const sideAllianceId = sideDip.allianceId;
+  if (muAllianceId == null) return null;
+  if (sideAllianceId == null) return false;
+  return muAllianceId === sideAllianceId;
+}
+
+function opponentCountryId(
+  fightSide: BattleSide,
+  attackerCountryId: string,
+  defenderCountryId: string,
+): string {
   return fightSide === "attacker" ? defenderCountryId : attackerCountryId;
 }
 
@@ -146,12 +168,14 @@ function buildBonusFacts(
   hq: ReturnType<typeof parseHq>,
   orders: ReturnType<typeof mergeOrderSides>,
   factsRow: typeof battleBonusFacts.$inferSelect | undefined,
-  diplomacy: typeof countryDiplomacy.$inferSelect | undefined,
+  diplomacyByCountry: Map<string, typeof countryDiplomacy.$inferSelect>,
   now: Date,
 ): BattleBonusFacts {
   const attackerCountryId = row.attackerCountryId ?? "";
   const defenderCountryId = row.defenderCountryId ?? "";
   const fightSide = orders.muOrderSide ?? orders.countryOrderSide ?? "attacker";
+  const orderedSideCountryId = fightSide === "attacker" ? attackerCountryId : defenderCountryId;
+  const diplomacy = diplomacyByCountry.get(muCountryId);
 
   return {
     fightSide,
@@ -164,6 +188,11 @@ function buildBonusFacts(
     hqLevel: hq.hqLevel,
     hqRunning: hq.hqRunning,
     allianceWorldShare: diplomacy?.allianceWorldShare ?? null,
+    supportingAllianceMember: supportingAllianceMember(
+      muCountryId,
+      orderedSideCountryId,
+      diplomacyByCountry,
+    ),
     ...diplomacyRampPartners(diplomacy, fightSide, attackerCountryId, defenderCountryId, now),
     bunkerLevel: factsRow?.bunkerLevel ?? null,
     bunkerActive: factsRow?.bunkerActive ?? null,
@@ -196,27 +225,21 @@ export async function loadFightDeskBattles(
 
   const battleIds = stripRows.map((row) => row.id);
   const regionIds = stripRows.flatMap((row) =>
-    [row.defenderRegionId, row.attackerRegionId].filter((id): id is string => id != null && id.length > 0),
+    [row.defenderRegionId, row.attackerRegionId].filter(
+      (id): id is string => id != null && id.length > 0,
+    ),
   );
   const countryIds = [
     ...new Set(
-      stripRows.flatMap((row) =>
-        [row.attackerCountryId, row.defenderCountryId].filter(
-          (id): id is string => id != null && id.length > 0,
-        ),
-      ),
+      [
+        muCountryId,
+        ...stripRows.flatMap((row) => [row.attackerCountryId, row.defenderCountryId]),
+      ].filter((id): id is string => id != null && id.length > 0),
     ),
   ];
 
   const ordersByBattle = new Map<string, ParsedBattleOrder[]>();
-  const [
-    ,
-    damageByBattle,
-    factsRows,
-    diplomacyRows,
-    regionsById,
-    countryRows,
-  ] = await Promise.all([
+  const [, damageByBattle, factsRows, diplomacyRows, regionsById, countryRows] = await Promise.all([
     Promise.all(
       battleIds.map(async (battleId) => {
         ordersByBattle.set(battleId, await listBattleOrders(db, battleId));
@@ -226,13 +249,9 @@ export async function loadFightDeskBattles(
     battleIds.length === 0
       ? Promise.resolve([])
       : db.select().from(battleBonusFacts).where(inArray(battleBonusFacts.battleId, battleIds)),
-    muCountryId.length === 0
+    countryIds.length === 0
       ? Promise.resolve([])
-      : db
-          .select()
-          .from(countryDiplomacy)
-          .where(eq(countryDiplomacy.countryId, muCountryId))
-          .limit(1),
+      : db.select().from(countryDiplomacy).where(inArray(countryDiplomacy.countryId, countryIds)),
     getRegionsByIds(db, regionIds),
     countryIds.length === 0
       ? Promise.resolve([])
@@ -242,13 +261,18 @@ export async function loadFightDeskBattles(
           .where(inArray(countries.id, countryIds)),
   ]);
   const factsByBattle = new Map(factsRows.map((row) => [row.battleId, row]));
-  const diplomacy = diplomacyRows[0];
+  const diplomacyByCountry = new Map(diplomacyRows.map((row) => [row.countryId, row]));
   const isoByCountry = new Map(countryRows.map((row) => [row.id, row.isoCode ?? null]));
 
   const cards: MuFightDeskBattle[] = [];
 
   for (const row of stripRows) {
-    const orders = mergeOrderSides(row, muId, muCountryId || null, ordersByBattle.get(row.id) ?? []);
+    const orders = mergeOrderSides(
+      row,
+      muId,
+      muCountryId || null,
+      ordersByBattle.get(row.id) ?? [],
+    );
     const kind = battleKind(orders.muOrderSide, orders.countryOrderSide);
     if (kind == null) continue;
 
@@ -272,7 +296,7 @@ export async function loadFightDeskBattles(
       isRevolt: factsRow?.isRevolt ?? false,
       muDamageToDate: damage === undefined ? null : damage,
       bonus: computeBattleBonus(
-        buildBonusFacts(row, muCountryId, hq, orders, factsRow, diplomacy, now),
+        buildBonusFacts(row, muCountryId, hq, orders, factsRow, diplomacyByCountry, now),
       ),
     });
   }

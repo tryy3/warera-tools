@@ -14,6 +14,7 @@ function facts(patch: Partial<BattleBonusFacts> = {}): BattleBonusFacts {
     hqLevel: 3,
     hqRunning: false,
     allianceWorldShare: null,
+    supportingAllianceMember: null,
     defendingPactPartner: null,
     swornEnemy: null,
     bunkerLevel: null,
@@ -97,6 +98,41 @@ describe("computeBattleBonus", () => {
     const result = computeBattleBonus(facts({ allianceWorldShare: null }));
     expect(status(result, "alliance")).toBe("unknown");
     expect(result.total).toBe(0);
+  });
+
+  it("applies alliance curve when supporting an alliance member with a known share", () => {
+    const result = computeBattleBonus(
+      facts({ supportingAllianceMember: true, allianceWorldShare: 0.1 }),
+    );
+    expect(status(result, "alliance")).toBe("applied");
+    expect(amount(result, "alliance")).toBe(0.1);
+    expect(result.total).toBeCloseTo(0.1);
+  });
+
+  it("turns alliance off when not supporting an alliance member even if share is known", () => {
+    const result = computeBattleBonus(
+      facts({ supportingAllianceMember: false, allianceWorldShare: 0.1 }),
+    );
+    expect(status(result, "alliance")).toBe("off");
+    expect(amount(result, "alliance")).toBe(0);
+    expect(result.total).toBe(0);
+  });
+
+  it("keeps alliance unknown when support is unknown even if share is known", () => {
+    const result = computeBattleBonus(
+      facts({ supportingAllianceMember: null, allianceWorldShare: 0.1 }),
+    );
+    expect(status(result, "alliance")).toBe("unknown");
+    expect(amount(result, "alliance")).toBeNull();
+    expect(result.total).toBe(0);
+  });
+
+  it("keeps alliance unknown when supporting but share is missing", () => {
+    const result = computeBattleBonus(
+      facts({ supportingAllianceMember: true, allianceWorldShare: null }),
+    );
+    expect(status(result, "alliance")).toBe("unknown");
+    expect(amount(result, "alliance")).toBeNull();
   });
 
   it("treats unknown bunker active as unknown, not off", () => {

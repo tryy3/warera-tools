@@ -1,4 +1,4 @@
-import { and, asc, eq, gt, inArray, notExists, or } from "drizzle-orm";
+import { and, asc, eq, gt, inArray, isNull, notExists, or } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import type { Db } from "./client";
 import { battleLootSnapshots, battleOrders, battles, mus } from "./schema";
@@ -73,12 +73,10 @@ export async function listFightDeskBattles(db: Db, muId: string): Promise<Battle
   const activeRows = await db
     .select()
     .from(battles)
-    .where(eq(battles.isActive, true))
+    .where(and(eq(battles.isActive, true), isNull(battles.endedAt)))
     .orderBy(asc(battles.id));
 
-  const orderPredicates = [
-    and(eq(battleOrders.ownerType, "mu"), eq(battleOrders.ownerId, muId)),
-  ];
+  const orderPredicates = [and(eq(battleOrders.ownerType, "mu"), eq(battleOrders.ownerId, muId))];
   if (countryId != null) {
     orderPredicates.push(
       and(eq(battleOrders.ownerType, "country"), eq(battleOrders.ownerId, countryId)),
