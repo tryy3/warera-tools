@@ -1,6 +1,6 @@
 # WarEra data inventory (as-is)
 
-**Last reviewed:** 2026-09-19
+**Last reviewed:** 2026-09-20
 **Status:** Living — update when cadence, ownership, or major consumers change  
 **Tier rules:** [Data tier caching strategy](../superpowers/specs/2026-08-02-data-tier-caching-strategy-design.md)
 
@@ -51,9 +51,9 @@ Browser (SPA)
 | Recommended regions | Best region id per producible item | `recommended-regions-poll`; cold miss on advisor paths | Hourly (`0 0 * * * *`) | api2 POST + `X-API-Key` | Latest upsert (`recommended_regions`) | Advisor / company economy |
 | Item-market transactions | Equipment / itemMarket and commodity trading sales stream | `item-market-tx-backfill` (once per process) then `item-market-tx-poll` (both `itemMarket` + `trading` types); **manual deep history:** `vp run backfill:item-market-tx -- --until <ISO> [--type …]` (operator-run, not scheduled) | Poll every minute; backfill `maxRuns: 1` | api2 + `X-API-Key` | Append-only (`item_market_transactions`) + handoff cursor; buyer/seller indexes for player lookups | Equipment Market (`/api/equipment` overview, detail, craft-compare), Battle quote (`POST /api/battle-build/quote`), Market my-trades |
 | Commodity trading transactions | Stackable buy/sell fills | same `item-market-tx-*` jobs (both transaction types); manual backfill via same CLI (`--type trading` or `both`) | Poll every minute; backfill `maxRuns: 1` | api2 | `item_market_transactions` | Market my-trades |
-| Battles (ordered) | Active/ended battles sticky when watched MU in `muOrders`; light scoreboard + per-member loot | `battle-info-poll` | Every 15 minutes | `battle.getBattles` (full cursor), `battle.getById` on finalize only, `battleLootSummary.getByBattleAndUser` | `battles` current + `battle_scoreboard_snapshots` / `battle_loot_snapshots` | Future MU achievements / battle contrib (no UI yet) |
+| Battles (ordered) | Active/ended battles sticky when watched MU in attacker/defender `muOrders` **or** watched MU `country_id` in attacker/defender `countryOrders`; scoreboard, per-member loot, current orders, computed bonus facts | `battle-info-poll` | Every 15 minutes | `battle.getBattles` (full cursor), `battle.getById` on finalize only, `battleLootSummary.getByBattleAndUser`, `battleOrder.getByBattle` (dual-side), `countryDiplomacy.getByCountry`, `gameStat.getWorldDevelopment`, `country.getCountryById`, `region.getById`; MU HQ level from `mu-stats-poll` (`mus.activeUpgradeLevels`), not a new WarEra call | `battles` (incl. country-order id lists), `battle_scoreboard_snapshots`, `battle_loot_snapshots`, `battle_orders`, `battle_bonus_facts`, `country_diplomacy` | Fight Desk (`GET /api/mu/:muId/fight-desk` `battles[]` strip + MU loot sums) |
 
-Global battle catalog (`battle.getBattles` cursor drain); rows enter and stay sticky when a watched MU (Geo watchlist from `mu_watch_reasons`) appears in attacker/defender `muOrders`.
+Global battle catalog (`battle.getBattles` cursor drain). Rows enter and stay sticky until finalize when a watched MU (Geo watchlist from `mu_watch_reasons`) is in attacker/defender `muOrders` or its `country_id` is in attacker/defender `countryOrders` (also persisted on `battle_orders`). Fight Desk tab reads DB facts only; manual ↻ is `POST .../fight-desk/refresh` (MU fight snapshots), not live battle/diplomacy/region calls.
 
 ### Geo
 
@@ -93,7 +93,7 @@ The country watchlist is distinct ids in `country_watch_reasons` (Sweden seeded 
 | **Append-only history** | Care about time series / sales | price snapshots, item_market_transactions, MU stat snapshots |
 | **TTL pack / KV** | Short-lived assembled payload | company_packs, generic `cache` table |
 | **Client memory only** | Cross-tool reuse in one tab | TanStack Query |
-| **Client prefs (LS)** | UX continuity, not SoT | recent players, equipment/calculator prefs |
+| **Client prefs (LS)** | UX continuity, not SoT | recent players, equipment/calculator prefs, Fight Desk `fightDeskPrefs:v2:${muId}` (selected battle, Custom %) |
 
 We do **not** currently dual-write every entity as transactional history + latest. That remains a possible future if requirements grow (likely with a different store).
 
