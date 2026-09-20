@@ -7,32 +7,18 @@ import type { Db } from "../db/client";
 import { getRegionsByIds } from "../db/regions";
 import { battleBonusFacts, countries, countryDiplomacy, mus } from "../db/schema";
 import type { ParsedBattleOrder } from "../warera/battle-orders";
-
-export type MuFightDeskBattle = {
-  id: string;
-  regionName: string | null;
-  attackerCountryId: string | null;
-  defenderCountryId: string | null;
-  attackerIsoCode: string | null;
-  defenderIsoCode: string | null;
-  kind: "mu_order" | "country_order" | "both";
-  muOrderSide: BattleSide | null;
-  countryOrderSide: BattleSide | null;
-  isRevolt: boolean;
-  muDamageToDate: number | null;
-  bonus: BattleBonusResult;
-};
+import type { MuFightDeskBattle } from "../web/features/mu/types";
 
 function parseHq(activeUpgradeLevels: Record<string, unknown> | null | undefined): {
   hqLevel: number | null;
-  hqRunning: boolean | null;
+  hqRunning: boolean;
 } {
   if (activeUpgradeLevels == null) {
-    return { hqLevel: null, hqRunning: null };
+    return { hqLevel: null, hqRunning: false };
   }
   const raw = Number(activeUpgradeLevels.headquarters);
   if (!Number.isFinite(raw) || raw < 1 || raw > 4) {
-    return { hqLevel: null, hqRunning: null };
+    return { hqLevel: null, hqRunning: false };
   }
   const hqLevel = Math.floor(raw);
   return { hqLevel, hqRunning: hqLevel != null };
@@ -209,39 +195,9 @@ export async function loadFightDeskBattles(
   if (stripRows.length === 0) return [];
 
   const battleIds = stripRows.map((row) => row.id);
-  const ordersByBattle = new Map<string, ParsedBattleOrder[]>();
-  await Promise.all(
-    battleIds.map(async (battleId) => {
-      ordersByBattle.set(battleId, await listBattleOrders(db, battleId));
-    }),
-  );
-
-  const damageByBattle = await listLatestMuDamageByBattle(db, muId, battleIds);
-
-  const factsRows =
-    battleIds.length === 0
-      ? []
-      : await db
-          .select()
-          .from(battleBonusFacts)
-          .where(inArray(battleBonusFacts.battleId, battleIds));
-  const factsByBattle = new Map(factsRows.map((row) => [row.battleId, row]));
-
-  const diplomacyRows =
-    muCountryId.length === 0
-      ? []
-      : await db
-          .select()
-          .from(countryDiplomacy)
-          .where(eq(countryDiplomacy.countryId, muCountryId))
-          .limit(1);
-  const diplomacy = diplomacyRows[0];
-
   const regionIds = stripRows.flatMap((row) =>
     [row.defenderRegionId, row.attackerRegionId].filter((id): id is string => id != null && id.length > 0),
   );
-  const regionsById = await getRegionsByIds(db, regionIds);
-
   const countryIds = [
     ...new Set(
       stripRows.flatMap((row) =>
@@ -251,13 +207,42 @@ export async function loadFightDeskBattles(
       ),
     ),
   ];
-  const countryRows =
+
+  const ordersByBattle = new Map<string, ParsedBattleOrder[]>();
+  const [
+    ,
+    damageByBattle,
+    factsRows,
+    diplomacyRows,
+    regionsById,
+    countryRows,
+  ] = await Promise.all([
+    Promise.all(
+      battleIds.map(async (battleId) => {
+        ordersByBattle.set(battleId, await listBattleOrders(db, battleId));
+      }),
+    ),
+    listLatestMuDamageByBattle(db, muId, battleIds),
+    battleIds.length === 0
+      ? Promise.resolve([])
+      : db.select().from(battleBonusFacts).where(inArray(battleBonusFacts.battleId, battleIds)),
+    muCountryId.length === 0
+      ? Promise.resolve([])
+      : db
+          .select()
+          .from(countryDiplomacy)
+          .where(eq(countryDiplomacy.countryId, muCountryId))
+          .limit(1),
+    getRegionsByIds(db, regionIds),
     countryIds.length === 0
-      ? []
-      : await db
+      ? Promise.resolve([])
+      : db
           .select({ id: countries.id, isoCode: countries.isoCode })
           .from(countries)
-          .where(inArray(countries.id, countryIds));
+          .where(inArray(countries.id, countryIds)),
+  ]);
+  const factsByBattle = new Map(factsRows.map((row) => [row.battleId, row]));
+  const diplomacy = diplomacyRows[0];
   const isoByCountry = new Map(countryRows.map((row) => [row.id, row.isoCode ?? null]));
 
   const cards: MuFightDeskBattle[] = [];

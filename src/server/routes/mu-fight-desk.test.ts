@@ -16,6 +16,7 @@ import * as schema from "../../db/schema";
 import type { ParsedBattle } from "../../warera/battles";
 import type { TrpcBatchSlotResult, WareraBatchItem } from "../../warera/trpc";
 import { errorPayload } from "../errors";
+import * as fightDeskBattles from "../fight-desk-battles";
 import { muFightDeskRoutes } from "./mu-fight-desk";
 
 const NOW = new Date("2026-09-15T12:00:00.000Z");
@@ -156,6 +157,17 @@ describe("muFightDeskRoutes", () => {
 
   afterEach(() => {
     vi.useRealTimers();
+  });
+
+  it("returns 404 for an unknown MU without loading battles", async () => {
+    const loadSpy = vi.spyOn(fightDeskBattles, "loadFightDeskBattles");
+    const { app } = appFor(db);
+
+    const res = await app.request("http://localhost/mu-missing/fight-desk");
+
+    expect(res.status).toBe(404);
+    expect(loadSpy).not.toHaveBeenCalled();
+    loadSpy.mockRestore();
   });
 
   it("returns an empty member list for an MU with an empty roster", async () => {
@@ -588,6 +600,7 @@ describe("muFightDeskRoutes", () => {
     };
 
     expect(body.battles).toHaveLength(1);
+    expect(body.battles[0]?.regionName).toBe("Crete");
     expect(body.battles[0]?.kind).toBe("both");
     expect(body.battles[0]?.muDamageToDate).toBe(12_400_000);
 
@@ -652,14 +665,97 @@ describe("muFightDeskRoutes", () => {
       },
       { stickyMuIds: [], fetchedAt },
     );
+    await replaceBattleOrders(
+      db,
+      battleId,
+      [
+        {
+          ownerType: "country",
+          ownerId: "sweden",
+          side: "attacker",
+          priority: "high",
+          payload: null,
+        },
+      ],
+      fetchedAt,
+    );
 
     const { app } = appFor(db);
     const res = await app.request("http://localhost/mu-1/fight-desk");
     expect(res.status).toBe(200);
     const body = (await res.json()) as {
-      battles: Array<{ id: string; muDamageToDate: number | null }>;
+      battles: Array<{
+        id: string;
+        kind: string;
+        muDamageToDate: number | null;
+        bonus: { parts: Array<{ id: string; amount: number | null; status: string }> };
+      }>;
     };
     expect(body.battles).toHaveLength(1);
+    expect(body.battles[0]?.kind).toBe("country_order");
     expect(body.battles[0]?.muDamageToDate).toBeNull();
+    const countryOrderPart = body.battles[0]?.bonus.parts.find((p) => p.id === "country_order");
+    expect(countryOrderPart).toEqual({
+      id: "country_order",
+      label: "Country order",
+      amount: 0.15,
+      status: "applied",
+    });
+  });
+
+  it("treats missing HQ upgrades as HQ off in battle bonus", async () => {
+    const battleId = "b-hq-off";
+    const fetchedAt = NOW;
+    await seedMu(db, [], false, {
+      countryId: "sweden",
+      activeUpgradeLevels: null,
+    });
+    await upsertBattleFromParsed(
+      db,
+      {
+        id: battleId,
+        warId: "w-hq",
+        type: "war",
+        isActive: true,
+        attacker: {
+          countryId: "x",
+          regionId: "r-x",
+          wonRoundsCount: 0,
+          muOrders: ["mu-1"],
+          countryOrders: [],
+          hitCount: null,
+        },
+        defender: {
+          countryId: "y",
+          regionId: "r-y",
+          wonRoundsCount: 0,
+          muOrders: [],
+          countryOrders: [],
+          hitCount: null,
+        },
+        roundsToWin: 8,
+        rounds: [],
+        roundsHistory: [],
+        startedAtGame: null,
+        currentRound: null,
+        payload: null,
+      },
+      { stickyMuIds: [], fetchedAt },
+    );
+    await replaceBattleOrders(
+      db,
+      battleId,
+      [{ ownerType: "mu", ownerId: "mu-1", side: "attacker", priority: "low", payload: null }],
+      fetchedAt,
+    );
+
+    const { app } = appFor(db);
+    const res = await app.request("http://localhost/mu-1/fight-desk");
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      battles: Array<{ bonus: { parts: Array<{ id: string; amount: number | null; status: string }> } }>;
+    };
+    const hqPart = body.battles[0]?.bonus.parts.find((p) => p.id === "hq");
+    expect(hqPart).toEqual({ id: "hq", label: "HQ", amount: 0, status: "off" });
   });
 });

@@ -22,6 +22,7 @@ import type { WareraRequester } from "../../warera/prices";
 import { fetchUserByIdRawBatch } from "../../warera/users";
 import { loadFightDeskBattles } from "../fight-desk-battles";
 import { HttpError } from "../errors";
+import type { MuFightDeskResponse } from "../../web/features/mu/types";
 
 export type MuFightDeskRouteDeps = {
   db: Db;
@@ -139,9 +140,8 @@ export function muFightDeskRoutes(deps: MuFightDeskRouteDeps) {
   const { db } = deps;
   const app = new Hono();
 
-  async function respond(muId: string, forceRefresh: boolean) {
+  async function respond(muId: string, forceRefresh: boolean): Promise<MuFightDeskResponse> {
     const now = new Date();
-    const battlesPromise = loadFightDeskBattles(db, muId, now);
     const [muRows, roster, watchRows] = await Promise.all([
       db.select({ id: mus.id, name: mus.name }).from(mus).where(eq(mus.id, muId)).limit(1),
       listMuMembers(db, muId),
@@ -155,6 +155,8 @@ export function muFightDeskRoutes(deps: MuFightDeskRouteDeps) {
     if (!mu) {
       throw new HttpError(404, "not_found", `MU ${muId} not found`);
     }
+
+    const battlesPromise = loadFightDeskBattles(db, muId, now);
 
     let snapshots = await listLatestFightStatesForMu(db, muId);
     const watched = watchRows.length > 0;
