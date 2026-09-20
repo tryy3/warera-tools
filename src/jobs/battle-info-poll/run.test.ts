@@ -9,17 +9,31 @@ import {
   insertMuWatchReason,
 } from "../../db/watch-reasons";
 import * as schema from "../../db/schema";
+import { listBattleOrders } from "../../db/battle-orders";
 import { runBattleInfoPoll } from "./run";
 
 const REASON_AT = new Date("2026-09-01T00:00:00.000Z");
 
-async function seedMuWatch(db: Db, muId: string): Promise<void> {
+async function seedMuWatch(
+  db: Db,
+  muId: string,
+  opts?: { countryId?: string | null },
+): Promise<void> {
   await insertMuWatchReason(db, {
     muId,
     reason: WATCH_REASON_MANUAL,
     sourceId: MANUAL_SOURCE_ID,
     at: REASON_AT,
   });
+  if (opts?.countryId !== undefined) {
+    await db
+      .insert(schema.mus)
+      .values({ id: muId, countryId: opts.countryId, enqueuedAt: REASON_AT })
+      .onConflictDoUpdate({
+        target: schema.mus.id,
+        set: { countryId: opts.countryId },
+      });
+  }
 }
 
 async function seedMuMembers(db: Db, muId: string, userIds: string[]): Promise<void> {
@@ -36,6 +50,8 @@ function battleFixture(opts: {
   id: string;
   attackerMuOrders?: string[];
   defenderMuOrders?: string[];
+  attackerCountryOrders?: string[];
+  defenderCountryOrders?: string[];
   isActive?: boolean;
   roundId?: string;
   roundNumber?: number;
@@ -50,6 +66,7 @@ function battleFixture(opts: {
       region: "r-att",
       wonRoundsCount: 1,
       muOrders: opts.attackerMuOrders ?? [],
+      countryOrders: opts.attackerCountryOrders ?? [],
       hitCount: 10,
     },
     defender: {
@@ -57,6 +74,7 @@ function battleFixture(opts: {
       region: "r-def",
       wonRoundsCount: 0,
       muOrders: opts.defenderMuOrders ?? [],
+      countryOrders: opts.defenderCountryOrders ?? [],
       hitCount: 8,
     },
     roundsToWin: 8,
@@ -94,6 +112,8 @@ function makeWarera(handlers: {
   loot?: (battleId: string, userId: string) => unknown;
   lootNotFoundFor?: Set<string>;
   lootThrowFor?: Set<string>;
+  battleOrders?: (battleId: string, side: "attacker" | "defender") => unknown;
+  battleOrdersThrowFor?: Set<string>;
 }) {
   const request = vi.fn(async (path: string) => {
     if (path.includes("battle.getBattles")) {
@@ -110,6 +130,18 @@ function makeWarera(handlers: {
         throw new Error("WarEra request failed: 404 NOT_FOUND");
       }
       return { result: { data: body ?? battleFixture({ id: battleId }) } };
+    }
+    if (path.includes("battleOrder.getByBattle")) {
+      const inputMatch = path.match(/input=([^&]+)/);
+      const inputJson = inputMatch?.[1] ? decodeURIComponent(inputMatch[1]) : "{}";
+      const input = JSON.parse(inputJson) as { battleId?: string; side?: "attacker" | "defender" };
+      const battleId = input.battleId ?? "";
+      const side = input.side ?? "attacker";
+      if (handlers.battleOrdersThrowFor?.has(battleId)) {
+        throw new Error("battle orders transport error");
+      }
+      const body = handlers.battleOrders?.(battleId, side);
+      return { result: { data: body ?? { orders: [] } } };
     }
     if (path.includes("battleLootSummary.getByBattleAndUser")) {
       const match = path.match(/battleId%22%3A%22([^%]+)%22%2C%22userId%22%3A%22([^%]+)/);
@@ -151,6 +183,40 @@ describe("runBattleInfoPoll", () => {
 
   beforeEach(async () => {
     await truncateAllTables(db);
+  });
+
+  it("country-order discovery: watched MU country on attacker countryOrders -> sticky + battle_orders", async () => {
+    await seedMuWatch(db, "mu-se", { countryId: "sweden" });
+    await seedMuMembers(db, "mu-se", ["u-se"]);
+    const warera = makeWarera({
+      activeBattles: [
+        battleFixture({ id: "b-co", attackerCountryOrders: ["sweden"], attackerMuOrders: [] }),
+      ],
+      battleOrders: (_battleId, side) =>
+        side === "attacker"
+          ? { orders: [{ country: "sweden", side: "attacker", priority: "high" }] }
+          : { orders: [] },
+      loot: () => lootFixture({}),
+    });
+    await runBattleInfoPoll({
+      db,
+      warera: warera as never,
+      logger: makeLogger() as never,
+      now: new Date("2026-09-03T12:00:00.000Z"),
+    });
+    const [row] = await db.select().from(schema.battles).where(eq(schema.battles.id, "b-co"));
+    expect(row).toBeDefined();
+    expect(row?.stickyMuIds).toEqual(["mu-se"]);
+    const orders = await listBattleOrders(db, "b-co");
+    expect(orders).toEqual([
+      {
+        ownerType: "country",
+        ownerId: "sweden",
+        side: "attacker",
+        priority: "high",
+        payload: null,
+      },
+    ]);
   });
 
   it("happy path: upserts watched battle, writes scoreboard + loot, status success", async () => {

@@ -12,7 +12,10 @@ import {
   type BattleLootSnapshotRow,
   type BattleScoreboardSnapshotRow,
 } from "../../db/battle-stats";
-import { listMuMembers, listMusForSync } from "../../db/mus";
+import { replaceBattleOrders } from "../../db/battle-orders";
+import { listMuMembers, listMusForSync, listWatchedMusWithCountry } from "../../db/mus";
+import { relevantStickyMuIds } from "./relevance";
+import { fetchBattleOrders } from "../../warera/battle-orders";
 import type { Logger } from "../../logging/logger";
 import {
   BATTLE_END_SETTLE_MS,
@@ -46,7 +49,7 @@ export async function runBattleInfoPoll(options: {
 
   // Watchlist (Geo/User-tier reads; no live WarEra calls here).
   const watchedMuIds = await listMusForSync(db);
-  const watchedSet = new Set(watchedMuIds);
+  const watchedMus = await listWatchedMusWithCountry(db);
 
   // Drain the full active-battle cursor before any end-detection.
   const { battles: activeList, pages, complete } = await fetchAllActiveBattles(warera);
@@ -60,8 +63,7 @@ export async function runBattleInfoPoll(options: {
   // watchlist. Sticky battles already in DB are handled in phase 2 even when
   // their current orders no longer intersect (sticky ids are preserved there).
   for (const b of activeList) {
-    const orderMus = [...b.attacker.muOrders, ...b.defender.muOrders];
-    const hit = orderMus.filter((id) => watchedSet.has(id));
+    const hit = relevantStickyMuIds(b, watchedMus);
     if (hit.length === 0) continue;
     await upsertBattleFromParsed(db, b, { stickyMuIds: hit, fetchedAt: now });
   }
@@ -125,6 +127,7 @@ export async function runBattleInfoPoll(options: {
           recordedAt: now,
         });
       }
+      await syncBattleOrders(db, warera, row.id, now, errors, logger);
       await collectLoot(warera, row.id, stickyMuIds, rosterByMu, lootRows, now, errors, logger);
       continue;
     }
@@ -138,6 +141,7 @@ export async function runBattleInfoPoll(options: {
     if (row.endedAt === null) {
       // First time we notice it ended — start the settle grace, still loot.
       await markBattleEnded(db, row.id, now);
+      await syncBattleOrders(db, warera, row.id, now, errors, logger);
       await collectLoot(warera, row.id, stickyMuIds, rosterByMu, lootRows, now, errors, logger);
       continue;
     }
@@ -145,6 +149,7 @@ export async function runBattleInfoPoll(options: {
     const ageMs = now.getTime() - row.endedAt.getTime();
     if (ageMs < BATTLE_END_SETTLE_MS) {
       // Within the 60s grace — loot only, no getById, not finalized.
+      await syncBattleOrders(db, warera, row.id, now, errors, logger);
       await collectLoot(warera, row.id, stickyMuIds, rosterByMu, lootRows, now, errors, logger);
       continue;
     }
@@ -164,6 +169,7 @@ export async function runBattleInfoPoll(options: {
         stickyMuIds,
         fetchedAt: now,
       });
+      await syncBattleOrders(db, warera, row.id, now, errors, logger);
       const lootErrors = await collectLoot(
         warera,
         row.id,
@@ -259,6 +265,26 @@ export async function runBattleInfoPoll(options: {
     finalizedCount,
     status,
   };
+}
+
+async function syncBattleOrders(
+  db: Db,
+  warera: WareraRequester,
+  battleId: string,
+  fetchedAt: Date,
+  errors: string[],
+  logger: Logger,
+): Promise<void> {
+  try {
+    const orders = await fetchBattleOrders(warera, battleId);
+    await replaceBattleOrders(db, battleId, orders, fetchedAt);
+  } catch (err) {
+    errors.push(`orders ${battleId}: ${err instanceof Error ? err.message : String(err)}`);
+    logger.warn(
+      { battle_id: battleId, err: err instanceof Error ? err.message : String(err) },
+      "battle orders fetch failed",
+    );
+  }
 }
 
 /**
