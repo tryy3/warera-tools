@@ -51,6 +51,7 @@ export function formatBonusBreakdown(parts: BonusPart[]): string {
   const tokens: string[] = [];
 
   for (const part of parts) {
+    if (part.id === "supply_line") continue;
     if (part.status === "applied" && part.amount != null && part.amount !== 0) {
       tokens.push(`${part.label} ${formatPartPercent(part.amount)}`);
     }
@@ -69,14 +70,12 @@ export function formatBonusBreakdown(parts: BonusPart[]): string {
   }
 
   const supply = parts.find((part) => part.id === "supply_line");
-  if (
-    supply?.status === "applied" &&
-    supply.amount != null &&
-    supply.amount < 0
-  ) {
-    tokens.push("supply −25%");
-  } else {
-    tokens.push("supply OK");
+  if (supply?.status !== "unknown") {
+    if (supply?.status === "applied" && supply.amount != null && supply.amount < 0) {
+      tokens.push("supply −25%");
+    } else {
+      tokens.push("supply OK");
+    }
   }
 
   return tokens.join(" · ");
@@ -116,7 +115,9 @@ function BattleCard({
       ].join(" ")}
       onClick={onSelect}
     >
-      <div className="truncate text-xs font-semibold text-foreground">{battle.regionName ?? "Battle"}</div>
+      <div className="truncate text-xs font-semibold text-foreground">
+        {battle.regionName ?? "Battle"}
+      </div>
       <div className="flex items-center gap-1.5">
         <FlagIcon code={flagCode(battle, "attacker")} className="h-4 w-5 rounded-sm object-cover" />
         {battle.isRevolt ? (
@@ -143,9 +144,7 @@ function BattleCard({
       </div>
       <div className="flex items-baseline justify-between gap-2 font-mono text-xs tabular-nums">
         <span className="font-semibold text-amber-300">+{firePct}%</span>
-        <span className="text-muted-foreground">
-          MU {muCompact === "—" ? "—" : muCompact}
-        </span>
+        <span className="text-muted-foreground">MU {muCompact === "—" ? "—" : muCompact}</span>
       </div>
     </button>
   );
@@ -167,9 +166,7 @@ function CustomCard({
       data-fight-desk-battle-selected={selected ? "true" : "false"}
       className={[
         "flex min-w-[9.5rem] shrink-0 flex-col gap-1.5 rounded-md border bg-secondary/80 px-3 py-2.5",
-        selected
-          ? "border-violet-400/70 ring-2 ring-violet-500/45"
-          : "border-border/60",
+        selected ? "border-violet-400/70 ring-2 ring-violet-500/45" : "border-border/60",
       ].join(" ")}
     >
       <button type="button" className="text-left" onClick={onSelect}>
@@ -189,9 +186,7 @@ function CustomCard({
           step="1"
           className="h-7 w-16 rounded-lg border border-input bg-background px-2 font-mono text-sm text-foreground outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
           value={customBonus * 100}
-          onChange={(event) =>
-            onCustomBonusChange(numericInputValue(event.target.value) / 100)
-          }
+          onChange={(event) => onCustomBonusChange(numericInputValue(event.target.value) / 100)}
           onFocus={onSelect}
         />
         %
@@ -237,7 +232,9 @@ export function FightDeskBattleStrip({
         ))}
       </div>
       {selectedBattle ? (
-        <p className="text-xs text-muted-foreground">{formatBonusBreakdown(selectedBattle.bonus.parts)}</p>
+        <p className="text-xs text-muted-foreground">
+          {formatBonusBreakdown(selectedBattle.bonus.parts)}
+        </p>
       ) : null}
     </div>
   );

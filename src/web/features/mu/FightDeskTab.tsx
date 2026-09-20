@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { classifyBuildFromSkillLevels } from "../../../build-class/classify";
 import { aggregateFightDesk } from "../../../fight-damage/aggregate";
 import { FIGHT_FOOD_OPTIONS, foodBonusForId } from "../../../fight-damage/food";
@@ -19,11 +19,15 @@ import {
 import { useMuFightDeskQuery, useRefreshMuFightDesk } from "../../query/useMuFightDeskQuery";
 import { FightDeskBattleStrip } from "./FightDeskBattleStrip";
 import { FightDeskMemberRow } from "./FightDeskMemberRow";
+import { resolveFightDeskBattleSelection } from "./fightDeskBattleSelection";
+import type { MuFightDeskBattle } from "./types";
 import {
   buildFightDeskMemberRows,
   sortFightDeskMemberRows,
   type FightDeskSort,
 } from "./fightDeskMemberRows";
+
+const EMPTY_BATTLES: MuFightDeskBattle[] = [];
 
 const PRESETS: Array<{ id: FightDeskPresetId; label: string }> = [
   { id: "pilled", label: "Pilled" },
@@ -69,6 +73,8 @@ export function FightDeskTab({ muId }: { muId: string }) {
   });
   const [prefs, setPrefs] = useState<FightDeskPrefsV1>(initial.prefs);
   const [initialPresetDone, setInitialPresetDone] = useState(!initial.applyInitialPreset);
+  const [autoSelectConsumed, setAutoSelectConsumed] = useState(!initial.applyInitialPreset);
+  const previousBattlesRef = useRef<MuFightDeskBattle[]>([]);
   const [sort, setSort] = useState<FightDeskSort>("now");
   const [nowMs, setNowMs] = useState(() => Date.now());
 
@@ -111,27 +117,44 @@ export function FightDeskTab({ muId }: { muId: string }) {
   }, [initialPresetDone, presetMembers, query.data]);
 
   useEffect(() => {
-    if (!initialPresetDone) return;
+    if (!initialPresetDone || !query.data) return;
     saveFightDeskPrefs(muId, prefs);
-  }, [initialPresetDone, muId, prefs]);
+  }, [initialPresetDone, muId, prefs, query.data]);
 
-  const battles = query.data?.battles ?? [];
+  const battles = query.data?.battles ?? EMPTY_BATTLES;
 
   useEffect(() => {
-    if (!query.data || !initial.applyInitialPreset) return;
-    setPrefs((current) => {
-      if (current.selectedBattleId !== "custom") return current;
-      const pick = battles.find((battle) => battle.kind !== "country_order");
-      if (!pick) return current;
-      return { ...current, selectedBattleId: pick.id };
+    const next = resolveFightDeskBattleSelection({
+      battlesLoaded: query.data != null,
+      battles: query.data?.battles ?? EMPTY_BATTLES,
+      previousBattles: previousBattlesRef.current,
+      selectedBattleId: prefs.selectedBattleId,
+      battleBonus: prefs.battleBonus,
+      applyInitialPreset: initial.applyInitialPreset,
+      autoSelectConsumed,
     });
-  }, [battles, initial.applyInitialPreset, query.data]);
+    if (query.data) previousBattlesRef.current = query.data.battles;
 
-  useEffect(() => {
-    if (prefs.selectedBattleId === "custom") return;
-    if (battles.some((battle) => battle.id === prefs.selectedBattleId)) return;
-    setPrefs((current) => ({ ...current, selectedBattleId: "custom" }));
-  }, [battles, prefs.selectedBattleId]);
+    if (next.autoSelectConsumed !== autoSelectConsumed) {
+      setAutoSelectConsumed(next.autoSelectConsumed);
+    }
+    if (
+      next.selectedBattleId !== prefs.selectedBattleId ||
+      next.battleBonus !== prefs.battleBonus
+    ) {
+      setPrefs((current) => ({
+        ...current,
+        selectedBattleId: next.selectedBattleId,
+        battleBonus: next.battleBonus,
+      }));
+    }
+  }, [
+    autoSelectConsumed,
+    initial.applyInitialPreset,
+    prefs.battleBonus,
+    prefs.selectedBattleId,
+    query.data,
+  ]);
 
   const selectedLiveBattle = useMemo(() => {
     if (prefs.selectedBattleId === "custom") return null;

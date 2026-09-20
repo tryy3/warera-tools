@@ -3,6 +3,7 @@ import { describe, expect, it } from "vite-plus/test";
 import { computeBattleBonus } from "../../../battle-bonus/compute";
 import {
   FightDeskBattleStrip,
+  formatBonusBreakdown,
   formatCompactMuDamage,
   type FightDeskBattleStripProps,
 } from "./FightDeskBattleStrip";
@@ -58,7 +59,7 @@ function renderStrip(overrides: Partial<FightDeskBattleStripProps> = {}): string
 }
 
 describe("formatCompactMuDamage", () => {
-  it('formats millions as one decimal M and null as em dash', () => {
+  it("formats millions as one decimal M and null as em dash", () => {
     expect(formatCompactMuDamage(12_400_000)).toBe("12.4M");
     expect(formatCompactMuDamage(null)).toBe("—");
   });
@@ -95,5 +96,68 @@ describe("FightDeskBattleStrip", () => {
     expect(html).toContain("MU order +5%");
     expect(html).toContain("HQ +15%");
     expect(html).toContain("supply OK");
+  });
+
+  it("does not duplicate supply penalty for an unlinked defender", () => {
+    const bonus = computeBattleBonus({
+      fightSide: "defender",
+      muCountryId: "sweden",
+      attackerCountryId: "greece",
+      defenderCountryId: "turkey",
+      isRevolt: false,
+      countryOrderPriority: "high",
+      muOrderPriority: "low",
+      hqLevel: 3,
+      hqRunning: true,
+      allianceWorldShare: null,
+      defendingPactPartner: null,
+      swornEnemy: null,
+      bunkerLevel: null,
+      bunkerActive: null,
+      militaryBaseLevel: null,
+      militaryBaseActive: false,
+      resistance: null,
+      defenderSupplyLinked: false,
+      alliedFortHalf: true,
+    });
+    const html = renderStrip({
+      battles: [{ ...creteBattle, bonus }],
+      selectedBattleId: creteBattle.id,
+    });
+    const breakdown = formatBonusBreakdown(bonus.parts);
+    expect(html).toContain("supply −25%");
+    expect(breakdown).toContain("supply −25%");
+    expect(html).not.toContain("Supply line");
+    expect(breakdown).not.toContain("Supply line");
+  });
+
+  it("does not claim supply OK when supply is unknown", () => {
+    const bonus = computeBattleBonus({
+      fightSide: "defender",
+      muCountryId: "sweden",
+      attackerCountryId: "greece",
+      defenderCountryId: "turkey",
+      isRevolt: false,
+      countryOrderPriority: "high",
+      muOrderPriority: "low",
+      hqLevel: 3,
+      hqRunning: true,
+      allianceWorldShare: null,
+      defendingPactPartner: null,
+      swornEnemy: null,
+      bunkerLevel: null,
+      bunkerActive: null,
+      militaryBaseLevel: null,
+      militaryBaseActive: false,
+      resistance: null,
+      defenderSupplyLinked: null,
+      alliedFortHalf: true,
+    });
+    const html = renderStrip({
+      battles: [{ ...creteBattle, bonus }],
+      selectedBattleId: creteBattle.id,
+    });
+    expect(html).not.toContain("supply OK");
+    expect(formatBonusBreakdown(bonus.parts)).not.toContain("supply OK");
   });
 });
