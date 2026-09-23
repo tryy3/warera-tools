@@ -44,6 +44,8 @@ export async function upsertBattleFromParsed(
     defenderWonRounds: parsed.defender.wonRoundsCount,
     attackerMuOrders: parsed.attacker.muOrders,
     defenderMuOrders: parsed.defender.muOrders,
+    attackerCountryOrders: parsed.attacker.countryOrders,
+    defenderCountryOrders: parsed.defender.countryOrders,
     stickyMuIds,
     roundsHistory: parsed.roundsHistory,
     startedAtGame: parsed.startedAtGame,

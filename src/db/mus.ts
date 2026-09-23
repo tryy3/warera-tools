@@ -1,4 +1,4 @@
-import { asc, eq } from "drizzle-orm";
+import { asc, eq, inArray } from "drizzle-orm";
 import type { Db, DbOrTx } from "./client";
 import { muMembers, mus } from "./schema";
 import { listDistinctWatchedMuIds } from "./watch-reasons";
@@ -6,6 +6,23 @@ import type { ParsedMu } from "../warera/mu";
 
 export async function listMusForSync(db: Db): Promise<string[]> {
   return listDistinctWatchedMuIds(db);
+}
+
+export type WatchedMuRow = {
+  muId: string;
+  countryId: string | null;
+};
+
+/** Watched MU ids with optional `mus.country_id` (null when no mus row yet). */
+export async function listWatchedMusWithCountry(db: Db): Promise<WatchedMuRow[]> {
+  const muIds = await listDistinctWatchedMuIds(db);
+  if (muIds.length === 0) return [];
+  const rows = await db
+    .select({ id: mus.id, countryId: mus.countryId })
+    .from(mus)
+    .where(inArray(mus.id, muIds));
+  const countryByMuId = new Map(rows.map((r) => [r.id, r.countryId ?? null]));
+  return muIds.map((muId) => ({ muId, countryId: countryByMuId.get(muId) ?? null }));
 }
 
 export async function upsertMuCurrent(

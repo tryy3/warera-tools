@@ -17,7 +17,7 @@ Custom vs OpenAPI: https://github.com/WarEraProjects/TRPC/tree/main/src/CustomEn
 | --- | --- | --- | --- |
 | alliance.getById | trpc-custom | unknown | no |
 | alliance.getByIds | trpc-custom | unknown | no |
-| alliance.getManyPaginated | trpc-custom | unknown | no |
+| alliance.getManyPaginated | trpc-custom | unknown | yes |
 | article.getArticleById | openapi | unknown | no |
 | article.getArticleLiteById | openapi | unknown | no |
 | article.getArticlesPaginated | openapi | unknown | no |
@@ -26,16 +26,16 @@ Custom vs OpenAPI: https://github.com/WarEraProjects/TRPC/tree/main/src/CustomEn
 | battle.getById | openapi | unknown | yes |
 | battle.getLiveBattleData | openapi | unknown | no |
 | battleLootSummary.getByBattleAndUser | openapi | unknown | yes |
-| battleOrder.getByBattle | openapi | unknown | no |
+| battleOrder.getByBattle | openapi | unknown | yes |
 | battleRanking.getRanking | openapi | unknown | no |
 | company.getById | openapi | unknown | yes |
 | company.getCompanies | openapi | unknown | yes |
 | company.getProductionBonus | trpc-custom | unknown | yes |
 | company.getRecommendedRegionIdsByItemCode | trpc-custom | required | yes |
 | country.getAllCountries | openapi | optional | yes |
-| country.getCountryById | openapi | unknown | no |
+| country.getCountryById | openapi | unknown | yes |
 | country.getUnrestData | explorer | unknown | no |
-| countryDiplomacy.getByCountry | explorer | unknown | no |
+| countryDiplomacy.getByCountry | explorer | unknown | yes |
 | donation.getManyPaginated | trpc-custom | required | yes |
 | donation.getTotalDonations | trpc-custom | unknown | no |
 | election.getElection | explorer | unknown | no |
@@ -44,7 +44,7 @@ Custom vs OpenAPI: https://github.com/WarEraProjects/TRPC/tree/main/src/CustomEn
 | gameConfig.getDates | openapi | unknown | no |
 | gameConfig.getGameConfig | openapi | unknown | no |
 | gameStat.getEquipmentAvgByCode | trpc-custom | unknown | no |
-| gameStat.getWorldDevelopment | explorer | unknown | no |
+| gameStat.getWorldDevelopment | explorer | unknown | yes |
 | giveaway.getManyPaginated | explorer | unknown | no |
 | government.getByCountryId | openapi | unknown | no |
 | inventory.fetchCurrentEquipment | openapi | unknown | yes |

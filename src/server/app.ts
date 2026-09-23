@@ -13,6 +13,7 @@ import { countriesRoutes } from "./routes/countries";
 import { economyRoutes } from "./routes/economy";
 import { equipmentRoutes } from "./routes/equipment";
 import { followRoutes } from "./routes/follow";
+import { muFightDeskRoutes } from "./routes/mu-fight-desk";
 import { muRoutes } from "./routes/mu";
 import { growthRoutes } from "./routes/growth";
 import { healthRoutes } from "./routes/health";
@@ -73,6 +74,10 @@ export function createApp(deps: CreateAppDeps): Hono {
   app.route("/api/user", userRoutes({ db: deps.db, warera: deps.warera, logger: deps.logger }));
   app.route("/api/follow", followRoutes({ db: deps.db, warera: deps.warera }));
   app.route("/api/mu", muRoutes({ db: deps.db, warera: deps.warera, logger: deps.logger }));
+  app.route(
+    "/api/mu",
+    muFightDeskRoutes({ db: deps.db, warera: deps.warera, logger: deps.logger }),
+  );
 
   // Production: serve built SPA from dist/web. Dev uses Vite on :5173.
   if (deps.config.nodeEnv === "production") {

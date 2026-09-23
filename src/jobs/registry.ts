@@ -1,11 +1,13 @@
 import type { Db } from "../db/client";
 import { jobs } from "../db/schema";
 import { battleInfoPollJob } from "./battle-info-poll";
+import { allianceSyncJob } from "./alliance-sync";
 import { countrySyncJob } from "./country-sync";
 import { donationPollJob } from "./donation-poll";
 import { exampleHeartbeatJob } from "./example-heartbeat";
 import { itemMarketTxBackfillJob } from "./item-market-tx-backfill";
 import { itemMarketTxPollJob } from "./item-market-tx-poll";
+import { muFightPollJob } from "./mu-fight-poll";
 import { muMemberPollJob } from "./mu-member-poll";
 import { muStatsPollJob } from "./mu-stats-poll";
 import { pricePollJob } from "./price-poll";
@@ -19,10 +21,12 @@ export function listJobDefinitions(): JobDefinition[] {
     exampleHeartbeatJob,
     pricePollJob,
     countrySyncJob,
+    allianceSyncJob,
     recommendedRegionsPollJob,
     regionSyncJob,
     muStatsPollJob,
     muMemberPollJob,
+    muFightPollJob,
     donationPollJob,
     battleInfoPollJob,
     workStatsPollJob,

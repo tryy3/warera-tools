@@ -10,6 +10,8 @@ import {
 } from "../../../mu/metrics";
 import { MU_HISTORY_RANGES, type MuHistoryRange } from "../../../mu/ranges";
 import { ApiError, api } from "../../api";
+import type { MuDetailTab } from "../../lib/muSearch";
+import { FightDeskTab } from "./FightDeskTab";
 import { formatMuMetricLabel, muRangeLabel } from "./formatMu";
 import { MuHistoryChart } from "./MuHistoryChart";
 import { MuMemberHistoryChart } from "./MuMemberHistoryChart";
@@ -177,7 +179,7 @@ function CurrentStrip({
 
 export function MuDetailPage() {
   const { muId } = muDetailRoute.useParams();
-  const { range, memberRange, muMetric, memberMetric } = muDetailRoute.useSearch();
+  const { tab, range, memberRange, muMetric, memberMetric } = muDetailRoute.useSearch();
   const navigate = muDetailRoute.useNavigate();
 
   const [detail, setDetail] = useState<MuDetailResponse | null>(null);
@@ -230,7 +232,7 @@ export function MuDetailPage() {
   }, [muId, reloadToken, detailKey]);
 
   useEffect(() => {
-    if (notFound || detailLoading) return;
+    if (tab !== "overview" || notFound || detailLoading) return;
 
     let cancelled = false;
 
@@ -250,10 +252,10 @@ export function MuDetailPage() {
     return () => {
       cancelled = true;
     };
-  }, [muId, range, muMetric, notFound, detailLoading, reloadToken, muHistoryKey]);
+  }, [muId, range, muMetric, notFound, detailLoading, reloadToken, muHistoryKey, tab]);
 
   useEffect(() => {
-    if (notFound || detailLoading) return;
+    if (tab !== "members" || notFound || detailLoading) return;
 
     let cancelled = false;
 
@@ -273,11 +275,24 @@ export function MuDetailPage() {
     return () => {
       cancelled = true;
     };
-  }, [muId, memberRange, memberMetric, notFound, detailLoading, reloadToken, memberHistoryKey]);
+  }, [
+    muId,
+    memberRange,
+    memberMetric,
+    notFound,
+    detailLoading,
+    reloadToken,
+    memberHistoryKey,
+    tab,
+  ]);
 
   const muMetricLabel = formatMuMetricLabel(muMetric);
   const memberMetricLabel = formatMuMetricLabel(memberMetric);
   const historyAvailable = detail?.meta.historyAvailable ?? false;
+
+  function selectTab(nextTab: MuDetailTab) {
+    void navigate({ search: (prev) => ({ ...prev, tab: nextTab }) });
+  }
 
   return (
     <div className="mx-auto max-w-[1200px] rounded-md border border-border bg-card p-4 pb-6">
@@ -345,105 +360,149 @@ export function MuDetailPage() {
             </div>
           </div>
 
-          <section className="mb-5">
-            <h2 className="mt-0 mb-2 text-[1.05rem] font-semibold">Current</h2>
-            <CurrentStrip
-              stats={detail.latestMuStats}
-              level={detail.mu.level}
-              mercenaryReputation={detail.mu.mercenaryReputation}
-            />
-          </section>
+          <div className="mb-5 flex border-b border-border" role="tablist" aria-label="MU detail">
+            {(["overview", "members", "fight"] as const).map((option) => {
+              const active = tab === option;
+              const label = option === "fight" ? "Fight Desk" : option;
+              return (
+                <button
+                  key={option}
+                  type="button"
+                  role="tab"
+                  id={`${option}-mu-tab`}
+                  aria-selected={active}
+                  aria-controls={`${option}-mu-panel`}
+                  className={`-mb-px border-t-2 border-b px-5 py-3 text-xs font-semibold tracking-[0.16em] uppercase transition-colors ${
+                    active
+                      ? "border-x border-t-primary border-b-card bg-card text-foreground"
+                      : "border-x border-t-transparent border-b-border text-muted-foreground hover:bg-card/60 hover:text-foreground"
+                  }`}
+                  onClick={() => selectTab(option)}
+                >
+                  {label}
+                </button>
+              );
+            })}
+          </div>
 
-          {!historyAvailable ? (
-            <p className="mb-5 rounded-md border border-border/60 bg-background/40 px-3 py-2 text-sm text-muted-foreground">
-              History appears after the next MU stats poll. Current identity and roster are shown
-              below.
-            </p>
+          {tab === "overview" ? (
+            <div id="overview-mu-panel" role="tabpanel" aria-labelledby="overview-mu-tab">
+              <section className="mb-5">
+                <h2 className="mt-0 mb-2 text-[1.05rem] font-semibold">Current</h2>
+                <CurrentStrip
+                  stats={detail.latestMuStats}
+                  level={detail.mu.level}
+                  mercenaryReputation={detail.mu.mercenaryReputation}
+                />
+              </section>
+
+              {!historyAvailable ? (
+                <p className="mb-5 rounded-md border border-border/60 bg-background/40 px-3 py-2 text-sm text-muted-foreground">
+                  MU history appears after the next stats poll.
+                </p>
+              ) : null}
+
+              <section>
+                <div className="mb-2 flex flex-wrap items-end justify-between gap-3">
+                  <h2 className="m-0 text-[1.05rem] font-semibold">MU history</h2>
+                  <select
+                    className={selectClassName}
+                    value={muMetric}
+                    aria-label="MU metric"
+                    onChange={(e) => {
+                      const next = e.target.value as MuHistoryMetric;
+                      void navigate({
+                        search: (prev) => ({ ...prev, muMetric: next }),
+                        replace: true,
+                      });
+                    }}
+                  >
+                    {MU_HISTORY_METRICS.map((metric) => (
+                      <option key={metric} value={metric}>
+                        {formatMuMetricLabel(metric)}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="mb-3">
+                  <RangeChips
+                    value={range}
+                    ariaLabel="MU history range"
+                    onChange={(next) => {
+                      void navigate({
+                        search: (prev) => ({ ...prev, range: next }),
+                        replace: true,
+                      });
+                    }}
+                  />
+                </div>
+                {muHistoryLoading ? (
+                  <p className="text-sm text-muted-foreground">Loading MU history…</p>
+                ) : (
+                  <MuHistoryChart points={muHistory?.points ?? []} metricLabel={muMetricLabel} />
+                )}
+              </section>
+            </div>
           ) : null}
 
-          <section className="mb-5">
-            <div className="mb-2 flex flex-wrap items-end justify-between gap-3">
-              <h2 className="m-0 text-[1.05rem] font-semibold">MU history</h2>
-              <select
-                className={selectClassName}
-                value={muMetric}
-                aria-label="MU metric"
-                onChange={(e) => {
-                  const next = e.target.value as MuHistoryMetric;
-                  void navigate({ search: (prev) => ({ ...prev, muMetric: next }), replace: true });
-                }}
-              >
-                {MU_HISTORY_METRICS.map((metric) => (
-                  <option key={metric} value={metric}>
-                    {formatMuMetricLabel(metric)}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="mb-3">
-              <RangeChips
-                value={range}
-                ariaLabel="MU history range"
-                onChange={(next) => {
-                  void navigate({ search: (prev) => ({ ...prev, range: next }), replace: true });
-                }}
-              />
-            </div>
-            {muHistoryLoading ? (
-              <p className="text-sm text-muted-foreground">Loading MU history…</p>
-            ) : (
-              <MuHistoryChart points={muHistory?.points ?? []} metricLabel={muMetricLabel} />
-            )}
-          </section>
+          {tab === "members" ? (
+            <div id="members-mu-panel" role="tabpanel" aria-labelledby="members-mu-tab">
+              <section className="mb-5">
+                <div className="mb-2 flex flex-wrap items-end justify-between gap-3">
+                  <h2 className="m-0 text-[1.05rem] font-semibold">Member history</h2>
+                  <select
+                    className={selectClassName}
+                    value={memberMetric}
+                    aria-label="Member metric"
+                    onChange={(e) => {
+                      const next = e.target.value as MemberHistoryMetric;
+                      void navigate({
+                        search: (prev) => ({ ...prev, memberMetric: next }),
+                        replace: true,
+                      });
+                    }}
+                  >
+                    {MEMBER_HISTORY_METRICS.map((metric) => (
+                      <option key={metric} value={metric}>
+                        {formatMuMetricLabel(metric)}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="mb-3">
+                  <RangeChips
+                    value={memberRange}
+                    ariaLabel="Member history range"
+                    onChange={(next) => {
+                      void navigate({
+                        search: (prev) => ({ ...prev, memberRange: next }),
+                        replace: true,
+                      });
+                    }}
+                  />
+                </div>
+                {memberHistoryLoading ? (
+                  <p className="text-sm text-muted-foreground">Loading member history…</p>
+                ) : (
+                  <MuMemberHistoryChart
+                    series={memberHistory?.series ?? []}
+                    metricLabel={memberMetricLabel}
+                  />
+                )}
+              </section>
 
-          <section className="mb-5">
-            <div className="mb-2 flex flex-wrap items-end justify-between gap-3">
-              <h2 className="m-0 text-[1.05rem] font-semibold">Member history</h2>
-              <select
-                className={selectClassName}
-                value={memberMetric}
-                aria-label="Member metric"
-                onChange={(e) => {
-                  const next = e.target.value as MemberHistoryMetric;
-                  void navigate({
-                    search: (prev) => ({ ...prev, memberMetric: next }),
-                    replace: true,
-                  });
-                }}
-              >
-                {MEMBER_HISTORY_METRICS.map((metric) => (
-                  <option key={metric} value={metric}>
-                    {formatMuMetricLabel(metric)}
-                  </option>
-                ))}
-              </select>
+              <section>
+                <h2 className="mt-0 mb-2 text-[1.05rem] font-semibold">Roster</h2>
+                <MuRosterTable members={detail.members} memberMetric={memberMetric} />
+              </section>
             </div>
-            <div className="mb-3">
-              <RangeChips
-                value={memberRange}
-                ariaLabel="Member history range"
-                onChange={(next) => {
-                  void navigate({
-                    search: (prev) => ({ ...prev, memberRange: next }),
-                    replace: true,
-                  });
-                }}
-              />
-            </div>
-            {memberHistoryLoading ? (
-              <p className="text-sm text-muted-foreground">Loading member history…</p>
-            ) : (
-              <MuMemberHistoryChart
-                series={memberHistory?.series ?? []}
-                metricLabel={memberMetricLabel}
-              />
-            )}
-          </section>
+          ) : null}
 
-          <section>
-            <h2 className="mt-0 mb-2 text-[1.05rem] font-semibold">Roster</h2>
-            <MuRosterTable members={detail.members} memberMetric={memberMetric} />
-          </section>
+          {tab === "fight" ? (
+            <div id="fight-mu-panel" role="tabpanel" aria-labelledby="fight-mu-tab">
+              <FightDeskTab key={muId} muId={muId} />
+            </div>
+          ) : null}
         </>
       ) : null}
     </div>

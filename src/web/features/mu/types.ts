@@ -1,5 +1,7 @@
+import type { BattleBonusResult } from "../../../battle-bonus/types";
 import type { MemberHistoryMetric, MuHistoryMetric } from "../../../mu/metrics";
 import type { MuHistoryRange } from "../../../mu/ranges";
+import type { FightPlayerInput } from "../../../fight-damage/types";
 
 export type MuSearchHit = { muId: string; name: string };
 
@@ -71,4 +73,52 @@ export type MuMemberHistoryResponse = {
   scope: "members";
   metric: MemberHistoryMetric;
   series: MuMemberHistorySeries[];
+};
+
+export type MuFightDeskBattle = {
+  id: string;
+  regionName: string | null;
+  attackerCountryId: string | null;
+  defenderCountryId: string | null;
+  attackerIsoCode: string | null;
+  defenderIsoCode: string | null;
+  kind: "mu_order" | "country_order" | "both";
+  muOrderSide: "attacker" | "defender" | null;
+  countryOrderSide: "attacker" | "defender" | null;
+  muCountryIsoCode: string | null;
+  isRevolt: boolean;
+  muDamageToDate: number | null;
+  bonus: BattleBonusResult;
+};
+
+export type MuFightDeskMember = {
+  userId: string;
+  username: string | null;
+  level: number | null;
+  role: string | null;
+  incomplete: boolean;
+  refreshFailed?: boolean;
+  fight: FightPlayerInput | null;
+  /** Highest-ATK loadout in 7d (or latest on cold start). Null only when incomplete. */
+  peakFight: FightPlayerInput | null;
+  display: {
+    avatarUrl: string | null;
+    militaryRankBonus: number | null;
+    ammoLabel: string | null;
+    pillLabel: string | null;
+    pillEndsAt: string | null;
+    skillLevels: Record<string, number>;
+  };
+};
+
+export type MuFightDeskResponse = {
+  mu: { id: string; name: string | null; avatarUrl?: string | null };
+  asOf: string | null;
+  members: MuFightDeskMember[];
+  battles: MuFightDeskBattle[];
+  meta: {
+    watched: boolean;
+    liveFilled: boolean;
+    refreshFailedUserIds: string[];
+  };
 };

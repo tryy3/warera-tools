@@ -21,6 +21,8 @@ describe("parseWareraCountries", () => {
         name: "Sweden",
         isoCode: "SE",
         taxRate: 0.01,
+        coreDevelopment: null,
+        allianceId: null,
       },
     ]);
   });
@@ -31,6 +33,27 @@ describe("parseWareraCountries", () => {
         result: { data: [{ name: "X", taxes: { market: 1 } }] },
       }),
     ).toEqual([]);
+  });
+
+  it("reads coreDevelopment and allianceId from getAllCountries", () => {
+    const rows = parseWareraCountries({
+      result: {
+        data: [
+          {
+            _id: "sweden",
+            name: "Sweden",
+            code: "se",
+            taxes: { market: 1 },
+            coreDevelopment: 574.07,
+            allianceId: "forge",
+          },
+        ],
+      },
+    });
+    expect(rows[0]).toMatchObject({
+      coreDevelopment: 574.07,
+      allianceId: "forge",
+    });
   });
 
   it("skips entries when taxes.market is missing or not finite", () => {
@@ -56,6 +79,8 @@ describe("parseWareraCountries", () => {
         name: "Ok",
         isoCode: "OK",
         taxRate: 0.02,
+        coreDevelopment: null,
+        allianceId: null,
       },
     ]);
   });
