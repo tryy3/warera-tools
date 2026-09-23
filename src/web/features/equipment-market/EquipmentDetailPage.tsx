@@ -55,11 +55,52 @@ function detailUrl(itemCode: string, bands: SkillBand[] | null, countryId: strin
   return `/api/equipment/${encodeURIComponent(itemCode)}${qs ? `?${qs}` : ""}`;
 }
 
+function formatSaleTime(iso: string): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "—";
+  return date.toLocaleString(undefined, {
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function MarketRange({ label, value }: { label: string; value: string | null | undefined }) {
+  return (
+    <span className="inline-flex items-baseline gap-1">
+      <span className="text-[0.7em] tracking-wide uppercase">{label}</span>
+      <GoldAmount value={value} />
+    </span>
+  );
+}
+
+function RecentSalesList({ sales }: { sales: DetailResponse["recentSales"] }) {
+  if (sales.length === 0) {
+    return <p className="m-0 text-sm text-muted-foreground">No sales in this band yet.</p>;
+  }
+  return (
+    <ol className="m-0 grid list-none gap-1 p-0 sm:grid-cols-2">
+      {sales.map((sale, index) => (
+        <li
+          key={`${sale.createdAt}-${sale.money}-${index}`}
+          className="flex items-baseline justify-between gap-3 rounded-md border border-border/60 bg-background/40 px-3 py-1.5"
+        >
+          <GoldAmount value={sale.money} />
+          <time className="text-xs text-muted-foreground" dateTime={sale.createdAt}>
+            {formatSaleTime(sale.createdAt)}
+          </time>
+        </li>
+      ))}
+    </ol>
+  );
+}
+
 function marketVsRecommend(
-  marketMedian: string | number | null,
+  marketPrice: string | number | null,
   recommend: DetailResponse["recommend"],
 ): string | null {
-  const median = moneyToNumber(marketMedian);
+  const median = moneyToNumber(marketPrice);
   const attractive = moneyToNumber(recommend?.attractiveIncl);
   const breakEven = moneyToNumber(recommend?.breakEvenIncl);
   if (median == null || attractive == null || breakEven == null) return null;
@@ -199,7 +240,11 @@ export function EquipmentDetailPage() {
       : taxRate != null
         ? formatDisplayNumber(taxRate * 100, 2)
         : null;
-  const vsMarket = marketVsRecommend(detail?.marketMedian ?? null, detail?.recommend ?? null);
+  const vsMarket = marketVsRecommend(detail?.marketTypical ?? null, detail?.recommend ?? null);
+  const typical = moneyToNumber(detail?.marketTypical);
+  const rawMedian = moneyToNumber(detail?.marketMedian);
+  const trimmedOutlier =
+    typical != null && rawMedian != null && Math.abs(typical - rawMedian) > 1e-6;
 
   return (
     <div className="mx-auto max-w-[1200px] rounded-md border border-border bg-card p-4 pb-6">
@@ -225,7 +270,7 @@ export function EquipmentDetailPage() {
             </h1>
             <p className="m-0 text-sm text-muted-foreground">
               {detail ? equipmentTierShortLabel(detail.tier) : null}
-              {detail != null ? ` · ${detail.trades} trades in band` : null}
+              {detail != null ? ` · ${detail.trades} sales in 24h` : null}
               {refreshing ? " · updating…" : null}
             </p>
           </div>
@@ -274,11 +319,24 @@ export function EquipmentDetailPage() {
             ) : null}
 
             <div className="grid gap-3 sm:grid-cols-2">
-              <GoldInclExclBox
-                label="Market"
-                incl={detail?.marketMedian}
-                excl={detail?.sellerNet}
-              />
+              <GoldInclExclBox label="Market" incl={detail?.marketTypical} excl={detail?.sellerNet}>
+                {detail != null && detail.trades > 0 ? (
+                  <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-sm text-muted-foreground">
+                    <MarketRange label="24h low" value={detail.marketLow} />
+                    <MarketRange label="median" value={detail.marketMedian} />
+                    <MarketRange label="high" value={detail.marketHigh} />
+                  </div>
+                ) : detail?.listingWindow === "recent" ? (
+                  <p className="mt-2 mb-0 text-xs text-muted-foreground">
+                    Nothing sold in the last 24h. This uses the latest sales on record.
+                  </p>
+                ) : null}
+                {trimmedOutlier ? (
+                  <p className="mt-1.5 mb-0 text-xs text-muted-foreground">
+                    A one-off low or high is left out of this price.
+                  </p>
+                ) : null}
+              </GoldInclExclBox>
               <div className="rounded-md border border-border/60 bg-background/40 px-3 py-2">
                 <div className="m-0 text-[0.75em] tracking-wide text-muted-foreground uppercase">
                   Scrap price
@@ -322,6 +380,11 @@ export function EquipmentDetailPage() {
                 </div>
               </div>
             )}
+          </section>
+
+          <section className="mt-5">
+            <h2 className="mt-0 mb-2 text-[1.05rem] font-semibold">Recent sales</h2>
+            <RecentSalesList sales={detail?.recentSales ?? []} />
           </section>
 
           <section className="mt-5">

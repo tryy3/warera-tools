@@ -3,6 +3,7 @@ import { scrapAmountForTier } from "../calculator";
 import { txMoney, type ItemMarketTxRow } from "../db/item-market-tx-read";
 import { isFiniteMoney, parseMoney, type Decimal } from "../money/decimal";
 import { tierFromItemCode } from "./catalog";
+import { listingPrice, priceBounds } from "./listing-price";
 import { median } from "./median";
 import { recommendListing, type RecommendListing } from "./recommend";
 import {
@@ -12,7 +13,7 @@ import {
   type SkillBand,
   type SkillNumbers,
 } from "./skills";
-import { MARKET_WINDOW_MS } from "./windows";
+import { MARKET_WINDOW_MS, RECENT_SALES_LIMIT } from "./windows";
 
 export type EquipmentDetail = {
   itemCode: string;
@@ -23,11 +24,22 @@ export type EquipmentDetail = {
   lowestObserved: SkillNumbers | null;
   skillKeys: string[];
   activeBands: SkillBand[];
+  /** Raw 24h median, including one-off cheap fills and overpays. */
   marketMedian: Decimal | null;
+  marketLow: Decimal | null;
+  marketHigh: Decimal | null;
+  /**
+   * Price to list near: 24h sales with isolated lows/highs removed.
+   * Falls back to the last {@link RECENT_SALES_LIMIT} sales when the last 24h is empty.
+   */
+  marketTypical: Decimal | null;
+  /** `24h` when the typical price uses the market window; `recent` when it falls back. */
+  listingWindow: "24h" | "recent" | null;
   sellerNet: Decimal | null;
   scrapFloor: Decimal | null;
   recommend: RecommendListing | null;
   trades: number;
+  recentSales: { money: Decimal; createdAtMs: number }[];
   dailyMedians: { day: string; median: Decimal; trades: number }[];
   ladder: { bucketLabel: string; median: Decimal; trades: number }[];
 };
@@ -56,7 +68,7 @@ function bandsFromLowest(lowest: SkillNumbers | null): SkillBand[] {
   if (!lowest) return [];
   return Object.keys(lowest)
     .toSorted()
-    .map((key) => ({ key, target: lowest[key]!, band: 1 }));
+    .map((key) => ({ key, target: lowest[key]!, band: 0 }));
 }
 
 function buildDailyMedians(matched: ParsedTx[]): EquipmentDetail["dailyMedians"] {
@@ -133,10 +145,23 @@ export function buildEquipmentDetail(input: BuildEquipmentDetailInput): Equipmen
   const bandMatched = parsed.filter((row) => matchesSkillBands(row.skills, activeBands));
   const marketSince = now - MARKET_WINDOW_MS;
   const marketMatched = bandMatched.filter((row) => row.createdAtMs >= marketSince);
-  const marketMedian = median(marketMatched.map((r) => r.money));
+  const windowMoneys = marketMatched.map((r) => r.money);
+  const marketMedian = median(windowMoneys);
+  const { low: marketLow, high: marketHigh } = priceBounds(windowMoneys);
   const trades = marketMatched.length;
 
-  const sellerNet = marketMedian != null && taxRate != null ? marketMedian.div(1 + taxRate) : null;
+  const recentSales = [...bandMatched]
+    .sort((a, b) => b.createdAtMs - a.createdAtMs)
+    .slice(0, RECENT_SALES_LIMIT)
+    .map((row) => ({ money: row.money, createdAtMs: row.createdAtMs }));
+
+  const listingWindow = windowMoneys.length > 0 ? "24h" : recentSales.length > 0 ? "recent" : null;
+  const marketTypical = listingPrice(
+    listingWindow === "24h" ? windowMoneys : recentSales.map((row) => row.money),
+  );
+
+  const sellerNet =
+    marketTypical != null && taxRate != null ? marketTypical.div(1 + taxRate) : null;
 
   const scrapFloor =
     tier != null && isFiniteMoney(scrapPrice) ? scrapPrice.times(scrapAmountForTier(tier)) : null;
@@ -156,10 +181,15 @@ export function buildEquipmentDetail(input: BuildEquipmentDetailInput): Equipmen
     skillKeys,
     activeBands,
     marketMedian,
+    marketLow,
+    marketHigh,
+    marketTypical,
+    listingWindow,
     sellerNet,
     scrapFloor,
     recommend,
     trades,
+    recentSales,
     dailyMedians: buildDailyMedians(bandMatched),
     ladder: buildLadder(parsed, skillKeys, activeBands),
   };

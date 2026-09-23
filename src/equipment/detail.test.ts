@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vite-plus/test";
 import type { ItemMarketTxRow } from "../db/item-market-tx-read";
+import { Decimal } from "../money/decimal";
 import { buildEquipmentDetail } from "./detail";
 import { MARKET_WINDOW_MS, TREND_LOOKBACK_MS } from "./windows";
 
@@ -17,7 +18,7 @@ function tx(
 }
 
 describe("buildEquipmentDetail", () => {
-  it("defaults active bands to lowestObserved ±1 and computes triad + recommend", () => {
+  it("defaults active bands to lowestObserved exact match and computes triad + recommend", () => {
     const scrapPrice = 0.2;
     const taxRate = 0.01;
     const detail = buildEquipmentDetail({
@@ -41,9 +42,11 @@ describe("buildEquipmentDetail", () => {
     expect(detail.countryId).toBe("sweden");
     expect(detail.lowestObserved).toEqual({ armor: 22 });
     expect(detail.skillKeys).toEqual(["armor"]);
-    expect(detail.activeBands).toEqual([{ key: "armor", target: 22, band: 1 }]);
-    // Only armor 22 (±1) in 24h: id a (40). id b is 24 → out of band.
+    expect(detail.activeBands).toEqual([{ key: "armor", target: 22, band: 0 }]);
+    // Exact armor 22 in 24h: id a (40). id b is 24 → out of band.
     expect(detail.marketMedian!.toNumber()).toBe(40);
+    expect(detail.marketTypical!.toNumber()).toBe(40);
+    expect(detail.listingWindow).toBe("24h");
     expect(detail.trades).toBe(1);
     expect(detail.sellerNet!.toNumber()).toBeCloseTo(40 / 1.01, 5);
     expect(detail.scrapFloor!.toNumber()).toBe(162 * scrapPrice);
@@ -76,6 +79,73 @@ describe("buildEquipmentDetail", () => {
     expect(detail.activeBands).toEqual([{ key: "armor", target: 22, band: 0 }]);
     expect(detail.marketMedian!.toNumber()).toBe(40);
     expect(detail.trades).toBe(1);
+  });
+
+  it("prices a listing off the fair sale when a cheap fill pulls the 24h median down", () => {
+    const detail = buildEquipmentDetail({
+      itemCode: "rifle",
+      txs: [
+        tx({
+          id: "snipe",
+          itemCode: "rifle",
+          money: new Decimal("12.2"),
+          skills: { attack: 80, criticalChance: 15 },
+          createdAt: new Date(NOW - 2 * 60_000),
+        }),
+        tx({
+          id: "fair",
+          itemCode: "rifle",
+          money: new Decimal("15"),
+          skills: { attack: 80, criticalChance: 15 },
+          createdAt: new Date(NOW - 60_000),
+        }),
+      ],
+      scrapPrice: 0.2,
+      taxRate: 0.01,
+      countryId: "sweden",
+      skills: [
+        { key: "attack", target: 80, band: 0 },
+        { key: "criticalChance", target: 15, band: 0 },
+      ],
+      now: NOW,
+    });
+
+    expect(detail.marketMedian!.toNumber()).toBe(13.6);
+    expect(detail.marketLow!.toNumber()).toBe(12.2);
+    expect(detail.marketHigh!.toNumber()).toBe(15);
+    expect(detail.marketTypical!.toNumber()).toBe(15);
+    expect(detail.listingWindow).toBe("24h");
+    expect(detail.sellerNet!.toNumber()).toBeCloseTo(15 / 1.01, 5);
+    expect(detail.recentSales.map((row) => row.money.toNumber())).toEqual([15, 12.2]);
+  });
+
+  it("falls back to the last sales when nothing sold in 24h", () => {
+    const detail = buildEquipmentDetail({
+      itemCode: "rifle",
+      txs: [
+        tx({
+          id: "old",
+          itemCode: "rifle",
+          money: new Decimal("15"),
+          skills: { attack: 80, criticalChance: 15 },
+          createdAt: new Date(NOW - MARKET_WINDOW_MS - 60_000),
+        }),
+      ],
+      scrapPrice: null,
+      taxRate: null,
+      countryId: null,
+      skills: [
+        { key: "attack", target: 80, band: 0 },
+        { key: "criticalChance", target: 15, band: 0 },
+      ],
+      now: NOW,
+    });
+
+    expect(detail.marketMedian).toBeNull();
+    expect(detail.trades).toBe(0);
+    expect(detail.listingWindow).toBe("recent");
+    expect(detail.marketTypical!.toNumber()).toBe(15);
+    expect(detail.recentSales).toHaveLength(1);
   });
 
   it("builds dailyMedians over TREND_LOOKBACK with band filter", () => {

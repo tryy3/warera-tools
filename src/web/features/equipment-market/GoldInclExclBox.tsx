@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { formatDisplayNumber } from "@/lib/formatDisplayNumber";
 import { moneyToNumber } from "@/money/decimal";
 import { GoldIcon } from "../../components/GoldIcon";
@@ -21,10 +22,12 @@ export function GoldInclExclBox({
   label,
   incl,
   excl,
+  children,
 }: {
   label: string;
   incl: string | number | null | undefined;
   excl: string | number | null | undefined;
+  children?: ReactNode;
 }) {
   return (
     <div className="rounded-md border border-border/60 bg-background/40 px-3 py-2">
@@ -36,6 +39,7 @@ export function GoldInclExclBox({
         <span className="text-[0.7em] tracking-wide uppercase">excl</span>
         <GoldLine value={excl} />
       </div>
+      {children}
     </div>
   );
 }
