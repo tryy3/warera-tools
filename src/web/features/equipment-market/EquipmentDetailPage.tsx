@@ -75,23 +75,39 @@ function MarketRange({ label, value }: { label: string; value: string | null | u
   );
 }
 
-function RecentSalesList({ sales }: { sales: DetailResponse["recentSales"] }) {
+function RecentSalesList({
+  sales,
+  taxRate,
+}: {
+  sales: DetailResponse["recentSales"];
+  taxRate: number | null;
+}) {
   if (sales.length === 0) {
     return <p className="m-0 text-sm text-muted-foreground">No sales in this band yet.</p>;
   }
   return (
     <ol className="m-0 grid list-none gap-1 p-0 sm:grid-cols-2">
-      {sales.map((sale, index) => (
-        <li
-          key={`${sale.createdAt}-${sale.money}-${index}`}
-          className="flex items-baseline justify-between gap-3 rounded-md border border-border/60 bg-background/40 px-3 py-1.5"
-        >
-          <GoldAmount value={sale.money} />
-          <time className="text-xs text-muted-foreground" dateTime={sale.createdAt}>
-            {formatSaleTime(sale.createdAt)}
-          </time>
-        </li>
-      ))}
+      {sales.map((sale, index) => {
+        const excl = exclFromIncl(sale.money, taxRate);
+        return (
+          <li
+            key={`${sale.createdAt}-${sale.money}-${index}`}
+            className="flex items-baseline justify-between gap-3 rounded-md border border-border/60 bg-background/40 px-3 py-1.5"
+          >
+            <span className="inline-flex items-center gap-1 font-mono">
+              <GoldIcon />
+              {formatDisplayNumber(sale.money, EQUIPMENT_GOLD_DIGITS)}
+              <span className="text-muted-foreground">/</span>
+              <span className="text-muted-foreground">
+                {excl == null ? "—" : formatDisplayNumber(excl, EQUIPMENT_GOLD_DIGITS)}
+              </span>
+            </span>
+            <time className="text-xs text-muted-foreground" dateTime={sale.createdAt}>
+              {formatSaleTime(sale.createdAt)}
+            </time>
+          </li>
+        );
+      })}
     </ol>
   );
 }
@@ -383,8 +399,11 @@ export function EquipmentDetailPage() {
           </section>
 
           <section className="mt-5">
-            <h2 className="mt-0 mb-2 text-[1.05rem] font-semibold">Recent sales</h2>
-            <RecentSalesList sales={detail?.recentSales ?? []} />
+            <h2 className="mt-0 mb-2 text-[1.05rem] font-semibold">
+              Recent sales
+              <span className="ml-2 text-sm font-normal text-muted-foreground">incl / excl</span>
+            </h2>
+            <RecentSalesList sales={detail?.recentSales ?? []} taxRate={taxRate} />
           </section>
 
           <section className="mt-5">
