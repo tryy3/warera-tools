@@ -51,13 +51,13 @@ export function loadStats(itemCode: string, lowestObserved: SkillNumbers | null)
     return Object.keys(stored.targets).map((key) => ({
       key,
       target: stored.targets[key]!,
-      band: stored.bands[key] ?? 1,
+      band: stored.bands[key] ?? 0,
     }));
   }
   if (!lowestObserved) return [];
   return Object.entries(lowestObserved).map(([key, target]) => ({
     key,
     target,
-    band: 1,
+    band: 0,
   }));
 }

@@ -66,10 +66,15 @@ export type DetailResponse = {
   skillKeys: string[];
   activeBands: SkillBand[];
   marketMedian: string | null;
+  marketLow: string | null;
+  marketHigh: string | null;
+  marketTypical: string | null;
+  listingWindow: "24h" | "recent" | null;
   sellerNet: string | null;
   scrapFloor: string | null;
   recommend: RecommendListingDto | null;
   trades: number;
+  recentSales: { money: string; createdAt: string }[];
   dailyMedians: { day: string; median: string; trades: number }[];
   ladder: { bucketLabel: string; median: string; trades: number }[];
 };

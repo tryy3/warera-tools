@@ -100,6 +100,10 @@ function serializeEquipmentDetail(detail: EquipmentDetail) {
     skillKeys: detail.skillKeys,
     activeBands: detail.activeBands,
     marketMedian: serializeMoney(detail.marketMedian),
+    marketLow: serializeMoney(detail.marketLow),
+    marketHigh: serializeMoney(detail.marketHigh),
+    marketTypical: serializeMoney(detail.marketTypical),
+    listingWindow: detail.listingWindow,
     sellerNet: serializeMoney(detail.sellerNet),
     scrapFloor: serializeMoney(detail.scrapFloor),
     recommend: detail.recommend
@@ -110,6 +114,10 @@ function serializeEquipmentDetail(detail: EquipmentDetail) {
         }
       : null,
     trades: detail.trades,
+    recentSales: detail.recentSales.map((row) => ({
+      money: serializeMoney(row.money)!,
+      createdAt: new Date(row.createdAtMs).toISOString(),
+    })),
     dailyMedians: detail.dailyMedians.map((row) => ({
       day: row.day,
       median: serializeMoney(row.median)!,

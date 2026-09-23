@@ -106,27 +106,27 @@ describe("loadStats", () => {
       }),
     ).toEqual([
       { key: "armor", target: 22, band: 2 },
-      { key: "attack", target: 90, band: 1 },
+      { key: "attack", target: 90, band: 0 },
     ]);
   });
 
-  it("defaults missing band to 1", () => {
+  it("defaults missing band to 0", () => {
     saveStoredEquipmentStats("weapon_q1", {
       targets: { armor: 22 },
       bands: {},
     });
-    expect(loadStats("weapon_q1", null)).toEqual([{ key: "armor", target: 22, band: 1 }]);
+    expect(loadStats("weapon_q1", null)).toEqual([{ key: "armor", target: 22, band: 0 }]);
   });
 
-  it("falls back to lowestObserved with band 1 when no stored targets", () => {
+  it("falls back to lowestObserved with band 0 when no stored targets", () => {
     expect(
       loadStats("weapon_q1", {
         armor: 15,
         criticalChance: 13,
       }),
     ).toEqual([
-      { key: "armor", target: 15, band: 1 },
-      { key: "criticalChance", target: 13, band: 1 },
+      { key: "armor", target: 15, band: 0 },
+      { key: "criticalChance", target: 13, band: 0 },
     ]);
   });
 
@@ -136,7 +136,7 @@ describe("loadStats", () => {
 
   it("treats empty stored targets as missing and uses lowestObserved", () => {
     saveStoredEquipmentStats("weapon_q1", { targets: {}, bands: { armor: 2 } });
-    expect(loadStats("weapon_q1", { armor: 15 })).toEqual([{ key: "armor", target: 15, band: 1 }]);
+    expect(loadStats("weapon_q1", { armor: 15 })).toEqual([{ key: "armor", target: 15, band: 0 }]);
   });
 
   it("returns empty on corrupt storage when lowestObserved is null", () => {
