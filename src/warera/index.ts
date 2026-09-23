@@ -80,8 +80,4 @@ export {
   type ParsedCurrentRound,
   type ParsedCurrentRoundLive,
 } from "./battles";
-export {
-  fetchBattleOrders,
-  parseBattleOrders,
-  type ParsedBattleOrder,
-} from "./battle-orders";
+export { fetchBattleOrders, parseBattleOrders, type ParsedBattleOrder } from "./battle-orders";

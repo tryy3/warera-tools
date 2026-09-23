@@ -5,15 +5,20 @@ export type WatchedMu = {
   countryId: string | null;
 };
 
-function sideCountryOrders(battle: ParsedBattle): string[] {
+type BattleOrderSides = {
+  attacker: Pick<ParsedBattle["attacker"], "muOrders" | "countryOrders">;
+  defender: Pick<ParsedBattle["defender"], "muOrders" | "countryOrders">;
+};
+
+function sideCountryOrders(battle: BattleOrderSides): string[] {
   return [...battle.attacker.countryOrders, ...battle.defender.countryOrders];
 }
 
-function sideMuOrders(battle: ParsedBattle): string[] {
+function sideMuOrders(battle: BattleOrderSides): string[] {
   return [...battle.attacker.muOrders, ...battle.defender.muOrders];
 }
 
-export function relevantStickyMuIds(battle: ParsedBattle, watched: WatchedMu[]): string[] {
+export function relevantStickyMuIds(battle: BattleOrderSides, watched: WatchedMu[]): string[] {
   const muOrderSet = new Set(sideMuOrders(battle));
   const countryOrderSet = new Set(sideCountryOrders(battle));
   const sticky = new Set<string>();

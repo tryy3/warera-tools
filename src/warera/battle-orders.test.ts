@@ -11,7 +11,13 @@ describe("parseBattleOrders", () => {
     });
     expect(parsed).toEqual([
       { ownerType: "mu", ownerId: "mu-1", side: "attacker", priority: "low", payload: null },
-      { ownerType: "country", ownerId: "sweden", side: "attacker", priority: "high", payload: null },
+      {
+        ownerType: "country",
+        ownerId: "sweden",
+        side: "attacker",
+        priority: "high",
+        payload: null,
+      },
     ]);
   });
 
@@ -71,7 +77,10 @@ describe("fetchBattleOrders", () => {
         return {
           result: {
             data: {
-              orders: [{ mu: "mu-1", priority: "high" }, { countryId: "c1", rank: 2 }],
+              orders: [
+                { mu: "mu-1", priority: "high" },
+                { countryId: "c1", rank: 2 },
+              ],
             },
           },
         };

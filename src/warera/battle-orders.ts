@@ -24,7 +24,9 @@ function pickString(obj: Record<string, unknown>, keys: string[]): string | null
   return null;
 }
 
-function resolveOwner(obj: Record<string, unknown>): { ownerType: "mu" | "country"; ownerId: string } | null {
+function resolveOwner(
+  obj: Record<string, unknown>,
+): { ownerType: "mu" | "country"; ownerId: string } | null {
   const muId = pickString(obj, ["mu", "muId"]);
   if (muId) return { ownerType: "mu", ownerId: muId };
   const countryId = pickString(obj, ["country", "countryId"]);
