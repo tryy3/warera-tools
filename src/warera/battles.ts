@@ -9,6 +9,7 @@ export type ParsedBattleSide = {
   regionId: string | null;
   wonRoundsCount: number | null;
   muOrders: string[];
+  countryOrders: string[];
   hitCount: number | null;
 };
 
@@ -113,6 +114,7 @@ function parseSide(raw: unknown): ParsedBattleSide {
     regionId: pickString(obj, ["region", "regionId"]),
     wonRoundsCount: pickInt(obj.wonRoundsCount),
     muOrders: pickStringList(obj.muOrders),
+    countryOrders: pickStringList(obj.countryOrders ?? obj.countryOrderIds),
     hitCount: pickInt(obj.hitCount),
   };
 }

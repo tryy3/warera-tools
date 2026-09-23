@@ -12,4 +12,12 @@ describe("formatDisplayNumber", () => {
     // Implementation must not depend on process locale for formula embedding.
     expect(formatDisplayNumber(1234.5)).toMatch(/^1234\.5/);
   });
+
+  it("optionally groups thousands with spaces", () => {
+    expect(formatDisplayNumber(100_000, 0, { groupThousands: true })).toBe("100 000");
+    expect(formatDisplayNumber(159_858, 0, { groupThousands: true })).toBe("159 858");
+    expect(formatDisplayNumber(1_234.5, 1, { groupThousands: true })).toBe("1 234.5");
+    expect(formatDisplayNumber(-12_345, 0, { groupThousands: true })).toBe("-12 345");
+    expect(formatDisplayNumber(100_000, 0)).toBe("100000");
+  });
 });

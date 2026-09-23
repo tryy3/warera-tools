@@ -1,6 +1,6 @@
 # WarEra data inventory (as-is)
 
-**Last reviewed:** 2026-09-19
+**Last reviewed:** 2026-09-20
 **Status:** Living — update when cadence, ownership, or major consumers change  
 **Tier rules:** [Data tier caching strategy](../superpowers/specs/2026-08-02-data-tier-caching-strategy-design.md)
 
@@ -51,18 +51,20 @@ Browser (SPA)
 | Recommended regions | Best region id per producible item | `recommended-regions-poll`; cold miss on advisor paths | Hourly (`0 0 * * * *`) | api2 POST + `X-API-Key` | Latest upsert (`recommended_regions`) | Advisor / company economy |
 | Item-market transactions | Equipment / itemMarket and commodity trading sales stream | `item-market-tx-backfill` (once per process) then `item-market-tx-poll` (both `itemMarket` + `trading` types); **manual deep history:** `vp run backfill:item-market-tx -- --until <ISO> [--type …]` (operator-run, not scheduled) | Poll every minute; backfill `maxRuns: 1` | api2 + `X-API-Key` | Append-only (`item_market_transactions`) + handoff cursor; buyer/seller indexes for player lookups | Equipment Market (`/api/equipment` overview, detail, craft-compare), Battle quote (`POST /api/battle-build/quote`), Market my-trades |
 | Commodity trading transactions | Stackable buy/sell fills | same `item-market-tx-*` jobs (both transaction types); manual backfill via same CLI (`--type trading` or `both`) | Poll every minute; backfill `maxRuns: 1` | api2 | `item_market_transactions` | Market my-trades |
-| Battles (ordered) | Active/ended battles sticky when watched MU in `muOrders`; light scoreboard + per-member loot | `battle-info-poll` | Every 15 minutes | `battle.getBattles` (full cursor), `battle.getById` on finalize only, `battleLootSummary.getByBattleAndUser` | `battles` current + `battle_scoreboard_snapshots` / `battle_loot_snapshots` | Future MU achievements / battle contrib (no UI yet) |
+| Battles (ordered) | Active/ended battles sticky when watched MU in attacker/defender `muOrders` **or** watched MU `country_id` in attacker/defender `countryOrders`; scoreboard, per-member loot, current orders, computed bonus facts; battlefield/neighbor region names; diplomacy for MU country **and** battle attacker/defender countries | `battle-info-poll` | Every 15 minutes | `battle.getBattles` (full cursor), `battle.getById` on finalize only, `battleLootSummary.getByBattleAndUser`, `battleOrder.getByBattle` (dual-side), `countryDiplomacy.getByCountry` (MU + attacker/defender ids in the workset), `gameStat.getWorldDevelopment`, `alliance.getManyPaginated` (diplomacy fallback share), `country.getCountryById` (`allianceId` + capital), `region.getById` (combat facts **and** `name`/`countryCode` upserted); MU HQ level from `mu-stats-poll` (`mus.activeUpgradeLevels`), not a new WarEra call. Fight Desk alliance bonus prefers `alliances.core_development / sum(countries.core_development)` (in-game: +20% up to 10% share, then −4pp per share-pp, floor −20%); `country_diplomacy.alliance_world_share` only if cores are missing | `battles` (incl. country-order id lists), `battle_scoreboard_snapshots`, `battle_loot_snapshots`, `battle_orders`, `battle_bonus_facts`, `country_diplomacy`, `regions` (battlefield names) | Fight Desk (`GET /api/mu/:muId/fight-desk` `battles[]` strip + MU loot sums) |
 
-Global battle catalog (`battle.getBattles` cursor drain); rows enter and stay sticky when a watched MU (Geo watchlist from `mu_watch_reasons`) appears in attacker/defender `muOrders`.
+Global battle catalog (`battle.getBattles` cursor drain). Rows enter and stay sticky until finalize when a watched MU (Geo watchlist from `mu_watch_reasons`) is in attacker/defender `muOrders` or its `country_id` is in attacker/defender `countryOrders` (also persisted on `battle_orders`). Fight Desk tab reads DB facts only; manual ↻ is `POST .../fight-desk/refresh` (MU fight snapshots), not live battle/diplomacy/region calls.
 
 ### Geo
 
 | Resource | What | Who refreshes | Cadence (default) | Upstream today | Storage | Main consumers |
 | --- | --- | --- | --- | --- | --- | --- |
-| Countries | Country list + tax metadata | `country-sync` | Daily midnight | api2 | Latest rows (`countries`) | Calculator, Equipment prefs, economy UI |
+| Countries | Country list + tax metadata + `coreDevelopment` + `allianceId` | `country-sync` | Daily midnight | `country.getAllCountries` | Latest rows (`countries`) | Calculator, Equipment prefs, economy UI, Fight Desk (world core sum + MU country → alliance) |
+| Alliances | Alliance catalog + `coreDevelopment` | `alliance-sync` | Hourly (`0 0 * * * *`) | `alliance.getManyPaginated` | Latest rows (`alliances`) | Fight Desk alliance share (alliance core / sum of country cores) |
 | Regions | Region facts for watchlist ids | `region-sync`; advisor cold miss upserts + enqueues | Hourly at :05 | api2 | Latest rows (`regions`); refresh when fetched_at null or older than 12h | Advisor, Growth, recommended-region follow-ups |
 | Military units (MU) | MU metadata + member roster/stats | `mu-stats-poll` over watchlist | Every 30 minutes | `mu.getById` via api2; **`muMember.getByMu` forced api2 + X-API-Key** | Latest roster + append stat snapshots | MU tool (`/mu`, `GET /api/mu/:id`, `GET /api/mu/:id/history`), Follow |
 | MU member profiles / activity | Identity + activity dates/leveling/premium for watched MU rosters | `mu-member-poll` | Every 5 minutes | `user.getUserById` batch | Append-on-change `user_profile_polls` / `user_profile_snapshots` (poll row every run; snapshot only when content changes) | Follow sync (DB-first), future MU activity tools |
+| MU member fight state | Combat stats, resources, equipment, pill state, and skills for watched MU rosters | `mu-fight-poll`; Fight Desk cold miss / manual refresh | Every 5 minutes; on-demand when missing or explicitly refreshed | `user.getUserById` batch | Append-on-change `user_fight_polls` / `user_fight_snapshots` (poll row every run; snapshot only when content changes) | Fight Desk (`GET /api/mu/:muId/fight-desk`, refresh endpoint) |
 | Country watchlist | Distinct country ids with watch reasons (seed Sweden manual) | Manual insert now; future auto-enqueue | On write | — | `country_watch_reasons` | `donation-poll` |
 | Donations (MU/country) | Per-donor running totals for watched MUs + countries | `donation-poll` | Hourly (`0 0 * * * *`) | `donation.getManyPaginated` (api2 override) | Append-on-change `donation_polls` / `donation_snapshots` (poll row every run; snapshot only when amount changes) | Future MU weekly stats / rankings |
 
@@ -92,7 +94,7 @@ The country watchlist is distinct ids in `country_watch_reasons` (Sweden seeded 
 | **Append-only history** | Care about time series / sales | price snapshots, item_market_transactions, MU stat snapshots |
 | **TTL pack / KV** | Short-lived assembled payload | company_packs, generic `cache` table |
 | **Client memory only** | Cross-tool reuse in one tab | TanStack Query |
-| **Client prefs (LS)** | UX continuity, not SoT | recent players, equipment/calculator prefs |
+| **Client prefs (LS)** | UX continuity, not SoT | recent players, equipment/calculator prefs, Fight Desk `fightDeskPrefs:v2:${muId}` (selected battle, Custom %) |
 
 We do **not** currently dual-write every entity as transactional history + latest. That remains a possible future if requirements grow (likely with a different store).
 

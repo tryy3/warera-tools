@@ -35,6 +35,8 @@ const WARERA_SWEDEN: WareraCountryRow = {
   name: "Sweden",
   isoCode: "SE",
   taxRate: 0.05,
+  coreDevelopment: 574.07,
+  allianceId: "forge",
 };
 
 const NOW = new Date("2026-08-01T12:00:00.000Z");
@@ -64,6 +66,8 @@ describe("syncCountriesFromWarera", () => {
       taxRate: 0.05,
       source: "warera",
       syncedAt: NOW,
+      coreDevelopment: 574.07,
+      allianceId: "forge",
     });
   });
 
@@ -89,6 +93,8 @@ describe("syncCountriesFromWarera", () => {
       taxRate: 0.05,
       source: "warera",
       syncedAt: NOW,
+      coreDevelopment: 574.07,
+      allianceId: "forge",
     });
   });
 
@@ -114,6 +120,8 @@ describe("syncCountriesFromWarera", () => {
       taxRate: 0.05,
       source: "warera",
       syncedAt: NOW,
+      coreDevelopment: 574.07,
+      allianceId: "forge",
     });
   });
 
