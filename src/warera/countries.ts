@@ -6,6 +6,8 @@ export type WareraCountryRow = {
   name: string;
   isoCode: string;
   taxRate: number;
+  coreDevelopment: number | null;
+  allianceId: string | null;
 };
 
 function asRecord(value: unknown): Record<string, unknown> | null {
@@ -27,11 +29,20 @@ function parseCountryRow(raw: unknown): WareraCountryRow | null {
   const marketTax = taxes?.market;
   if (typeof marketTax !== "number" || !Number.isFinite(marketTax)) return null;
 
+  const coreDevelopment =
+    typeof obj.coreDevelopment === "number" && Number.isFinite(obj.coreDevelopment)
+      ? obj.coreDevelopment
+      : null;
+  const allianceId =
+    typeof obj.allianceId === "string" && obj.allianceId.length > 0 ? obj.allianceId : null;
+
   return {
     id,
     name,
     isoCode: code.trim().toUpperCase(),
     taxRate: marketTax / 100,
+    coreDevelopment,
+    allianceId,
   };
 }
 

@@ -1,4 +1,5 @@
-import { eq, inArray } from "drizzle-orm";
+import { eq, inArray, sql } from "drizzle-orm";
+import { RAMP_MAX, RAMP_PER_DAY } from "../battle-bonus/constants";
 import { computeBattleBonus } from "../battle-bonus/compute";
 import type { BattleBonusFacts, BattleSide, OrderPriority } from "../battle-bonus/types";
 import { listBattleOrders } from "../db/battle-orders";
@@ -9,7 +10,7 @@ import {
 } from "../db/battle-strip";
 import type { Db } from "../db/client";
 import { getRegionsByIds } from "../db/regions";
-import { battleBonusFacts, countries, countryDiplomacy, mus } from "../db/schema";
+import { alliances, battleBonusFacts, countries, countryDiplomacy, mus } from "../db/schema";
 import type { ParsedBattleOrder } from "../warera/battle-orders";
 import type { MuFightDeskBattle } from "../web/features/mu/types";
 
@@ -106,16 +107,27 @@ function alliedFortHalf(
 function supportingAllianceMember(
   muCountryId: string,
   orderedSideCountryId: string,
-  diplomacyByCountry: Map<string, typeof countryDiplomacy.$inferSelect>,
+  allianceIdByCountry: Map<string, string | null>,
 ): boolean | null {
-  const muDip = diplomacyByCountry.get(muCountryId);
-  const sideDip = diplomacyByCountry.get(orderedSideCountryId);
-  if (muDip == null || sideDip == null) return null;
-  const muAllianceId = muDip.allianceId;
-  const sideAllianceId = sideDip.allianceId;
+  const muAllianceId = allianceIdByCountry.get(muCountryId);
+  const sideAllianceId = allianceIdByCountry.get(orderedSideCountryId);
   if (muAllianceId == null) return null;
   if (sideAllianceId == null) return false;
   return muAllianceId === sideAllianceId;
+}
+
+function allianceWorldShareFromCores(
+  muCountryId: string,
+  allianceIdByCountry: Map<string, string | null>,
+  allianceCoreById: Map<string, number | null>,
+  worldCore: number | null,
+  fallbackShare: number | null,
+): number | null {
+  const allianceId = allianceIdByCountry.get(muCountryId);
+  if (allianceId == null) return fallbackShare;
+  const allianceCore = allianceCoreById.get(allianceId);
+  if (allianceCore == null || worldCore == null || worldCore <= 0) return fallbackShare;
+  return allianceCore / worldCore;
 }
 
 function opponentCountryId(
@@ -138,24 +150,23 @@ function diplomacyRampPartners(
   }
 
   const opponentId = opponentCountryId(fightSide, attackerCountryId, defenderCountryId);
+  const fullRampDays = Math.round(RAMP_MAX / RAMP_PER_DAY);
   let swornEnemy: BattleBonusFacts["swornEnemy"] = null;
   if (diplomacy.swornEnemyId === opponentId) {
-    const ageDays = floorAgeDays(diplomacy.swornEnemySince, now);
-    if (ageDays != null) {
-      swornEnemy = { ageDays };
-    }
+    swornEnemy = { ageDays: floorAgeDays(diplomacy.swornEnemySince, now) ?? fullRampDays };
   }
 
   let defendingPactPartner: BattleBonusFacts["defendingPactPartner"] = null;
   if (fightSide === "defender") {
     const pacts = diplomacy.defensivePacts ?? [];
     const partner = pacts.find((p) => p.countryId === defenderCountryId);
-    if (partner?.since) {
-      const since = new Date(partner.since);
-      const ageDays = floorAgeDays(since, now);
-      if (ageDays != null) {
-        defendingPactPartner = { ageDays };
-      }
+    if (partner) {
+      const since = partner.since ? new Date(partner.since) : null;
+      const ageDays =
+        since != null && !Number.isNaN(since.getTime())
+          ? (floorAgeDays(since, now) ?? fullRampDays)
+          : fullRampDays;
+      defendingPactPartner = { ageDays };
     }
   }
 
@@ -169,6 +180,9 @@ function buildBonusFacts(
   orders: ReturnType<typeof mergeOrderSides>,
   factsRow: typeof battleBonusFacts.$inferSelect | undefined,
   diplomacyByCountry: Map<string, typeof countryDiplomacy.$inferSelect>,
+  allianceIdByCountry: Map<string, string | null>,
+  allianceCoreById: Map<string, number | null>,
+  worldCore: number | null,
   now: Date,
 ): BattleBonusFacts {
   const attackerCountryId = row.attackerCountryId ?? "";
@@ -187,11 +201,17 @@ function buildBonusFacts(
     muOrderPriority: orders.muOrderPriority,
     hqLevel: hq.hqLevel,
     hqRunning: hq.hqRunning,
-    allianceWorldShare: diplomacy?.allianceWorldShare ?? null,
+    allianceWorldShare: allianceWorldShareFromCores(
+      muCountryId,
+      allianceIdByCountry,
+      allianceCoreById,
+      worldCore,
+      diplomacy?.allianceWorldShare ?? null,
+    ),
     supportingAllianceMember: supportingAllianceMember(
       muCountryId,
       orderedSideCountryId,
-      diplomacyByCountry,
+      allianceIdByCountry,
     ),
     ...diplomacyRampPartners(diplomacy, fightSide, attackerCountryId, defenderCountryId, now),
     bunkerLevel: factsRow?.bunkerLevel ?? null,
@@ -202,6 +222,12 @@ function buildBonusFacts(
     defenderSupplyLinked: factsRow?.defenderSupplyLinked ?? null,
     alliedFortHalf: alliedFortHalf(muCountryId, fightSide, attackerCountryId, defenderCountryId),
   };
+}
+
+function asFiniteNumber(value: string | number | null | undefined): number | null {
+  if (value == null) return null;
+  const n = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(n) ? n : null;
 }
 
 export async function loadFightDeskBattles(
@@ -239,7 +265,16 @@ export async function loadFightDeskBattles(
   ];
 
   const ordersByBattle = new Map<string, ParsedBattleOrder[]>();
-  const [, damageByBattle, factsRows, diplomacyRows, regionsById, countryRows] = await Promise.all([
+  const [
+    ,
+    damageByBattle,
+    factsRows,
+    diplomacyRows,
+    regionsById,
+    countryRows,
+    worldCoreRow,
+    allianceRows,
+  ] = await Promise.all([
     Promise.all(
       battleIds.map(async (battleId) => {
         ordersByBattle.set(battleId, await listBattleOrders(db, battleId));
@@ -254,15 +289,37 @@ export async function loadFightDeskBattles(
       : db.select().from(countryDiplomacy).where(inArray(countryDiplomacy.countryId, countryIds)),
     getRegionsByIds(db, regionIds),
     countryIds.length === 0
-      ? Promise.resolve([])
+      ? Promise.resolve([] as { id: string; isoCode: string | null; allianceId: string | null }[])
       : db
-          .select({ id: countries.id, isoCode: countries.isoCode })
+          .select({
+            id: countries.id,
+            isoCode: countries.isoCode,
+            allianceId: countries.allianceId,
+          })
           .from(countries)
           .where(inArray(countries.id, countryIds)),
+    db
+      .select({
+        worldCore: sql<string | number | null>`sum(${countries.coreDevelopment})`,
+      })
+      .from(countries)
+      .then((rows) => rows[0] ?? { worldCore: null }),
+    db.select({ id: alliances.id, coreDevelopment: alliances.coreDevelopment }).from(alliances),
   ]);
   const factsByBattle = new Map(factsRows.map((row) => [row.battleId, row]));
   const diplomacyByCountry = new Map(diplomacyRows.map((row) => [row.countryId, row]));
   const isoByCountry = new Map(countryRows.map((row) => [row.id, row.isoCode ?? null]));
+  const allianceIdByCountry = new Map<string, string | null>();
+  for (const row of countryRows) {
+    allianceIdByCountry.set(row.id, row.allianceId);
+  }
+  for (const [countryId, diplomacy] of diplomacyByCountry) {
+    if (allianceIdByCountry.get(countryId) == null && diplomacy.allianceId != null) {
+      allianceIdByCountry.set(countryId, diplomacy.allianceId);
+    }
+  }
+  const allianceCoreById = new Map(allianceRows.map((row) => [row.id, row.coreDevelopment]));
+  const worldCore = asFiniteNumber(worldCoreRow.worldCore);
 
   const cards: MuFightDeskBattle[] = [];
 
@@ -293,10 +350,23 @@ export async function loadFightDeskBattles(
       kind,
       muOrderSide: orders.muOrderSide,
       countryOrderSide: orders.countryOrderSide,
+      muCountryIsoCode:
+        muCountryId.length > 0 ? (isoByCountry.get(muCountryId) ?? muCountryId) : null,
       isRevolt: factsRow?.isRevolt ?? false,
       muDamageToDate: damage === undefined ? null : damage,
       bonus: computeBattleBonus(
-        buildBonusFacts(row, muCountryId, hq, orders, factsRow, diplomacyByCountry, now),
+        buildBonusFacts(
+          row,
+          muCountryId,
+          hq,
+          orders,
+          factsRow,
+          diplomacyByCountry,
+          allianceIdByCountry,
+          allianceCoreById,
+          worldCore,
+          now,
+        ),
       ),
     });
   }

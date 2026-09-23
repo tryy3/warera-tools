@@ -8,9 +8,8 @@ export const RESISTANCE_MAX = 0.3;
 export const RAMP_PER_DAY = 0.01;
 export const RAMP_MAX = 0.1;
 
-/** v0.25 alliance curve: full +10% at share ≤ 15%; −0.5pp per share-pp over 15%; 0 at ≥ 35%. */
+/** In-game: +20% at share ≤ 10%; −4pp per share-pp over that, floored at −20%. */
 export function allianceBonusFromWorldShare(share: number): number {
-  if (share <= 0.15) return 0.1;
-  if (share >= 0.35) return 0;
-  return 0.1 - (share - 0.15) * 0.5;
+  const overPoints = Math.max(0, share * 100 - 10);
+  return Math.max(-0.2, 0.2 - 0.04 * overPoints);
 }

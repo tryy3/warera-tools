@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vite-plus/test";
 import { computeBattleBonus, customBattleBonus } from "./compute";
+import { allianceBonusFromWorldShare } from "./constants";
 import type { BattleBonusFacts } from "./types";
 
 function facts(patch: Partial<BattleBonusFacts> = {}): BattleBonusFacts {
@@ -105,8 +106,44 @@ describe("computeBattleBonus", () => {
       facts({ supportingAllianceMember: true, allianceWorldShare: 0.1 }),
     );
     expect(status(result, "alliance")).toBe("applied");
-    expect(amount(result, "alliance")).toBe(0.1);
-    expect(result.total).toBeCloseTo(0.1);
+    expect(amount(result, "alliance")).toBe(0.2);
+    expect(result.total).toBeCloseTo(0.2);
+  });
+
+  it("keeps full +20% alliance below the 10% core-share plateau", () => {
+    const result = computeBattleBonus(
+      facts({ supportingAllianceMember: true, allianceWorldShare: 0.075 }),
+    );
+    expect(amount(result, "alliance")).toBe(0.2);
+  });
+
+  it("matches a live Crete-style stack at +85%", () => {
+    const result = computeBattleBonus(
+      facts({
+        fightSide: "defender",
+        muCountryId: "sweden",
+        attackerCountryId: "iraq",
+        defenderCountryId: "iran",
+        countryOrderPriority: "high",
+        muOrderPriority: "high",
+        hqLevel: 4,
+        hqRunning: true,
+        supportingAllianceMember: true,
+        allianceWorldShare: 0.08,
+        defendingPactPartner: { ageDays: 12 },
+        bunkerLevel: 2,
+        bunkerActive: true,
+        alliedFortHalf: true,
+        defenderSupplyLinked: true,
+      }),
+    );
+    expect(amount(result, "country_order")).toBe(0.15);
+    expect(amount(result, "mu_order")).toBe(0.15);
+    expect(amount(result, "alliance")).toBe(0.2);
+    expect(amount(result, "defensive_pact")).toBe(0.1);
+    expect(amount(result, "hq")).toBe(0.2);
+    expect(amount(result, "bunker")).toBe(0.05);
+    expect(result.total).toBeCloseTo(0.85);
   });
 
   it("turns alliance off when not supporting an alliance member even if share is known", () => {
@@ -151,5 +188,16 @@ describe("customBattleBonus", () => {
       total: 0.6,
       parts: [{ id: "custom", label: "Custom", amount: 0.6, status: "applied" }],
     });
+  });
+});
+
+describe("allianceBonusFromWorldShare", () => {
+  it("holds +20% through 10% share, then drops 4pp per share-pp down to -20%", () => {
+    expect(allianceBonusFromWorldShare(0.075)).toBe(0.2);
+    expect(allianceBonusFromWorldShare(0.1)).toBe(0.2);
+    expect(allianceBonusFromWorldShare(0.11)).toBeCloseTo(0.16);
+    expect(allianceBonusFromWorldShare(0.15)).toBeCloseTo(0);
+    expect(allianceBonusFromWorldShare(0.2)).toBeCloseTo(-0.2);
+    expect(allianceBonusFromWorldShare(0.35)).toBe(-0.2);
   });
 });

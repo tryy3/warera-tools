@@ -19,12 +19,42 @@ describe("parseRegionCombat", () => {
       bunkerActive: true,
       militaryBaseLevel: 2,
       militaryBaseActive: false,
+      supplyLinkedToCapital: null,
       resistance: 0.42,
       neighborRegionIds: ["r2"],
       ownerCountryId: "c-def",
       isCore: true,
       name: "Crete",
       countryCode: "GR",
+    });
+  });
+
+  it("parses bunker from top-level level aliases and isActive", () => {
+    expect(
+      parseRegionCombat({
+        bunkerLevel: 2,
+        bunker: { isActive: true },
+      }),
+    ).toMatchObject({ bunkerLevel: 2, bunkerActive: true });
+  });
+
+  it("parses live region combat from activeUpgradeLevels and isLinkedToCapital", () => {
+    expect(
+      parseRegionCombat({
+        country: "iran",
+        neighbors: ["r2"],
+        isLinkedToCapital: true,
+        activeUpgradeLevels: { bunker: 2, base: 2 },
+        upgradesV2: { upgrades: { bunker: { level: 3, status: "active" } } },
+      }),
+    ).toMatchObject({
+      bunkerLevel: 2,
+      bunkerActive: true,
+      militaryBaseLevel: 2,
+      militaryBaseActive: true,
+      supplyLinkedToCapital: true,
+      ownerCountryId: "iran",
+      neighborRegionIds: ["r2"],
     });
   });
 

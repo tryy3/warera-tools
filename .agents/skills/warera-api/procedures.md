@@ -17,7 +17,7 @@ Custom vs OpenAPI: https://github.com/WarEraProjects/TRPC/tree/main/src/CustomEn
 | --- | --- | --- | --- |
 | alliance.getById | trpc-custom | unknown | no |
 | alliance.getByIds | trpc-custom | unknown | no |
-| alliance.getManyPaginated | trpc-custom | unknown | no |
+| alliance.getManyPaginated | trpc-custom | unknown | yes |
 | article.getArticleById | openapi | unknown | no |
 | article.getArticleLiteById | openapi | unknown | no |
 | article.getArticlesPaginated | openapi | unknown | no |

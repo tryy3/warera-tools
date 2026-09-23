@@ -7,6 +7,7 @@ export type ParsedRegionCombat = {
   bunkerActive: boolean | null;
   militaryBaseLevel: number | null;
   militaryBaseActive: boolean | null;
+  supplyLinkedToCapital: boolean | null;
   resistance: number | null;
   neighborRegionIds: string[];
   ownerCountryId: string | null;
@@ -59,9 +60,37 @@ function parseFacility(raw: unknown): { level: number | null; active: boolean | 
     if (typeof raw === "number") return { level: Math.trunc(raw), active: raw > 0 };
     return { level: null, active: null };
   }
+  const status = typeof obj.status === "string" ? obj.status.toLowerCase() : null;
+  const activeFromStatus = status == null ? null : status === "active" || status === "working";
   return {
-    level: pickInt(obj.level ?? obj.upgradeLevel),
-    active: pickBool(obj.active ?? obj.isActive),
+    level: pickInt(obj.level ?? obj.upgradeLevel ?? obj.bunkerLevel),
+    active:
+      pickBool(obj.active ?? obj.isActive ?? obj.isWorking ?? obj.enabled) ?? activeFromStatus,
+  };
+}
+
+function parseActiveUpgradeLevels(raw: unknown): {
+  bunkerLevel: number | null;
+  bunkerActive: boolean | null;
+  militaryBaseLevel: number | null;
+  militaryBaseActive: boolean | null;
+} {
+  const obj = asRecord(raw);
+  if (!obj) {
+    return {
+      bunkerLevel: null,
+      bunkerActive: null,
+      militaryBaseLevel: null,
+      militaryBaseActive: null,
+    };
+  }
+  const bunkerLevel = pickInt(obj.bunker);
+  const militaryBaseLevel = pickInt(obj.base ?? obj.militaryBase ?? obj.military_base);
+  return {
+    bunkerLevel,
+    bunkerActive: bunkerLevel != null ? bunkerLevel > 0 : null,
+    militaryBaseLevel,
+    militaryBaseActive: militaryBaseLevel != null ? militaryBaseLevel > 0 : null,
   };
 }
 
@@ -90,16 +119,26 @@ function parseNeighbors(obj: Record<string, unknown>): string[] {
 
 export function parseRegionCombat(raw: unknown): ParsedRegionCombat {
   const obj = asRecord(raw) ?? {};
-  const bunker = parseFacility(obj.bunker);
-  const militaryBase = parseFacility(obj.militaryBase ?? obj.military_base);
+  const upgradesV2 = asRecord(obj.upgradesV2);
+  const v2Upgrades = asRecord(upgradesV2?.upgrades);
+  const bunker = parseFacility(obj.bunker ?? v2Upgrades?.bunker);
+  const militaryBase = parseFacility(
+    obj.militaryBase ?? obj.military_base ?? v2Upgrades?.base ?? v2Upgrades?.militaryBase,
+  );
+  const activeLevels = parseActiveUpgradeLevels(obj.activeUpgradeLevels);
+  const bunkerLevel = activeLevels.bunkerLevel ?? bunker.level ?? pickInt(obj.bunkerLevel);
+  const bunkerActive = activeLevels.bunkerActive ?? bunker.active ?? pickBool(obj.bunkerActive);
+  const militaryBaseLevel = activeLevels.militaryBaseLevel ?? militaryBase.level;
+  const militaryBaseActive = activeLevels.militaryBaseActive ?? militaryBase.active;
   const ownerCountryId = pickString(obj, ["countryId", "country", "ownerCountryId", "owner"]);
   const isCore = obj.isCore === true || obj.core === true;
   const info = parseRegionInfo(raw);
   return {
-    bunkerLevel: bunker.level,
-    bunkerActive: bunker.active,
-    militaryBaseLevel: militaryBase.level,
-    militaryBaseActive: militaryBase.active,
+    bunkerLevel,
+    bunkerActive,
+    militaryBaseLevel,
+    militaryBaseActive,
+    supplyLinkedToCapital: pickBool(obj.isLinkedToCapital ?? obj.supplyLinkedToCapital),
     resistance: pickFiniteNumber(obj.resistance),
     neighborRegionIds: parseNeighbors(obj),
     ownerCountryId,

@@ -85,6 +85,7 @@ export type MuFightDeskBattle = {
   kind: "mu_order" | "country_order" | "both";
   muOrderSide: "attacker" | "defender" | null;
   countryOrderSide: "attacker" | "defender" | null;
+  muCountryIsoCode: string | null;
   isRevolt: boolean;
   muDamageToDate: number | null;
   bonus: BattleBonusResult;
@@ -111,7 +112,7 @@ export type MuFightDeskMember = {
 };
 
 export type MuFightDeskResponse = {
-  mu: { id: string; name: string | null };
+  mu: { id: string; name: string | null; avatarUrl?: string | null };
   asOf: string | null;
   members: MuFightDeskMember[];
   battles: MuFightDeskBattle[];

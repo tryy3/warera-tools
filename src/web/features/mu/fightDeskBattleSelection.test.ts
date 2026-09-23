@@ -14,6 +14,7 @@ function battle(
     kind: "mu_order",
     muOrderSide: "attacker",
     countryOrderSide: null,
+    muCountryIsoCode: "SE",
     isRevolt: false,
     muDamageToDate: 1000,
     bonus: { total: 0.2, parts: [] },

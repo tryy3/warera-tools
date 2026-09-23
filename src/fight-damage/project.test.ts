@@ -23,4 +23,18 @@ describe("projectResources", () => {
   it("projects regeneration by ticks and caps resources at their maximums", () => {
     expect(projectResources(player, 2)).toEqual({ hp: 75, hunger: 50 });
   });
+
+  it("floors hunger to whole eats (fractional hunger cannot be spent)", () => {
+    expect(
+      projectResources(
+        {
+          ...player,
+          hunger: 1.8,
+          maxHunger: 6,
+          hungerRegenPerHour: 0,
+        },
+        0,
+      ),
+    ).toEqual({ hp: 50, hunger: 1 });
+  });
 });

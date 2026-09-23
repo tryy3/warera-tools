@@ -143,7 +143,11 @@ export function muFightDeskRoutes(deps: MuFightDeskRouteDeps) {
   async function respond(muId: string, forceRefresh: boolean): Promise<MuFightDeskResponse> {
     const now = new Date();
     const [muRows, roster, watchRows] = await Promise.all([
-      db.select({ id: mus.id, name: mus.name }).from(mus).where(eq(mus.id, muId)).limit(1),
+      db
+        .select({ id: mus.id, name: mus.name, avatarUrl: mus.avatarUrl })
+        .from(mus)
+        .where(eq(mus.id, muId))
+        .limit(1),
       listMuMembers(db, muId),
       db
         .select({ muId: muWatchReasons.muId })

@@ -123,7 +123,7 @@ BonusPart = { id: string; label: string; amount: number | null; status: "applied
 
 ### Parts (named constants, golden tests)
 
-Published guides and the wiki disagree on several rates (patriotic +10 vs +20, alliance curve). Implementation **pins constants** to wiki + live fixtures; changing a rate is a constant + test change, not a UI change.
+Published guides and the wiki disagree on several rates (patriotic +10 vs +20, alliance curve). Implementation **pins constants** to in-game descriptions + live fixtures; changing a rate is a constant + test change, not a UI change.
 
 Include at least:
 
@@ -132,7 +132,7 @@ Include at least:
 | Country order | MU country has an order on this side; +5/10/15 by Low/Med/High |
 | MU order | This MU has an order on this side; same tiers; stacks with country order |
 | Patriotic | MU country is attacker or defender |
-| Alliance | Supporting an alliance member; curve from alliance world-dev share |
+| Alliance | Supporting an alliance member. Share = alliance `coreDevelopment` / sum of country `coreDevelopment` (not all countries are in an alliance). Full **+20%** through **10%** share, then **−4pp per share-pp**, floored at **−20%** |
 | Defensive pact | Defending a pact partner’s territory; ramp by pact age |
 | Sworn enemy | Fighting the MU country’s sworn enemy; ramp by age |
 | MU HQ | Headquarters **running** (not merely upgrade level); +5–20 by level |

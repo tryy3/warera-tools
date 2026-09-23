@@ -54,7 +54,8 @@ TRUNCATE TABLE
   cache,
   job_runs,
   jobs,
-  players
+  players,
+  alliances
 RESTART IDENTITY CASCADE
 `;
 

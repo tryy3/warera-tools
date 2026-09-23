@@ -1,6 +1,7 @@
 import type { Db } from "../db/client";
 import { jobs } from "../db/schema";
 import { battleInfoPollJob } from "./battle-info-poll";
+import { allianceSyncJob } from "./alliance-sync";
 import { countrySyncJob } from "./country-sync";
 import { donationPollJob } from "./donation-poll";
 import { exampleHeartbeatJob } from "./example-heartbeat";
@@ -20,6 +21,7 @@ export function listJobDefinitions(): JobDefinition[] {
     exampleHeartbeatJob,
     pricePollJob,
     countrySyncJob,
+    allianceSyncJob,
     recommendedRegionsPollJob,
     regionSyncJob,
     muStatsPollJob,

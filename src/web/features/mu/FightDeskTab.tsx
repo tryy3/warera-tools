@@ -328,6 +328,7 @@ export function FightDeskTab({ muId }: { muId: string }) {
             battles={battles}
             selectedBattleId={prefs.selectedBattleId}
             customBonus={prefs.battleBonus}
+            muAvatarUrl={query.data?.mu.avatarUrl ?? null}
             onSelectBattle={(selectedBattleId) => updatePrefs({ selectedBattleId })}
             onCustomBonusChange={(battleBonus) =>
               updatePrefs({ battleBonus, selectedBattleId: "custom" })

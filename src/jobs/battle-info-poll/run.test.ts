@@ -118,6 +118,7 @@ function makeWarera(handlers: {
   countryDiplomacy?: (countryId: string) => unknown;
   countryById?: (countryId: string) => unknown;
   worldDevelopment?: unknown;
+  allianceList?: unknown;
 }) {
   const request = vi.fn(async (path: string) => {
     if (path.includes("battle.getBattles")) {
@@ -202,6 +203,9 @@ function makeWarera(handlers: {
       const countryId = input.countryId ?? "";
       const body = handlers.countryById?.(countryId);
       return { result: { data: body ?? { capitalRegionId: "r-cap" } } };
+    }
+    if (path.includes("alliance.getManyPaginated")) {
+      return { result: { data: handlers.allianceList ?? { items: [] } } };
     }
     throw new Error(`unexpected path ${path}`);
   });
@@ -841,6 +845,59 @@ describe("runBattleInfoPoll", () => {
     const ids = rows.map((row) => row.countryId).toSorted();
     expect(ids).toEqual(["c-att", "c-def", "c-mu"]);
     expect(rows.find((row) => row.countryId === "c-def")?.allianceId).toBe("south");
+  });
+
+  it("parses live diplomacy partners, country allianceId, and numeric world development", async () => {
+    await seedMuWatch(db, "mu-a", { countryId: "c-mu" });
+    await seedMuMembers(db, "mu-a", ["u1"]);
+    const warera = makeWarera({
+      activeBattles: [battleFixture({ id: "b-live", attackerMuOrders: ["mu-a"] })],
+      countryDiplomacy: () => ({
+        swornEnemy: { enemy: "c-foe", bonusPercent: 10 },
+        defensivePacts: [{ partner: "c-def", bonusPercent: 10 }],
+      }),
+      countryById: (countryId) => ({
+        allianceId: countryId === "c-def" ? "south" : "north",
+        capitalRegionId: countryId === "c-def" ? "r-cap" : null,
+      }),
+      worldDevelopment: 1000,
+      allianceList: {
+        items: [
+          { _id: "north", currentDevelopment: 80 },
+          { _id: "south", currentDevelopment: 200 },
+        ],
+      },
+      regionById: (regionId) => {
+        if (regionId === "r-def") {
+          return {
+            country: "c-def",
+            neighbors: [],
+            isLinkedToCapital: true,
+            activeUpgradeLevels: { bunker: 2, base: 2 },
+          };
+        }
+        return { country: "c-att", neighbors: [], activeUpgradeLevels: { base: 2 } };
+      },
+      loot: () => lootFixture({}),
+    });
+    await runBattleInfoPoll({
+      db,
+      warera: warera as never,
+      logger: makeLogger() as never,
+      now: new Date("2026-09-03T12:00:00.000Z"),
+    });
+    const rows = await db.select().from(schema.countryDiplomacy);
+    const muDip = rows.find((row) => row.countryId === "c-mu");
+    expect(muDip?.allianceId).toBe("north");
+    expect(muDip?.defensivePacts).toEqual([{ countryId: "c-def", since: null }]);
+    expect(muDip?.allianceWorldShare).toBe(0.08);
+    const [facts] = await db
+      .select()
+      .from(schema.battleBonusFacts)
+      .where(eq(schema.battleBonusFacts.battleId, "b-live"));
+    expect(facts?.bunkerLevel).toBe(2);
+    expect(facts?.bunkerActive).toBe(true);
+    expect(facts?.defenderSupplyLinked).toBe(true);
   });
 
   it("fix2: sticky unwatched MU still gets loot for its mu_members (roster loaded from stickyMuIds)", async () => {

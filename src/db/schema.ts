@@ -64,6 +64,8 @@ export const countries = pgTable("countries", {
   taxRate: doublePrecision("tax_rate").notNull(),
   isoCode: text("iso_code"),
   source: text("source").notNull().default("manual"),
+  coreDevelopment: doublePrecision("core_development"),
+  allianceId: text("alliance_id"),
   syncedAt: timestamp("synced_at", { withTimezone: true, mode: "date" }),
   createdAt: timestamp("created_at", { withTimezone: true, mode: "date" })
     .notNull()
@@ -71,6 +73,13 @@ export const countries = pgTable("countries", {
   updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" })
     .notNull()
     .$defaultFn(() => new Date()),
+});
+
+export const alliances = pgTable("alliances", {
+  id: text("id").primaryKey(),
+  name: text("name"),
+  coreDevelopment: doublePrecision("core_development"),
+  fetchedAt: timestamp("fetched_at", { withTimezone: true, mode: "date" }).notNull(),
 });
 
 export const pricePollStatuses = ["success", "partial", "error"] as const;
@@ -577,7 +586,7 @@ export const countryDiplomacy = pgTable(
     swornEnemySince: timestamp("sworn_enemy_since", { withTimezone: true, mode: "date" }),
     defensivePacts: jsonb("defensive_pacts").$type<Array<{
       countryId: string;
-      since: string;
+      since: string | null;
     }> | null>(),
     fetchedAt: timestamp("fetched_at", { withTimezone: true, mode: "date" }).notNull(),
   },

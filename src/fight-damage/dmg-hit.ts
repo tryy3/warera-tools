@@ -1,7 +1,8 @@
 import type { FightPlayerInput } from "./types";
 
 export const HP_LOSS_DIMINISH_K = 40;
-export const BASE_HP_LOSS_PER_HIT = 1;
+/** Base health spent per attempted hit before armor/dodge diminishing returns. */
+export const BASE_HP_LOSS_PER_HIT = 10;
 
 export function dmgPerHit(
   input: Pick<FightPlayerInput, "atk" | "precision" | "critChance" | "critDamage">,
@@ -13,6 +14,12 @@ export function dmgPerHit(
   return input.precision * accurateHitDamage + (1 - input.precision) * missedHitDamage;
 }
 
+/**
+ * Expected HP lost per attempted hit (Sanna / WarEra).
+ * Armor and dodge each apply `K/(K+stat)` independently against a base cost of 10.
+ */
 export function hpLossPerHit(armor: number, dodge: number): number {
-  return BASE_HP_LOSS_PER_HIT * (HP_LOSS_DIMINISH_K / (armor + dodge + HP_LOSS_DIMINISH_K));
+  const armorFactor = HP_LOSS_DIMINISH_K / (HP_LOSS_DIMINISH_K + armor);
+  const dodgeFactor = HP_LOSS_DIMINISH_K / (HP_LOSS_DIMINISH_K + dodge);
+  return BASE_HP_LOSS_PER_HIT * armorFactor * dodgeFactor;
 }

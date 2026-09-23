@@ -42,6 +42,7 @@ export const creteBattle: MuFightDeskBattle = {
   kind: "both",
   muOrderSide: "attacker",
   countryOrderSide: "attacker",
+  muCountryIsoCode: "SE",
   isRevolt: false,
   muDamageToDate: 12_400_000,
   bonus: creteBonus,
@@ -80,6 +81,23 @@ describe("FightDeskBattleStrip", () => {
     });
     expect(html).toContain("MU —");
     expect(html).not.toContain("MU 0");
+  });
+
+  it("shows MU and country-order badges for a both card", () => {
+    const html = renderStrip({ muAvatarUrl: "https://example.test/mu.png" });
+    expect(html).toContain('data-fight-desk-order="mu"');
+    expect(html).toContain('data-fight-desk-order="country"');
+    expect(html).toContain('data-order-chip-amount="5"');
+    expect(html).toContain('data-order-chip-amount="15"');
+    expect(html).toContain("https://example.test/mu.png");
+    expect(html).toContain("absolute");
+    expect(html).toContain('data-order-icon="target"');
+    expect(html).toContain("MU low");
+    expect(html).toContain("Country high");
+    expect(html).not.toContain("-space-x-1.5");
+    expect(html).toContain("#9fd06f");
+    expect(html).toContain("#e29596");
+    expect(html).not.toContain("border-red-500");
   });
 
   it("includes a Custom card", () => {

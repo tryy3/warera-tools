@@ -16,23 +16,24 @@
             turso-cli
             nodejs_26
             pnpm
-            vp
+            # Do NOT add nixpkgs `vp` here — that package is an SDL image viewer
+            # (erikg/vp), not Vite+. Vite+ comes from the local vite-plus dep.
           ];
 
           shellHook = ''
             echo "WarEra devenv: node $(node -v), pnpm $(pnpm -v 2>/dev/null || echo n/a)"
-            if ! command -v vp >/dev/null 2>&1; then
-              echo "Note: install Vite+ CLI with: curl -fsSL https://vite.plus | bash"
-            fi
 
-            # Vite+ (`vp`) ships as a local npm devDependency; use Nix's Node.js.
+            # Vite+ (`vp`) ships as a local pnpm dependency; put it first on PATH.
+            # Never add nixpkgs `vp` to buildInputs — that is an unrelated SDL image viewer.
             if [ ! -x node_modules/.bin/vp ]; then
-              echo "Installing npm dependencies (vite-plus / vp)..."
-              npm install --no-fund --no-audit
+              echo "Installing dependencies (vite-plus / vp)..."
+              pnpm install
             fi
             export PATH="$PWD/node_modules/.bin:$PATH"
 
-
+            if [ ! -x node_modules/.bin/vp ]; then
+              echo "Warning: node_modules/.bin/vp missing after install — check vite-plus in package.json"
+            fi
           '';
         };
       }

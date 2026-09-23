@@ -8,6 +8,12 @@ function formatNumber(value: number | null, digits = 0): string {
   return value == null || !Number.isFinite(value) ? "—" : formatDisplayNumber(value, digits);
 }
 
+function formatDamage(value: number | null, digits = 0): string {
+  return value == null || !Number.isFinite(value)
+    ? "—"
+    : formatDisplayNumber(value, digits, { groupThousands: true });
+}
+
 function formatPercent(value: number | null): string {
   return value == null || !Number.isFinite(value) ? "—" : `${formatDisplayNumber(value * 100, 1)}%`;
 }
@@ -219,11 +225,11 @@ export function FightDeskMemberRow({
             Now
           </div>
           <div className="font-mono text-sm font-semibold text-amber-100 tabular-nums">
-            {formatNumber(row.nowDamage)}
+            {formatDamage(row.nowDamage)}
           </div>
           {row.peakDamage != null ? (
             <div className="font-mono text-[0.65rem] text-violet-300 tabular-nums">
-              Peak {formatNumber(row.peakDamage)}
+              Peak {formatDamage(row.peakDamage)}
             </div>
           ) : null}
           <div className="mt-1">
@@ -263,7 +269,7 @@ export function FightDeskMemberRow({
             }
           />
           <Detail label="Ammo" value={member.display.ammoLabel ?? "—"} />
-          <Detail label="Dmg / hit" value={formatNumber(row.damagePerHit, 1)} accent />
+          <Detail label="Dmg / hit" value={formatDamage(row.damagePerHit, 1)} accent />
           <Detail label="Pill" value={complete ? pillText : "—"} />
         </dl>
       ) : null}

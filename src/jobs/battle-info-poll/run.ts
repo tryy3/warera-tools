@@ -466,18 +466,20 @@ async function syncBattleBonusFacts(
       graph.set(attackerRegionId, toGraphNode(attackerRegionId, attackerCombat));
     }
 
-    const defenderSupplyLinked = await computeDefenderSupplyLinkedWithFetch(
-      defenderRegionId,
-      capitalRegionId,
-      graph,
-      async (regionId) => {
-        try {
-          return await loadRegionCombatCached(db, warera, regionId, warm, fetchedAt);
-        } catch {
-          return null;
-        }
-      },
-    );
+    const defenderSupplyLinked =
+      defenderCombat.supplyLinkedToCapital ??
+      (await computeDefenderSupplyLinkedWithFetch(
+        defenderRegionId,
+        capitalRegionId,
+        graph,
+        async (regionId) => {
+          try {
+            return await loadRegionCombatCached(db, warera, regionId, warm, fetchedAt);
+          } catch {
+            return null;
+          }
+        },
+      ));
 
     await upsertBattleBonusFacts(db, parsed.id, {
       isRevolt: isBattleRevoltType(parsed.type),
