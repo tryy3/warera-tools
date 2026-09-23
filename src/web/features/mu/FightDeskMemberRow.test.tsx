@@ -1,6 +1,7 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vite-plus/test";
 import type { FightKnobs, FightPlayerInput, PillStatus } from "../../../fight-damage/types";
+import { formatDisplayNumber } from "../../../lib/formatDisplayNumber";
 import { FightDeskMemberRow } from "./FightDeskMemberRow";
 import { buildFightDeskMemberRows } from "./fightDeskMemberRows";
 import type { MuFightDeskMember } from "./types";
@@ -127,7 +128,9 @@ describe("FightDeskMemberRow", () => {
     const [row] = buildFightDeskMemberRows([member("active", "Active", "active", 80)], knobs);
 
     expect(row?.peakDamage).not.toBeNull();
-    expect(html).toContain(`Peak ${row?.peakDamage}`);
+    expect(html).toContain(
+      `Peak ${formatDisplayNumber(row!.peakDamage!, 0, { groupThousands: true })}`,
+    );
   });
 
   it("tightens the xl grid after dropping reset and the separate pill column", () => {
