@@ -5,8 +5,8 @@ allowBuilds:
   protobufjs: false
   ssh2: false
 catalog:
-  vite: npm:@voidzero-dev/vite-plus-core@0.3.0
-  vite-plus: 0.3.0
+  vite: npm:@voidzero-dev/vite-plus-core@0.3.3
+  vite-plus: 0.3.3
 minimumReleaseAgeExclude:
   - "@voidzero-dev/vite-plus-core@0.2.9"
   - "@voidzero-dev/vite-plus-darwin-arm64@0.2.9"
