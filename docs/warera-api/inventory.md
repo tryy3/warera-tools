@@ -1,6 +1,6 @@
 # WarEra data inventory (as-is)
 
-**Last reviewed:** 2026-09-20
+**Last reviewed:** 2026-10-09
 **Status:** Living — update when cadence, ownership, or major consumers change  
 **Tier rules:** [Data tier caching strategy](../superpowers/specs/2026-08-02-data-tier-caching-strategy-design.md)
 
@@ -84,6 +84,7 @@ The country watchlist is distinct ids in `country_watch_reasons` (Sweden seeded 
 | Company pack | Companies + advisor inputs for a player (opportunities include live `buyPrice`/`sellPrice`) | Shell Load/Refresh (`refresh=1` busts pack) | Server TTL ~600s | Mix: companies/regions via api2; some company helpers use `X-API-Key` | `company_packs` + TQ memory; Companies page may apply session-only buy/sell overrides (not persisted) | Companies, Growth |
 | User aggregate | Skills / job / income-oriented payload | `GET /api/user` on demand | Aligned with pack / Load | api2 | Server TTL patterns + TQ | Skills optimizer, income views |
 | Equipped loadout | Weapon / armor / consumable slots for selected player | Shell Load/Refresh + Battle tab import (`GET /api/battle-build/import`) | Aligned with pack / Load (~10m server TTL, TQ stale ~9m) | `inventory.fetchCurrentEquipment` via api2 | Ephemeral / TQ memory — no dedicated table | Battle tab (Skills route) |
+| Player battle loot | Active battles a player fought in, their round and battle damage rank per side, the prize item (rarity + type) on each rank slot, and damage needed to take each slot above them | `GET /api/player-battles?userId=&refresh=1` on demand; Player page polls every 60s | Server TTL 60s (rankings move on ~2 min round ticks); `refresh=1` bypasses | api2: `battle.getBattles` (full cursor), `battleLootSummary.getByBattleAndUser` (GET batch in groups of 8; NOT_FOUND = not fought), `battleRanking.getRanking` (damage, user, per side and scope, batched per page depth, max 5 pages) | Generic `cache` KV key `player-battles:v1:<userId>`; no table; TQ memory (`["player-battles", userId]`) | Player page (`/player`) |
 | Workers / wages | Work offers / worker rows + lite skills/username | Advisor on Companies Load/Refresh: `worker.getWorkers` then batched `user.getUserLite` for unique worker ids | On Load / tool need | api2 | Ephemeral / pack-adjacent — not a long Global history | Companies (sim + badges); wage helpers |
 
 ## Storage styles in use

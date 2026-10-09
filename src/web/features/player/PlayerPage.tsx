@@ -30,7 +30,9 @@ export function PlayerPage() {
   const search = playerRoute.useSearch();
   const navigate = playerRoute.useNavigate();
   const queryClient = useQueryClient();
-  const { player } = usePlayerSelection();
+  // The shell player is the source of truth after hydration, so a chip sets it and the sync hook
+  // writes the URL. Navigating alone would be reverted by the shell-to-route effect.
+  const { player, setPlayer } = usePlayerSelection();
   const nowMs = useNow(1000);
   const [refreshing, setRefreshing] = useState(false);
   const [refreshError, setRefreshError] = useState<string | null>(null);
@@ -122,11 +124,7 @@ export function PlayerPage() {
               type="button"
               size="sm"
               variant={p.playerId === userId ? "default" : "outline"}
-              onClick={() =>
-                void navigate({
-                  search: buildPlayerSearch({ userId: p.playerId, username: p.username }),
-                })
-              }
+              onClick={() => setPlayer({ userId: p.playerId, username: p.username ?? p.playerId })}
             >
               {p.username ?? p.playerId}
             </Button>

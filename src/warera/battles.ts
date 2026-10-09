@@ -1,6 +1,6 @@
 import { isWareraNotFoundError } from "./errors";
 import type { WareraRequester } from "./prices";
-import { unwrapTrpcData, wareraProcedurePath } from "./trpc";
+import { unwrapTrpcData, wareraProcedurePath, type TrpcBatchSlotResult } from "./trpc";
 
 export const BATTLE_END_SETTLE_MS = 60_000;
 
@@ -353,6 +353,9 @@ export async function fetchBattleLootSummary(
   }
 }
 
+/** Keeps each group's GET URL under the client's 2000 char batch cap (about 160 chars per slot). */
+const LOOT_BATCH_GROUP_SIZE = 8;
+
 function isNotFoundSlotError(error: unknown): boolean {
   if (isWareraNotFoundError(error)) return true;
   const data = asRecord(asRecord(error)?.data);
@@ -380,21 +383,42 @@ export async function fetchBattleLootSummaries(
     return out;
   }
 
-  const slots = await warera.requestBatch(
-    battleIds.map((battleId) => ({
-      procedure: "battleLootSummary.getByBattleAndUser",
-      input: { battleId, userId },
-    })),
+  const requestBatch = warera.requestBatch;
+  const groups: string[][] = [];
+  for (let i = 0; i < battleIds.length; i += LOOT_BATCH_GROUP_SIZE) {
+    groups.push(battleIds.slice(i, i + LOOT_BATCH_GROUP_SIZE));
+  }
+  await Promise.all(
+    groups.map(async (ids) => {
+      let slots: TrpcBatchSlotResult[];
+      try {
+        slots = await requestBatch(
+          ids.map((battleId) => ({
+            procedure: "battleLootSummary.getByBattleAndUser",
+            input: { battleId, userId },
+          })),
+        );
+      } catch (err) {
+        // api2 answers a batch whose every slot is NOT_FOUND with HTTP 404 instead of 207 and the
+        // client throws it. That is why groups stay under one URL chunk: a thrown chunk must not
+        // discard the summaries of other chunks.
+        if (err instanceof Error && /\bNOT_FOUND\b/.test(err.message)) {
+          for (const id of ids) out.set(id, null);
+          return;
+        }
+        throw err;
+      }
+      ids.forEach((id, i) => {
+        const slot = slots[i];
+        if (slot?.ok) {
+          out.set(id, parseBattleLootSummary(slot.data));
+        } else if (slot && isNotFoundSlotError(slot.error)) {
+          out.set(id, null);
+        } else {
+          throw new Error(`battleLootSummary batch slot failed for battle ${id}`);
+        }
+      });
+    }),
   );
-  battleIds.forEach((id, i) => {
-    const slot = slots[i];
-    if (slot?.ok) {
-      out.set(id, parseBattleLootSummary(slot.data));
-    } else if (slot && isNotFoundSlotError(slot.error)) {
-      out.set(id, null);
-    } else {
-      throw new Error(`battleLootSummary batch slot failed for battle ${id}`);
-    }
-  });
   return out;
 }

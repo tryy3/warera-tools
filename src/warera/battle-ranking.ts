@@ -21,6 +21,13 @@ export type RankingPage = {
   nextCursor: string | null;
 };
 
+export type RankingTarget = { scope: RankingScope; side: BattleSideId };
+export type DamageRanking = { rows: ParsedRankingRow[]; complete: boolean };
+
+export const RANKING_MAX_PAGES = 5;
+
+const PROCEDURE = "battleRanking.getRanking";
+
 function asRecord(value: unknown): Record<string, unknown> | null {
   return value != null && typeof value === "object" && !Array.isArray(value)
     ? (value as Record<string, unknown>)
@@ -52,42 +59,64 @@ export function parseRankingPage(data: unknown): RankingPage {
   return { rows, nextCursor };
 }
 
-export async function fetchDamageRankingPage(
-  warera: WareraRequester,
-  scope: RankingScope,
-  side: BattleSideId,
-  cursor?: string,
-): Promise<RankingPage> {
-  const input: Record<string, unknown> = {
+function rankingInput(target: RankingTarget, cursor: string | undefined): Record<string, unknown> {
+  const { scope, side } = target;
+  return {
     ...(scope.kind === "round" ? { roundId: scope.roundId } : { battleId: scope.battleId }),
     dataType: "damage",
     type: "user",
     side,
     limit: 100,
+    ...(cursor ? { cursor } : {}),
   };
-  if (cursor) input.cursor = cursor;
-  const json = await warera.request<unknown>(
-    wareraProcedurePath("battleRanking.getRanking", input),
-  );
-  return parseRankingPage(unwrapTrpcData(json));
 }
 
-export const RANKING_MAX_PAGES = 5;
-
-/** Walks pages until the cursor ends or `maxPages` is hit. `complete: false` means ranks below the last row are unknown. */
-export async function fetchDamageRanking(
+async function fetchPages(
   warera: WareraRequester,
-  scope: RankingScope,
-  side: BattleSideId,
-  maxPages = RANKING_MAX_PAGES,
-): Promise<{ rows: ParsedRankingRow[]; complete: boolean }> {
-  const rows: ParsedRankingRow[] = [];
-  let cursor: string | undefined;
-  for (let page = 0; page < maxPages; page++) {
-    const result = await fetchDamageRankingPage(warera, scope, side, cursor);
-    rows.push(...result.rows);
-    if (!result.nextCursor) return { rows, complete: true };
-    cursor = result.nextCursor;
+  inputs: Record<string, unknown>[],
+): Promise<RankingPage[]> {
+  if (!warera.requestBatch) {
+    return Promise.all(
+      inputs.map(async (input) =>
+        parseRankingPage(
+          unwrapTrpcData(await warera.request<unknown>(wareraProcedurePath(PROCEDURE, input))),
+        ),
+      ),
+    );
   }
-  return { rows, complete: false };
+  const slots = await warera.requestBatch(inputs.map((input) => ({ procedure: PROCEDURE, input })));
+  return inputs.map((_, i) => {
+    const slot = slots[i];
+    if (!slot?.ok) throw new Error(`${PROCEDURE} batch slot ${i} failed`);
+    return parseRankingPage(slot.data);
+  });
+}
+
+/**
+ * Walks every target's ranking, one HTTP batch per page depth instead of one call per page.
+ * `complete: false` means the page cap was hit, so ranks below the last row are unknown.
+ */
+export async function fetchDamageRankings(
+  warera: WareraRequester,
+  targets: readonly RankingTarget[],
+  maxPages = RANKING_MAX_PAGES,
+): Promise<DamageRanking[]> {
+  const results: DamageRanking[] = targets.map(() => ({ rows: [], complete: true }));
+  let pending = targets.map((_, i) => ({ index: i, cursor: undefined as string | undefined }));
+
+  for (let depth = 0; depth < maxPages && pending.length > 0; depth++) {
+    const pages = await fetchPages(
+      warera,
+      pending.map((p) => rankingInput(targets[p.index]!, p.cursor)),
+    );
+    const next: typeof pending = [];
+    pages.forEach((page, i) => {
+      const { index } = pending[i]!;
+      results[index]!.rows.push(...page.rows);
+      if (page.nextCursor) next.push({ index, cursor: page.nextCursor });
+    });
+    pending = next;
+  }
+  for (const p of pending) results[p.index]!.complete = false;
+  return results;
 }

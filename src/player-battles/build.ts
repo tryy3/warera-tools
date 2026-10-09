@@ -1,5 +1,10 @@
 import { inArray } from "drizzle-orm";
-import { resolveBattleLadders, type BattleRankings, type SideRanking } from "../battle-loot/battle";
+import {
+  resolveBattleLadders,
+  type BattleRankings,
+  type ScopeRankings,
+  type SideRanking,
+} from "../battle-loot/battle";
 import { tallyLoot, type LootTallyKey } from "../battle-loot/ladder";
 import type { Db } from "../db/client";
 import { classifyCacheLookup, getCachedRow, recordCacheLookup, setCached } from "../db/cache";
@@ -11,10 +16,11 @@ import {
   type ParsedBattle,
 } from "../warera/battles";
 import {
-  fetchDamageRanking,
+  fetchDamageRankings,
   type BattleSideId,
-  type ParsedRankingRow,
+  type DamageRanking,
   type RankingScope,
+  type RankingTarget,
 } from "../warera/battle-ranking";
 import type { WareraRequester } from "../warera/prices";
 import type { PlayerBattleView, PlayerBattlesResponse } from "./types";
@@ -26,7 +32,7 @@ export function playerBattlesCacheKey(userId: string): string {
   return `player-battles:v1:${userId}`;
 }
 
-function toSideRanking(result: { rows: ParsedRankingRow[]; complete: boolean }): SideRanking {
+function toSideRanking(result: DamageRanking): SideRanking {
   return {
     complete: result.complete,
     rows: result.rows.map((r) => ({
@@ -38,13 +44,34 @@ function toSideRanking(result: { rows: ParsedRankingRow[]; complete: boolean }):
   };
 }
 
-async function fetchScopeRankings(warera: WareraRequester, scope: RankingScope) {
-  const [attacker, defender] = await Promise.all(
-    (["attacker", "defender"] as const satisfies readonly BattleSideId[]).map((side) =>
-      fetchDamageRanking(warera, scope, side),
-    ),
+const SIDES = ["attacker", "defender"] as const satisfies readonly BattleSideId[];
+
+function scopesOf(battle: ParsedBattle): RankingScope[] {
+  const roundId = battle.currentRound?.id ?? null;
+  return [
+    ...(roundId ? [{ kind: "round", roundId } as const] : []),
+    { kind: "battle", battleId: battle.id },
+  ];
+}
+
+/** One batched walk for every battle, so call count does not grow with the number of battles. */
+async function fetchAllRankings(
+  warera: WareraRequester,
+  battles: readonly ParsedBattle[],
+): Promise<BattleRankings[]> {
+  const targets: RankingTarget[] = battles.flatMap((b) =>
+    scopesOf(b).flatMap((scope) => SIDES.map((side) => ({ scope, side }))),
   );
-  return { attacker: toSideRanking(attacker!), defender: toSideRanking(defender!) };
+  const results = (await fetchDamageRankings(warera, targets)).map(toSideRanking);
+  let at = 0;
+  return battles.map((b) => {
+    const byScope = new Map<RankingScope["kind"], ScopeRankings>();
+    for (const scope of scopesOf(b)) {
+      byScope.set(scope.kind, { attacker: results[at]!, defender: results[at + 1]! });
+      at += SIDES.length;
+    }
+    return { round: byScope.get("round") ?? null, battle: byScope.get("battle")! };
+  });
 }
 
 type Names = {
@@ -112,40 +139,37 @@ async function buildLive(options: {
     fought.map((f) => f.battle),
   );
 
-  const views: PlayerBattleView[] = await Promise.all(
-    fought.map(async ({ battle, loot }): Promise<PlayerBattleView> => {
-      const roundId = battle.currentRound?.id ?? null;
-      const [round, battleScope] = await Promise.all([
-        roundId ? fetchScopeRankings(warera, { kind: "round", roundId }) : Promise.resolve(null),
-        fetchScopeRankings(warera, { kind: "battle", battleId: battle.id }),
-      ]);
-      const rankings: BattleRankings = { round, battle: battleScope };
-      const { mySide, ladders } = resolveBattleLadders(rankings, userId, loot?.totalDmg ?? null);
-      const attackerCountry = battle.attacker.countryId
-        ? names.countries.get(battle.attacker.countryId)
-        : undefined;
-      const defenderCountry = battle.defender.countryId
-        ? names.countries.get(battle.defender.countryId)
-        : undefined;
-      const regionId = battle.defender.regionId ?? battle.attacker.regionId;
-      return {
-        battleId: battle.id,
-        regionName: regionId ? (names.regions.get(regionId) ?? null) : null,
-        attackerCountryName: attackerCountry?.name ?? null,
-        defenderCountryName: defenderCountry?.name ?? null,
-        attackerIsoCode: attackerCountry?.isoCode ?? null,
-        defenderIsoCode: defenderCountry?.isoCode ?? null,
-        roundNumber: battle.currentRound?.number ?? null,
-        nextTickAt: battle.currentRound?.live?.nextTickAt?.toISOString() ?? null,
-        mySide,
-        totalDamage: loot?.totalDmg ?? null,
-        hits: loot?.hits ?? null,
-        case1Count: loot?.case1Count ?? null,
-        case2Count: loot?.case2Count ?? null,
-        ladders,
-      };
-    }),
+  const rankingsByBattle = await fetchAllRankings(
+    warera,
+    fought.map((f) => f.battle),
   );
+
+  const views: PlayerBattleView[] = fought.map(({ battle, loot }, i): PlayerBattleView => {
+    const { mySide, ladders } = resolveBattleLadders(rankingsByBattle[i]!, userId, loot.totalDmg);
+    const attackerCountry = battle.attacker.countryId
+      ? names.countries.get(battle.attacker.countryId)
+      : undefined;
+    const defenderCountry = battle.defender.countryId
+      ? names.countries.get(battle.defender.countryId)
+      : undefined;
+    const regionId = battle.defender.regionId ?? battle.attacker.regionId;
+    return {
+      battleId: battle.id,
+      regionName: regionId ? (names.regions.get(regionId) ?? null) : null,
+      attackerCountryName: attackerCountry?.name ?? null,
+      defenderCountryName: defenderCountry?.name ?? null,
+      attackerIsoCode: attackerCountry?.isoCode ?? null,
+      defenderIsoCode: defenderCountry?.isoCode ?? null,
+      roundNumber: battle.currentRound?.number ?? null,
+      nextTickAt: battle.currentRound?.live?.nextTickAt?.toISOString() ?? null,
+      mySide,
+      totalDamage: loot.totalDmg,
+      hits: loot.hits,
+      case1Count: loot.case1Count,
+      case2Count: loot.case2Count,
+      ladders,
+    };
+  });
 
   const held: LootTallyKey[] = views
     .filter((v) => v.mySide != null)
