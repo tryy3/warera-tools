@@ -229,8 +229,7 @@ export function EquipmentOverviewPage() {
         <div>
           <h1 className="mb-0.5 text-[1.35rem] font-semibold tracking-tight">Equipment</h1>
           <p className="m-0 text-muted-foreground">
-            Market median vs scrap price by item.
-            {windowMs != null ? ` · last ${formatWindow(windowMs)}` : null}
+            24h median of every sale, all stat rolls mixed. Open an item to price one roll.
           </p>
         </div>
         <div className="flex flex-wrap items-end gap-3">
