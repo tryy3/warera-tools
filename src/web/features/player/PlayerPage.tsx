@@ -17,15 +17,6 @@ import { LootItem } from "./LootItem";
 
 const playerRoute = getRouteApi("/player");
 
-function useNow(intervalMs: number): number {
-  const [now, setNow] = useState(() => Date.now());
-  useEffect(() => {
-    const id = setInterval(() => setNow(Date.now()), intervalMs);
-    return () => clearInterval(id);
-  }, [intervalMs]);
-  return now;
-}
-
 export function PlayerPage() {
   const search = playerRoute.useSearch();
   const navigate = playerRoute.useNavigate();
@@ -33,7 +24,6 @@ export function PlayerPage() {
   // The shell player is the source of truth after hydration, so a chip sets it and the sync hook
   // writes the URL. Navigating alone would be reverted by the shell-to-route effect.
   const { player, setPlayer } = usePlayerSelection();
-  const nowMs = useNow(1000);
   const [refreshing, setRefreshing] = useState(false);
   const [refreshError, setRefreshError] = useState<string | null>(null);
 
@@ -177,7 +167,7 @@ export function PlayerPage() {
                 )}
               </div>
               {data.battles.map((b) => (
-                <BattleLootCard key={b.battleId} battle={b} nowMs={nowMs} />
+                <BattleLootCard key={b.battleId} battle={b} />
               ))}
             </>
           )}

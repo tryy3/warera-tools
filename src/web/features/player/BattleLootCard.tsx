@@ -1,3 +1,4 @@
+import { useEffect, useState, type ReactNode } from "react";
 import type { PlayerBattleView } from "@/player-battles/types";
 import { FlagIcon } from "../../components/FlagIcon";
 import { formatDamage, formatTickCountdown } from "./lootFormat";
@@ -12,7 +13,17 @@ function SideName({ name, iso, mine }: { name: string | null; iso: string | null
   );
 }
 
-export function BattleLootCard({ battle, nowMs }: { battle: PlayerBattleView; nowMs: number }) {
+/** Owns the 1s clock so only this value re-renders each second, not the whole ladder tree. */
+function TickCountdown({ nextTickAt }: { nextTickAt: string | null }) {
+  const [nowMs, setNowMs] = useState(() => Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNowMs(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, []);
+  return <>{formatTickCountdown(nextTickAt, nowMs)}</>;
+}
+
+export function BattleLootCard({ battle }: { battle: PlayerBattleView }) {
   return (
     <article
       className="space-y-3 rounded-lg border border-border bg-card p-4"
@@ -42,7 +53,7 @@ export function BattleLootCard({ battle, nowMs }: { battle: PlayerBattleView; no
           </div>
         </div>
         <dl className="grid grid-cols-2 gap-x-5 gap-y-1 text-right text-xs sm:grid-cols-4">
-          <Stat label="Next tick" value={formatTickCountdown(battle.nextTickAt, nowMs)} />
+          <Stat label="Next tick" value={<TickCountdown nextTickAt={battle.nextTickAt} />} />
           <Stat
             label="Battle damage"
             value={battle.totalDamage == null ? "—" : formatDamage(battle.totalDamage)}
@@ -69,7 +80,7 @@ export function BattleLootCard({ battle, nowMs }: { battle: PlayerBattleView; no
   );
 }
 
-function Stat({ label, value, title }: { label: string; value: string; title?: string }) {
+function Stat({ label, value, title }: { label: string; value: ReactNode; title?: string }) {
   return (
     <div title={title}>
       <dt className="text-muted-foreground">{label}</dt>

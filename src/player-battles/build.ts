@@ -59,14 +59,15 @@ async function fetchAllRankings(
   warera: WareraRequester,
   battles: readonly ParsedBattle[],
 ): Promise<BattleRankings[]> {
-  const targets: RankingTarget[] = battles.flatMap((b) =>
-    scopesOf(b).flatMap((scope) => SIDES.map((side) => ({ scope, side }))),
+  const plan = battles.map(scopesOf);
+  const targets: RankingTarget[] = plan.flatMap((scopes) =>
+    scopes.flatMap((scope) => SIDES.map((side) => ({ scope, side }))),
   );
   const results = (await fetchDamageRankings(warera, targets)).map(toSideRanking);
   let at = 0;
-  return battles.map((b) => {
+  return plan.map((scopes) => {
     const byScope = new Map<RankingScope["kind"], ScopeRankings>();
-    for (const scope of scopesOf(b)) {
+    for (const scope of scopes) {
       byScope.set(scope.kind, { attacker: results[at]!, defender: results[at + 1]! });
       at += SIDES.length;
     }
@@ -134,15 +135,11 @@ async function buildLive(options: {
     return loot ? [{ battle, loot }] : [];
   });
 
-  const names = await loadNames(
-    db,
-    fought.map((f) => f.battle),
-  );
-
-  const rankingsByBattle = await fetchAllRankings(
-    warera,
-    fought.map((f) => f.battle),
-  );
+  const foughtBattles = fought.map((f) => f.battle);
+  const [names, rankingsByBattle] = await Promise.all([
+    loadNames(db, foughtBattles),
+    fetchAllRankings(warera, foughtBattles),
+  ]);
 
   const views: PlayerBattleView[] = fought.map(({ battle, loot }, i): PlayerBattleView => {
     const { mySide, ladders } = resolveBattleLadders(rankingsByBattle[i]!, userId, loot.totalDmg);

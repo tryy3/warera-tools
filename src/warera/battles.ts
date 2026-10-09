@@ -402,7 +402,7 @@ export async function fetchBattleLootSummaries(
         // api2 answers a batch whose every slot is NOT_FOUND with HTTP 404 instead of 207 and the
         // client throws it. That is why groups stay under one URL chunk: a thrown chunk must not
         // discard the summaries of other chunks.
-        if (err instanceof Error && /\bNOT_FOUND\b/.test(err.message)) {
+        if (isWareraNotFoundError(err)) {
           for (const id of ids) out.set(id, null);
           return;
         }
