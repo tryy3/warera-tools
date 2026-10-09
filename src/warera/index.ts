@@ -80,4 +80,14 @@ export {
   type ParsedCurrentRound,
   type ParsedCurrentRoundLive,
 } from "./battles";
+export {
+  fetchDamageRanking,
+  fetchDamageRankingPage,
+  parseRankingPage,
+  RANKING_MAX_PAGES,
+  type BattleSideId,
+  type ParsedRankingRow,
+  type RankingPage,
+  type RankingScope,
+} from "./battle-ranking";
 export { fetchBattleOrders, parseBattleOrders, type ParsedBattleOrder } from "./battle-orders";
