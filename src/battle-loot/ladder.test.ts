@@ -95,11 +95,7 @@ describe("buildLootLadder", () => {
   });
 
   it("maps weapon codes through the tier overrides", () => {
-    const ladder = buildLootLadder(
-      [row(1, "a", 50, "tank"), row(2, "me", 10, "knife")],
-      "me",
-      10,
-    );
+    const ladder = buildLootLadder([row(1, "a", 50, "tank"), row(2, "me", 10, "knife")], "me", 10);
     expect(ladder.current).toMatchObject({ tier: "gray", kind: "weapon" });
     expect(ladder.nextTier).toMatchObject({ tier: "yellow", kind: "weapon", damageNeeded: 41 });
   });
