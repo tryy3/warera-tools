@@ -3,6 +3,7 @@ import {
   BATTLE_END_SETTLE_MS,
   fetchAllActiveBattles,
   fetchBattleById,
+  fetchBattleLootSummaries,
   fetchBattleLootSummary,
   parseBattleById,
   parseBattleListItem,
@@ -283,6 +284,95 @@ describe("fetchBattleById", () => {
     const parsed = await fetchBattleById({ request }, "b1");
     expect(request).toHaveBeenCalledWith(expect.stringContaining("battle.getById"));
     expect(parsed.id).toBe("b1");
+  });
+});
+
+describe("fetchBattleLootSummaries", () => {
+  const notFound = {
+    ok: false as const,
+    error: { message: "not found", data: { code: "NOT_FOUND", httpStatus: 404 } },
+  };
+
+  it("maps ok slots to summaries and NOT_FOUND slots to null in one batch", async () => {
+    const requestBatch = vi
+      .fn()
+      .mockResolvedValue([{ ok: true, data: { totalDmg: 10, hits: 2 } }, notFound]);
+    const out = await fetchBattleLootSummaries(
+      { request: vi.fn(), requestBatch },
+      ["b1", "b2"],
+      "u1",
+    );
+    expect(out.get("b1")).toMatchObject({ totalDmg: 10, hits: 2 });
+    expect(out.get("b2")).toBeNull();
+    expect(requestBatch).toHaveBeenCalledTimes(1);
+    expect(requestBatch.mock.calls[0]![0]).toEqual([
+      {
+        procedure: "battleLootSummary.getByBattleAndUser",
+        input: { battleId: "b1", userId: "u1" },
+      },
+      {
+        procedure: "battleLootSummary.getByBattleAndUser",
+        input: { battleId: "b2", userId: "u1" },
+      },
+    ]);
+  });
+
+  it("throws on a non-NOT_FOUND slot error instead of hiding a battle", async () => {
+    const requestBatch = vi
+      .fn()
+      .mockResolvedValue([{ ok: false, error: { data: { code: "INTERNAL_SERVER_ERROR" } } }]);
+    await expect(
+      fetchBattleLootSummaries({ request: vi.fn(), requestBatch }, ["b1"], "u1"),
+    ).rejects.toThrow("b1");
+  });
+
+  it("treats an all-NOT_FOUND batch rejection as no battles fought", async () => {
+    const requestBatch = vi
+      .fn()
+      .mockRejectedValue(
+        new Error('WarEra request failed: 404 [{"error":{"data":{"code":"NOT_FOUND"}}}]'),
+      );
+    const out = await fetchBattleLootSummaries(
+      { request: vi.fn(), requestBatch },
+      ["b1", "b2"],
+      "u1",
+    );
+    expect([...out.values()]).toEqual([null, null]);
+  });
+
+  it("keeps summaries from one group when another group is all NOT_FOUND", async () => {
+    const ids = Array.from({ length: 10 }, (_, i) => `b${i}`);
+    const requestBatch = vi
+      .fn()
+      .mockRejectedValueOnce(
+        new Error('WarEra request failed: 404 [{"data":{"code":"NOT_FOUND"}}]'),
+      )
+      .mockResolvedValueOnce([
+        { ok: true, data: { totalDmg: 7 } },
+        { ok: true, data: { totalDmg: 8 } },
+      ]);
+    const out = await fetchBattleLootSummaries({ request: vi.fn(), requestBatch }, ids, "u1");
+    expect(requestBatch).toHaveBeenCalledTimes(2);
+    expect(out.get("b0")).toBeNull();
+    expect(out.get("b8")?.totalDmg).toBe(7);
+    expect(out.get("b9")?.totalDmg).toBe(8);
+  });
+
+  it("rethrows other batch failures", async () => {
+    const requestBatch = vi.fn().mockRejectedValue(new Error("WarEra request failed: 502"));
+    await expect(
+      fetchBattleLootSummaries({ request: vi.fn(), requestBatch }, ["b1"], "u1"),
+    ).rejects.toThrow("502");
+  });
+
+  it("falls back to per-battle requests without requestBatch", async () => {
+    const request = vi
+      .fn()
+      .mockResolvedValueOnce({ result: { data: { totalDmg: 5 } } })
+      .mockRejectedValueOnce(new Error("WarEra request failed: 404 NOT_FOUND"));
+    const out = await fetchBattleLootSummaries({ request }, ["b1", "b2"], "u1");
+    expect(out.get("b1")?.totalDmg).toBe(5);
+    expect(out.get("b2")).toBeNull();
   });
 });
 

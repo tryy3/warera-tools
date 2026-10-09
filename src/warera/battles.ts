@@ -1,6 +1,6 @@
 import { isWareraNotFoundError } from "./errors";
 import type { WareraRequester } from "./prices";
-import { unwrapTrpcData, wareraProcedurePath } from "./trpc";
+import { unwrapTrpcData, wareraProcedurePath, type TrpcBatchSlotResult } from "./trpc";
 
 export const BATTLE_END_SETTLE_MS = 60_000;
 
@@ -351,4 +351,74 @@ export async function fetchBattleLootSummary(
     if (isWareraNotFoundError(err)) return null;
     throw err;
   }
+}
+
+/** Keeps each group's GET URL under the client's 2000 char batch cap (about 160 chars per slot). */
+const LOOT_BATCH_GROUP_SIZE = 8;
+
+function isNotFoundSlotError(error: unknown): boolean {
+  if (isWareraNotFoundError(error)) return true;
+  const data = asRecord(asRecord(error)?.data);
+  return data?.code === "NOT_FOUND" || data?.httpStatus === 404;
+}
+
+/**
+ * Loot summaries for one user across many battles; a battle the user has not fought in maps to null.
+ * Uses one HTTP batch when the client has `requestBatch`, because the per-call path is paced by the
+ * rate limiter and takes tens of seconds for ~30 battles.
+ */
+export async function fetchBattleLootSummaries(
+  warera: WareraRequester,
+  battleIds: readonly string[],
+  userId: string,
+): Promise<Map<string, ParsedBattleLootSummary | null>> {
+  const out = new Map<string, ParsedBattleLootSummary | null>();
+  if (battleIds.length === 0) return out;
+
+  if (!warera.requestBatch) {
+    const all = await Promise.all(
+      battleIds.map((id) => fetchBattleLootSummary(warera, id, userId)),
+    );
+    battleIds.forEach((id, i) => out.set(id, all[i] ?? null));
+    return out;
+  }
+
+  const requestBatch = warera.requestBatch;
+  const groups: string[][] = [];
+  for (let i = 0; i < battleIds.length; i += LOOT_BATCH_GROUP_SIZE) {
+    groups.push(battleIds.slice(i, i + LOOT_BATCH_GROUP_SIZE));
+  }
+  await Promise.all(
+    groups.map(async (ids) => {
+      let slots: TrpcBatchSlotResult[];
+      try {
+        slots = await requestBatch(
+          ids.map((battleId) => ({
+            procedure: "battleLootSummary.getByBattleAndUser",
+            input: { battleId, userId },
+          })),
+        );
+      } catch (err) {
+        // api2 answers a batch whose every slot is NOT_FOUND with HTTP 404 instead of 207 and the
+        // client throws it. That is why groups stay under one URL chunk: a thrown chunk must not
+        // discard the summaries of other chunks.
+        if (isWareraNotFoundError(err)) {
+          for (const id of ids) out.set(id, null);
+          return;
+        }
+        throw err;
+      }
+      ids.forEach((id, i) => {
+        const slot = slots[i];
+        if (slot?.ok) {
+          out.set(id, parseBattleLootSummary(slot.data));
+        } else if (slot && isNotFoundSlotError(slot.error)) {
+          out.set(id, null);
+        } else {
+          throw new Error(`battleLootSummary batch slot failed for battle ${id}`);
+        }
+      });
+    }),
+  );
+  return out;
 }

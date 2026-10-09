@@ -19,6 +19,7 @@ import { growthRoutes } from "./routes/growth";
 import { healthRoutes } from "./routes/health";
 import { jobsRoutes } from "./routes/jobs";
 import { marketRoutes } from "./routes/market";
+import { playerBattlesRoutes } from "./routes/player-battles";
 import { pricesRoutes } from "./routes/prices";
 import { scrapsRoutes } from "./routes/scraps";
 import { userRoutes } from "./routes/user";
@@ -72,6 +73,10 @@ export function createApp(deps: CreateAppDeps): Hono {
   );
   app.route("/api/growth", growthRoutes({ db: deps.db, warera: deps.warera, logger: deps.logger }));
   app.route("/api/user", userRoutes({ db: deps.db, warera: deps.warera, logger: deps.logger }));
+  app.route(
+    "/api/player-battles",
+    playerBattlesRoutes({ db: deps.db, warera: deps.warera, logger: deps.logger }),
+  );
   app.route("/api/follow", followRoutes({ db: deps.db, warera: deps.warera }));
   app.route("/api/mu", muRoutes({ db: deps.db, warera: deps.warera, logger: deps.logger }));
   app.route(
