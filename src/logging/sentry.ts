@@ -33,7 +33,6 @@ export function initSentry(config: Pick<AppConfig, "sentryDsn" | "sentryEnvironm
   try {
     Sentry.init({
       dsn: config.sentryDsn,
-      enableLogs: true,
       tracesSampleRate: 1,
       environment: config.sentryEnvironment,
       debug: process.env.SENTRY_DEBUG === "true" || process.env.SENTRY_DEBUG === "1",

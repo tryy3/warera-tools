@@ -49,7 +49,7 @@ describe("sentry logging", () => {
     expect(init).not.toHaveBeenCalled();
   });
 
-  it("initSentry calls Sentry.init with enableLogs", () => {
+  it("initSentry calls Sentry.init with DSN, tracing and environment", () => {
     expect(
       initSentry({
         sentryDsn: "https://key@o0.ingest.sentry.io/1",
@@ -59,7 +59,6 @@ describe("sentry logging", () => {
     expect(init).toHaveBeenCalledWith(
       expect.objectContaining({
         dsn: "https://key@o0.ingest.sentry.io/1",
-        enableLogs: true,
         tracesSampleRate: 1,
         environment: "development",
       }),
