@@ -7,7 +7,7 @@ import { countries, regions } from "../db/schema";
 import type { Logger } from "../logging/logger";
 import {
   fetchAllActiveBattles,
-  fetchBattleLootSummary,
+  fetchBattleLootSummaries,
   type ParsedBattle,
 } from "../warera/battles";
 import {
@@ -21,22 +21,9 @@ import type { PlayerBattleView, PlayerBattlesResponse } from "./types";
 
 /** Rankings only move on round ticks (~2 min), so a minute keeps the page live without hammering api2. */
 export const PLAYER_BATTLES_TTL_SECONDS = 60;
-const LOOT_LOOKUP_CONCURRENCY = 8;
 
 export function playerBattlesCacheKey(userId: string): string {
   return `player-battles:v1:${userId}`;
-}
-
-async function mapInChunks<T, R>(
-  items: readonly T[],
-  size: number,
-  fn: (item: T) => Promise<R>,
-): Promise<R[]> {
-  const out: R[] = [];
-  for (let i = 0; i < items.length; i += size) {
-    out.push(...(await Promise.all(items.slice(i, i + size).map(fn))));
-  }
-  return out;
 }
 
 function toSideRanking(result: { rows: ParsedRankingRow[]; complete: boolean }): SideRanking {
@@ -110,11 +97,15 @@ async function buildLive(options: {
     );
   }
 
-  const lootChecks = await mapInChunks(active, LOOT_LOOKUP_CONCURRENCY, async (battle) => ({
-    battle,
-    loot: await fetchBattleLootSummary(warera, battle.id, userId),
-  }));
-  const fought = lootChecks.filter((c) => c.loot != null);
+  const lootByBattle = await fetchBattleLootSummaries(
+    warera,
+    active.map((b) => b.id),
+    userId,
+  );
+  const fought = active.flatMap((battle) => {
+    const loot = lootByBattle.get(battle.id) ?? null;
+    return loot ? [{ battle, loot }] : [];
+  });
 
   const names = await loadNames(
     db,

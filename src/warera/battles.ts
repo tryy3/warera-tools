@@ -352,3 +352,49 @@ export async function fetchBattleLootSummary(
     throw err;
   }
 }
+
+function isNotFoundSlotError(error: unknown): boolean {
+  if (isWareraNotFoundError(error)) return true;
+  const data = asRecord(asRecord(error)?.data);
+  return data?.code === "NOT_FOUND" || data?.httpStatus === 404;
+}
+
+/**
+ * Loot summaries for one user across many battles; a battle the user has not fought in maps to null.
+ * Uses one HTTP batch when the client has `requestBatch`, because the per-call path is paced by the
+ * rate limiter and takes tens of seconds for ~30 battles.
+ */
+export async function fetchBattleLootSummaries(
+  warera: WareraRequester,
+  battleIds: readonly string[],
+  userId: string,
+): Promise<Map<string, ParsedBattleLootSummary | null>> {
+  const out = new Map<string, ParsedBattleLootSummary | null>();
+  if (battleIds.length === 0) return out;
+
+  if (!warera.requestBatch) {
+    const all = await Promise.all(
+      battleIds.map((id) => fetchBattleLootSummary(warera, id, userId)),
+    );
+    battleIds.forEach((id, i) => out.set(id, all[i] ?? null));
+    return out;
+  }
+
+  const slots = await warera.requestBatch(
+    battleIds.map((battleId) => ({
+      procedure: "battleLootSummary.getByBattleAndUser",
+      input: { battleId, userId },
+    })),
+  );
+  battleIds.forEach((id, i) => {
+    const slot = slots[i];
+    if (slot?.ok) {
+      out.set(id, parseBattleLootSummary(slot.data));
+    } else if (slot && isNotFoundSlotError(slot.error)) {
+      out.set(id, null);
+    } else {
+      throw new Error(`battleLootSummary batch slot failed for battle ${id}`);
+    }
+  });
+  return out;
+}

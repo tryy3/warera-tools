@@ -120,7 +120,7 @@ describe("GET /api/player-battles", () => {
     const battleScope = b.ladders.find((l) => l.scope === "battle")!;
     // live summary damage 1200 against the holder's 3000
     expect(battleScope.targets[0]).toMatchObject({ damageNeeded: 1801 });
-    expect(body.held).toEqual([{ tier: "green", kind: "weapon", count: 2 }]);
+    expect(body.held).toEqual([{ tier: "green", kind: "weapon", code: "gun", count: 2 }]);
   });
 
   it("serves the second call from cache until refresh=1", async () => {

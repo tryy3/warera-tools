@@ -40,7 +40,8 @@ export type LootLadder = {
   otherTypes: UpgradeTarget[];
 };
 
-export type LootTallyKey = { tier: GearTierId; kind: EquipmentSlot };
+/** `code` is the first item seen for the tier and type; it only picks the icon. */
+export type LootTallyKey = { tier: GearTierId; kind: EquipmentSlot; code: string };
 export type LootTallyEntry = LootTallyKey & { count: number };
 
 const TIER_ORDER = [...EQUIPMENT_TIER_DISPLAY_ORDER].reverse();
@@ -93,13 +94,12 @@ export function buildLootLadder(
 
 export function tallyLoot(items: readonly LootTallyKey[]): LootTallyEntry[] {
   const counts = new Map<string, LootTallyEntry>();
-  for (const { tier, kind } of items) {
+  for (const { tier, kind, code } of items) {
     const key = `${tier}:${kind}`;
     const entry = counts.get(key);
     if (entry) entry.count += 1;
-    else counts.set(key, { tier, kind, count: 1 });
+    else counts.set(key, { tier, kind, code, count: 1 });
   }
-  // Best tier first, then by count.
   return [...counts.values()].sort(
     (a, b) => tierRank(b.tier) - tierRank(a.tier) || b.count - a.count,
   );

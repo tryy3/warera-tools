@@ -109,13 +109,13 @@ describe("buildLootLadder", () => {
 describe("tallyLoot", () => {
   it("counts held items by tier and kind", () => {
     const tally = tallyLoot([
-      { tier: "blue", kind: "chest" },
-      { tier: "blue", kind: "chest" },
-      { tier: "green", kind: "weapon" },
+      { tier: "blue", kind: "chest", code: "chest3" },
+      { tier: "blue", kind: "chest", code: "chest3" },
+      { tier: "green", kind: "weapon", code: "gun" },
     ]);
     expect(tally).toEqual([
-      { tier: "blue", kind: "chest", count: 2 },
-      { tier: "green", kind: "weapon", count: 1 },
+      { tier: "blue", kind: "chest", code: "chest3", count: 2 },
+      { tier: "green", kind: "weapon", code: "gun", count: 1 },
     ]);
   });
 });
