@@ -26,6 +26,7 @@ const tabs = [
   { to: "/equipment", label: "Equipment" },
   { to: "/countries", label: "Countries" },
   { to: "/follow", label: "Follow" },
+  { to: "/player", label: "Player" },
   { to: "/mu", label: "MU" },
 ] as const;
 
