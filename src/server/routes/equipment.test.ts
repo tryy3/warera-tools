@@ -260,6 +260,11 @@ describe("GET /:itemCode", () => {
       taxRate: number | null;
       countryId: string | null;
       marketMedian: string | null;
+      marketLow: string | null;
+      marketHigh: string | null;
+      marketTypical: string | null;
+      listingWindow: "24h" | "recent" | null;
+      recentSales: Array<{ money: string; createdAt: string }>;
       sellerNet: string | null;
       scrapFloor: string | null;
       recommend: { scrapFloor: string; breakEvenIncl: string; attractiveIncl: string } | null;
@@ -276,14 +281,20 @@ describe("GET /:itemCode", () => {
     expect(body.activeBands).toEqual([{ key: "armor", target: 22, band: 0 }]);
     expect(body.lowestObserved).toEqual({ armor: 22 });
     expect(body.marketMedian).toBe("45");
+    expect(body.marketLow).toBe("40");
+    expect(body.marketHigh).toBe("50");
+    // 40 is far enough below 50 that the listing price keeps the higher sale.
+    expect(body.marketTypical).toBe("50");
+    expect(body.listingWindow).toBe("24h");
+    expect(body.recentSales.map((row) => row.money)).toEqual(["50", "40"]);
     expect(body.trades).toBe(2);
-    expect(Number(body.sellerNet)).toBeCloseTo(45 / 1.01, 5);
+    expect(Number(body.sellerNet)).toBeCloseTo(50 / 1.01, 5);
     expect(body.scrapFloor).toBe("32.4");
     expect(body.recommend?.scrapFloor).toBe("32.4");
     expect(Number(body.recommend?.breakEvenIncl)).toBeCloseTo(32.4 * 1.01, 5);
   });
 
-  it("defaults skills to lowestObserved band 1 when skills omitted", async () => {
+  it("defaults skills to lowestObserved band 0 when skills omitted", async () => {
     await seedScrap(db, 0.2);
     await seedCountry(db, { id: "sweden", name: "Sweden", taxRate: 0.01 });
     const now = Date.now();
@@ -300,6 +311,12 @@ describe("GET /:itemCode", () => {
         skills: { armor: 30 },
         createdAt: new Date(now - 30_000),
       }),
+      makeTx({
+        id: "neighbor",
+        money: 70,
+        skills: { armor: 23 },
+        createdAt: new Date(now - 20_000),
+      }),
     ]);
 
     const res = await appFor(db).request("http://localhost/chest4?countryId=sweden");
@@ -309,7 +326,7 @@ describe("GET /:itemCode", () => {
       marketMedian: string | null;
       trades: number;
     };
-    expect(body.activeBands).toEqual([{ key: "armor", target: 22, band: 1 }]);
+    expect(body.activeBands).toEqual([{ key: "armor", target: 22, band: 0 }]);
     expect(body.marketMedian).toBe("40");
     expect(body.trades).toBe(1);
   });
