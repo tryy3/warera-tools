@@ -2,7 +2,7 @@
 
 FROM node:24-bookworm AS build
 WORKDIR /app
-RUN corepack enable && corepack prepare pnpm@11.17.0 --activate
+RUN corepack enable && corepack prepare pnpm@12.10.0 --activate
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY . .
 RUN pnpm install --frozen-lockfile
@@ -13,7 +13,7 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV HOST=0.0.0.0
 ENV PORT=8787
-RUN corepack enable && corepack prepare pnpm@11.17.0 --activate \
+RUN corepack enable && corepack prepare pnpm@12.10.0 --activate \
   && groupadd --system --gid 1001 warera \
   && useradd --system --uid 1001 --gid warera --create-home warera
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
