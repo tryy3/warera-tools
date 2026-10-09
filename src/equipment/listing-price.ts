@@ -19,27 +19,16 @@ function sortedMoney(values: Array<Decimal | number>): Decimal[] {
 export function listingPrice(values: Array<Decimal | number>): Decimal | null {
   if (values.length === 0) return null;
   const sorted = sortedMoney(values);
+  const last = sorted.length - 1;
+  if (last === 0) return sorted[0]!;
+
   const ratio = new Decimal(ISOLATED_PRICE_RATIO);
-  let lo = 0;
-  let hi = sorted.length - 1;
+  const cheap = sorted[0]!.lt(sorted[1]!.times(ratio));
+  if (last === 1) return cheap ? sorted[1]! : median(sorted);
 
-  while (hi - lo >= 1) {
-    const low = sorted[lo]!;
-    const next = sorted[lo + 1]!;
-    const high = sorted[hi]!;
-    const prev = sorted[hi - 1]!;
-    const cheap = low.lt(next.times(ratio));
-    const rich = high.gt(prev.div(ratio));
-    if (hi - lo === 1) {
-      if (cheap) lo += 1;
-      break;
-    }
-    if (!cheap && !rich) break;
-    if (cheap) lo += 1;
-    if (rich) hi -= 1;
-  }
-
-  return median(sorted.slice(lo, hi + 1));
+  // One pass per end: peeling repeatedly would eat a smooth spread of prices from the bottom.
+  const rich = sorted[last]!.gt(sorted[last - 1]!.div(ratio));
+  return median(sorted.slice(cheap ? 1 : 0, rich ? last : last + 1));
 }
 
 export function priceBounds(values: Array<Decimal | number>): {

@@ -23,6 +23,11 @@ describe("listingPrice", () => {
     expect(listingPrice([12.3, 12.4, 12.5, 15, 15])!.toNumber()).toBe(12.5);
   });
 
+  it("does not peel a smooth spread of prices down to its top", () => {
+    // Only the bottom 5 is isolated; repeated peeling would walk up to 9.5.
+    expect(listingPrice([5, 6, 7, 8, 9, 10])!.toNumber()).toBe(8);
+  });
+
   it("returns null for no sales", () => {
     expect(listingPrice([])).toBeNull();
   });
